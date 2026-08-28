@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Chapter 07: Support Vector Machines (SVM) – Machine Learning in R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../Notebook/chapter-08-ensemble-methods.html" rel="next">
+<link href="../Notebook/chapter-06-decision-trees.html" rel="prev">
+<link href="../Images/favicon.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-b13248f691110a3a988f32c964d6cd84.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-298d7a5bc0bdaa8e2d8fcf4df7d2d684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<style>
+  #quarto-document-content > header#title-block-header { display: none !important; }
+</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Machine Learning in R</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> <i class="bi bi-house" role="img" aria-label="Home">
+</i> 
+<span class="menu-text">Machine Learning in R</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/zia207/ML-R"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/zia-ahmed207"> <i class="bi bi-linkedin" role="img" aria-label="LinkedIn">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="mailto:zia207@gmail.com"> <i class="bi bi-mailbox" role="img" aria-label="Email">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-06-decision-trees.html"><strong>🟡 Intermediate</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-07-svm.html">Ch 07 · Support Vector Machines</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-center sidebar-header">
+      <a href="../index.html" class="sidebar-logo-link">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo light-content py-0 d-lg-inline d-none">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo dark-content py-0 d-lg-inline d-none">
+      </a>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>Machine Learning in R</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟢 Beginner</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-00-prerequisites.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 00 · Prerequisites &amp; Setup</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-01-intro-to-ml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 01 · Introduction to ML</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-02-linear-regression.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 02 · Linear Regression</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-03-glm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 03 · Generalized Linear Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-04-knn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 04 · K-Nearest Neighbors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-05-naive-bayes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 05 · Naive Bayes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>🟡 Intermediate</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-06-decision-trees.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 06 · Decision Trees</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-07-svm.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Ch 07 · Support Vector Machines</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-08-ensemble-methods.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 08 · Ensemble Methods</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-09-kmeans.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 09 · K-Means Clustering</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-10-pca.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 10 · PCA</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🔴 Advanced</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-11-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 11 · Neural Networks (MLP)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-12-cnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 12 · Convolutional Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-13-cnn-advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 13 · CNNs — Advanced</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-14-rnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 14 · Recurrent Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-15-lstm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 15 · LSTM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-16-gnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 16 · Graph Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-17-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 17 · NLP</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-18-generative-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 18 · Generative Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-19-reinforcement-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 19 · Reinforcement Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>📊 Best Practices</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-20-model-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 20 · Model Evaluation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#chapter-07-support-vector-machines-svm" id="toc-chapter-07-support-vector-machines-svm" class="nav-link active" data-scroll-target="#chapter-07-support-vector-machines-svm">Chapter 07: Support Vector Machines (SVM)</a>
+  <ul class="collapse">
+  <li><a href="#overview" id="toc-overview" class="nav-link" data-scroll-target="#overview">7.1 Overview</a></li>
+  <li><a href="#mathematical-formulation" id="toc-mathematical-formulation" class="nav-link" data-scroll-target="#mathematical-formulation">7.2 Mathematical Formulation</a>
+  <ul class="collapse">
+  <li><a href="#linear-svm-hard-margin" id="toc-linear-svm-hard-margin" class="nav-link" data-scroll-target="#linear-svm-hard-margin">Linear SVM (Hard Margin)</a></li>
+  <li><a href="#soft-margin-svm-for-beginners" id="toc-soft-margin-svm-for-beginners" class="nav-link" data-scroll-target="#soft-margin-svm-for-beginners">Soft Margin SVM (for beginners)</a></li>
+  <li><a href="#hinge-loss" id="toc-hinge-loss" class="nav-link" data-scroll-target="#hinge-loss">Hinge Loss</a></li>
+  </ul></li>
+  <li><a href="#the-kernel-trick-for-dummies" id="toc-the-kernel-trick-for-dummies" class="nav-link" data-scroll-target="#the-kernel-trick-for-dummies">7.3 The Kernel Trick (For Dummies)</a>
+  <ul class="collapse">
+  <li><a href="#types-of-kernels-in-svm" id="toc-types-of-kernels-in-svm" class="nav-link" data-scroll-target="#types-of-kernels-in-svm">Types of Kernels in SVM</a></li>
+  </ul></li>
+  <li><a href="#from-scratch-r-implementation-linear-svm-via-sgd" id="toc-from-scratch-r-implementation-linear-svm-via-sgd" class="nav-link" data-scroll-target="#from-scratch-r-implementation-linear-svm-via-sgd">7.4 From-Scratch R Implementation (Linear SVM via SGD)</a></li>
+  <li><a href="#summary-table" id="toc-summary-table" class="nav-link" data-scroll-target="#summary-table">7.5 Summary Table</a></li>
+  <li><a href="#exercises" id="toc-exercises" class="nav-link" data-scroll-target="#exercises">📝 Exercises</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-07-svm.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-06-decision-trees.html"><strong>🟡 Intermediate</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-07-svm.html">Ch 07 · Support Vector Machines</a></li></ol></nav><h1 class="title display-7">Chapter 07: Support Vector Machines (SVM)</h1></header>
+
+<header id="title-block-header">
+
+<p class="subtitle lead">Margins, soft margins, hinge loss, kernels, and a from-scratch SGD implementation</p>
+
+</header>
+
+
+<div class="page-banner">
+<p><img src="../Images/banner_ml_r.png" class="img-fluid" alt="Machine Learning in R — From Scratch without Tears"></p>
+</div>
+<section id="chapter-07-support-vector-machines-svm" class="level1">
+<h1>Chapter 07: Support Vector Machines (SVM)</h1>
+<blockquote class="blockquote">
+<p><strong>Level</strong>: Intermediate | <strong>Estimated Time</strong>: 4–5 hours</p>
+</blockquote>
+<hr>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">7.1 Overview</h2>
+<p>Imagine you want to separate two groups with a straight line (or a flat surface in more dimensions). SVM tries to draw this line so that it is as far away as possible from any point in both groups.</p>
+<p>Instead of just finding any line that splits the groups, SVM looks for the line that gives the biggest “buffer zone” (margin) between them. This helps the model make better predictions on new, unseen data.</p>
+<p>“Support vectors” are the specific data points that are closest to this separating line. They are important because they determine exactly where this line is placed.</p>
+<hr>
+</section>
+<section id="mathematical-formulation" class="level2">
+<h2 class="anchored" data-anchor-id="mathematical-formulation">7.2 Mathematical Formulation</h2>
+<section id="linear-svm-hard-margin" class="level3">
+<h3 class="anchored" data-anchor-id="linear-svm-hard-margin">Linear SVM (Hard Margin)</h3>
+<p>We want to split two groups using a straight line (or flat surface in higher dimensions).</p>
+<p>SVM wants to find the line that has the <em>biggest gap</em> (margin) between the two groups — not just any line that separates them.</p>
+<p>Imagine you lined up two groups of people and put the widest possible rope between them. The people closest to the rope decide where it goes — these are the “support vectors.”</p>
+<p>Mathematically, SVM tries to: - Place a line (hyperplane) as far away from both groups as possible - Make sure all points are on the correct side, and not too close to the line</p>
+<p>The rule for classifying each dot is: - If it’s on the right side of the line for its own group and at least 1 “unit” away, we’re happy.</p>
+<p>The wider the margin (gap), the better. To get the widest gap, the mathy way is: - Make the numbers (<span class="math inline">\(\mathbf{w}\)</span>) that define the line as small as possible, but still keep all points on the correct side.</p>
+<p>Formal-ish: <span class="math display">\[y_i(\mathbf{w}^\top \mathbf{x}_i + b) \geq 1\]</span> for all points <span class="math inline">\(i\)</span>. (This just means: each point is on the correct side and not too close to the line.)</p>
+<p>The training goal is: <span class="math display">\[ \text{Make } \frac{1}{2}\|\mathbf{w}\|^2 \text{ as small as possible, so the gap is as big as possible!} \]</span></p>
+<p>All while making sure every point is separated by at least a margin of 1 from the line.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># We use e1071::svm() here (an R interface to libsvm, the same engine behind</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># sklearn.svm.SVC) purely to draw an illustrative margin/boundary plot — the</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># from-scratch SVM implementation comes later in Section 7.4.</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">7</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>X1 <span class="ot">&lt;-</span> <span class="fu">sweep</span>(<span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">9</span> <span class="sc">*</span> <span class="dv">2</span>), <span class="at">ncol =</span> <span class="dv">2</span>), <span class="dv">2</span>, <span class="fu">c</span>(<span class="sc">-</span><span class="dv">2</span>, <span class="sc">-</span><span class="dv">2</span>), <span class="st">"+"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>X2 <span class="ot">&lt;-</span> <span class="fu">sweep</span>(<span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">9</span> <span class="sc">*</span> <span class="dv">2</span>), <span class="at">ncol =</span> <span class="dv">2</span>), <span class="dv">2</span>, <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>), <span class="st">"+"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">rbind</span>(X1, X2)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="fu">factor</span>(<span class="fu">c</span>(<span class="fu">rep</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">9</span>), <span class="fu">rep</span>(<span class="dv">1</span>, <span class="dv">9</span>)), <span class="at">levels =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit linear SVM (for demo purpose only)</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>clf <span class="ot">&lt;-</span> e1071<span class="sc">::</span><span class="fu">svm</span>(X, y, <span class="at">kernel =</span> <span class="st">"linear"</span>, <span class="at">cost =</span> <span class="dv">1000</span>, <span class="at">scale =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the data</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(X1[, <span class="dv">1</span>], X1[, <span class="dv">2</span>], <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">pch =</span> <span class="dv">16</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlim =</span> <span class="fu">range</span>(X[, <span class="dv">1</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>), <span class="at">ylim =</span> <span class="fu">range</span>(X[, <span class="dv">2</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="fu">expression</span>(x[<span class="dv">1</span>]), <span class="at">ylab =</span> <span class="fu">expression</span>(x[<span class="dv">2</span>]),</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"Linear SVM: Decision Boundary and Margins"</span>)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(X2[, <span class="dv">1</span>], X2[, <span class="dv">2</span>], <span class="at">col =</span> <span class="st">"blue"</span>, <span class="at">pch =</span> <span class="dv">16</span>)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot separator: build a grid and evaluate the decision function on it</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>xlim <span class="ot">&lt;-</span> <span class="fu">range</span>(X[, <span class="dv">1</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>); ylim <span class="ot">&lt;-</span> <span class="fu">range</span>(X[, <span class="dv">2</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>xx <span class="ot">&lt;-</span> <span class="fu">seq</span>(xlim[<span class="dv">1</span>], xlim[<span class="dv">2</span>], <span class="at">length.out =</span> <span class="dv">60</span>)</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>yy <span class="ot">&lt;-</span> <span class="fu">seq</span>(ylim[<span class="dv">1</span>], ylim[<span class="dv">2</span>], <span class="at">length.out =</span> <span class="dv">60</span>)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>grid <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(<span class="fu">expand.grid</span>(xx, yy))</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(grid) <span class="ot">&lt;-</span> <span class="fu">colnames</span>(X)</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>Z <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">attr</span>(<span class="fu">predict</span>(clf, grid, <span class="at">decision.values =</span> <span class="cn">TRUE</span>), <span class="st">"decision.values"</span>), <span class="at">nrow =</span> <span class="fu">length</span>(xx))</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Decision boundary and margins</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="fu">contour</span>(xx, yy, Z, <span class="at">levels =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>), <span class="at">lty =</span> <span class="dv">2</span>, <span class="at">add =</span> <span class="cn">TRUE</span>, <span class="at">drawlabels =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="fu">contour</span>(xx, yy, Z, <span class="at">levels =</span> <span class="dv">0</span>, <span class="at">lty =</span> <span class="dv">1</span>, <span class="at">lwd =</span> <span class="dv">2</span>, <span class="at">add =</span> <span class="cn">TRUE</span>, <span class="at">drawlabels =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="co"># Highlight Support Vectors</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>sv <span class="ot">&lt;-</span> clf<span class="sc">$</span>SV</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(sv[, <span class="dv">1</span>], sv[, <span class="dv">2</span>], <span class="at">pch =</span> <span class="dv">1</span>, <span class="at">cex =</span> <span class="fl">2.2</span>, <span class="at">lwd =</span> <span class="fl">1.5</span>)</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topleft"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Class -1"</span>, <span class="st">"Class +1"</span>, <span class="st">"Support Vectors"</span>, <span class="st">"Boundary (solid)"</span>, <span class="st">"Margin (dashed)"</span>),</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"red"</span>, <span class="st">"blue"</span>, <span class="st">"black"</span>, <span class="st">"black"</span>, <span class="st">"black"</span>), <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">16</span>, <span class="dv">16</span>, <span class="dv">1</span>, <span class="cn">NA</span>, <span class="cn">NA</span>),</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>       <span class="at">lty =</span> <span class="fu">c</span>(<span class="cn">NA</span>, <span class="cn">NA</span>, <span class="cn">NA</span>, <span class="dv">1</span>, <span class="dv">2</span>), <span class="at">bty =</span> <span class="st">"n"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="soft-margin-svm-for-beginners" class="level3">
+<h3 class="anchored" data-anchor-id="soft-margin-svm-for-beginners">Soft Margin SVM (for beginners)</h3>
+<p>Sometimes, in real life, there’s no way to perfectly separate two types of things (classes) with a straight line. A Soft Margin SVM lets us make some mistakes (“misclassifications”) to get a better overall result.</p>
+<p>To do this, we introduce something called <strong>slack variables</strong> <span class="math inline">\(\xi_i\)</span>, which are just numbers that measure how much each point is breaking the rule. Bigger <span class="math inline">\(\xi_i\)</span> means the point is either inside the margin or on the wrong side of the boundary.</p>
+<p>The SVM now tries to: - Make the margin as wide as possible (keep <span class="math inline">\(\|\mathbf{w}\|^2\)</span> small) - But it also allows mistakes, and adds up how “bad” they are (the sum of the <span class="math inline">\(\xi_i\)</span>) - The trade-off is controlled by a parameter called <strong>C</strong></p>
+<p>In simple terms, the SVM solves this: <span class="math display">\[
+\text{Minimize: } \frac{1}{2}\|\mathbf{w}\|^2 + C \sum_i \xi_i \\
+\text{Subject to: } y_i(\mathbf{w}^\top \mathbf{x}_i + b) \geq 1 - \xi_i\ \text{and}\ \xi_i \geq 0
+\]</span></p>
+<p>What does <strong>C</strong> do? - Small C (low value): The SVM will allow more mistakes (wider margin, but sloppier), which can help prevent overfitting (“high bias”). - Large C (high value): The SVM will be strict with mistakes (narrower margin, fits the data better), but might overfit (“high variance”).</p>
+<p>In summary: - Soft Margin SVM lets some points be on the wrong side, but tries to keep the margin wide. - <strong>C</strong> lets you decide what’s more important: fewer mistakes or a bigger safety margin.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate some data that is not perfectly separable</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">sweep</span>(<span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">15</span> <span class="sc">*</span> <span class="dv">2</span>), <span class="at">ncol =</span> <span class="dv">2</span>), <span class="dv">2</span>, <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>), <span class="st">"-"</span>),</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>           <span class="fu">sweep</span>(<span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">15</span> <span class="sc">*</span> <span class="dv">2</span>), <span class="at">ncol =</span> <span class="dv">2</span>), <span class="dv">2</span>, <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>), <span class="st">"+"</span>))</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>Y <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="dv">1</span>, <span class="dv">15</span>), <span class="fu">rep</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">15</span>))</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Add some noise - flip the label of 3 points to force misclassification</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>Y[<span class="dv">1</span>]  <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span>   <span class="co"># (Python index 0)</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>Y[<span class="dv">17</span>] <span class="ot">&lt;-</span> <span class="dv">1</span>    <span class="co"># (Python index 16)</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>Y[<span class="dv">26</span>] <span class="ot">&lt;-</span> <span class="dv">1</span>    <span class="co"># (Python index 25)</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>Y <span class="ot">&lt;-</span> <span class="fu">factor</span>(Y, <span class="at">levels =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit SVM model with soft margin (small C allows some errors)</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>clf <span class="ot">&lt;-</span> e1071<span class="sc">::</span><span class="fu">svm</span>(X, Y, <span class="at">kernel =</span> <span class="st">"linear"</span>, <span class="at">cost =</span> <span class="fl">0.7</span>, <span class="at">scale =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot data points, coloring by label</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(X[Y <span class="sc">==</span> <span class="dv">1</span>, <span class="dv">1</span>], X[Y <span class="sc">==</span> <span class="dv">1</span>, <span class="dv">2</span>], <span class="at">col =</span> <span class="st">"blue"</span>, <span class="at">pch =</span> <span class="dv">16</span>,</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlim =</span> <span class="fu">range</span>(X[, <span class="dv">1</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.5</span>, <span class="fl">0.5</span>), <span class="at">ylim =</span> <span class="fu">range</span>(X[, <span class="dv">2</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.5</span>, <span class="fl">0.5</span>),</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="fu">expression</span>(x[<span class="dv">1</span>]), <span class="at">ylab =</span> <span class="fu">expression</span>(x[<span class="dv">2</span>]),</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"Soft Margin SVM: Imperfectly Separable Data"</span>)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(X[Y <span class="sc">==</span> <span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>], X[Y <span class="sc">==</span> <span class="sc">-</span><span class="dv">1</span>, <span class="dv">2</span>], <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">pch =</span> <span class="dv">16</span>)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Show support vectors</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>sv <span class="ot">&lt;-</span> clf<span class="sc">$</span>SV</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(sv[, <span class="dv">1</span>], sv[, <span class="dv">2</span>], <span class="at">pch =</span> <span class="dv">1</span>, <span class="at">cex =</span> <span class="fl">2.2</span>, <span class="at">lwd =</span> <span class="dv">2</span>)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># Create grid to plot decision boundary and margins</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>xlim <span class="ot">&lt;-</span> <span class="fu">range</span>(X[, <span class="dv">1</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.5</span>, <span class="fl">0.5</span>); ylim <span class="ot">&lt;-</span> <span class="fu">range</span>(X[, <span class="dv">2</span>]) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.5</span>, <span class="fl">0.5</span>)</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>xx <span class="ot">&lt;-</span> <span class="fu">seq</span>(xlim[<span class="dv">1</span>], xlim[<span class="dv">2</span>], <span class="at">length.out =</span> <span class="dv">150</span>)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>yy <span class="ot">&lt;-</span> <span class="fu">seq</span>(ylim[<span class="dv">1</span>], ylim[<span class="dv">2</span>], <span class="at">length.out =</span> <span class="dv">150</span>)</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>grid <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(<span class="fu">expand.grid</span>(xx, yy))</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(grid) <span class="ot">&lt;-</span> <span class="fu">colnames</span>(X)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>Z <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">attr</span>(<span class="fu">predict</span>(clf, grid, <span class="at">decision.values =</span> <span class="cn">TRUE</span>), <span class="st">"decision.values"</span>), <span class="at">nrow =</span> <span class="fu">length</span>(xx))</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot decision boundary and soft margins</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="fu">contour</span>(xx, yy, Z, <span class="at">levels =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>), <span class="at">lty =</span> <span class="dv">2</span>, <span class="at">add =</span> <span class="cn">TRUE</span>, <span class="at">drawlabels =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="fu">contour</span>(xx, yy, Z, <span class="at">levels =</span> <span class="dv">0</span>, <span class="at">lty =</span> <span class="dv">1</span>, <span class="at">lwd =</span> <span class="dv">2</span>, <span class="at">add =</span> <span class="cn">TRUE</span>, <span class="at">drawlabels =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topright"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Class +1"</span>, <span class="st">"Class -1"</span>, <span class="st">"Support Vectors"</span>),</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>, <span class="st">"black"</span>), <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">16</span>, <span class="dv">16</span>, <span class="dv">1</span>), <span class="at">bty =</span> <span class="st">"n"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="hinge-loss" class="level3">
+<h3 class="anchored" data-anchor-id="hinge-loss">Hinge Loss</h3>
+<p>The <strong>hinge loss</strong> is a way for SVMs to figure out how “bad” a guess was. Imagine you want your SVM to not just get the answer right, but to be <em>really</em> sure—so sure that every point is not just on the right side, but far from the border.</p>
+<p>For each point, hinge loss does this: - If the point is on the correct side <em>and</em> a safe distance away: loss = 0 (no penalty). - If the point is either wrong or too close to the border: the farther it is from a comfortable margin, the bigger the penalty.</p>
+<p>The formula looks like this (don’t worry if it seems scary):</p>
+<p><span class="math display">\[
+L_{\text{hinge}}(y, \hat{y}) = \max(0, 1 - y \cdot \hat{y})
+\]</span></p>
+<ul>
+<li><span class="math inline">\(y\)</span> is the real answer (+1 or -1).</li>
+<li><span class="math inline">\(\hat{y}\)</span> is your SVM’s guess for the point (it’s a score, not just a class).</li>
+<li>If <span class="math inline">\(y \cdot \hat{y}\)</span> is 1 or more, life is good (loss is 0).</li>
+<li>If not, the “badness” grows the further you get from perfect.</li>
+</ul>
+<p>Why do we care? Because SVM doesn’t just want correct answers, it wants answers that are <em>confident</em>.</p>
+<p>In practice, SVMs balance two things: 1. Hinge loss (make as few and as small mistakes as possible), 2. Keeping the weights small (so the separation isn’t wild—called <strong>regularization</strong>).</p>
+<p>That total objective looks like:</p>
+<p><span class="math display">\[
+J(\mathbf{w}) = \frac{1}{n} \sum_i \max(0, 1 - y_i(\mathbf{w}^\top \mathbf{x}_i + b)) + \lambda\|\mathbf{w}\|^2
+\]</span></p>
+<p>This just means: “Let’s minimize mistakes (hinge loss) + don’t get too crazy with the separator (regularization).” That’s what makes SVMs powerful and reliable.</p>
+<hr>
+</section>
+</section>
+<section id="the-kernel-trick-for-dummies" class="level2">
+<h2 class="anchored" data-anchor-id="the-kernel-trick-for-dummies">7.3 The Kernel Trick (For Dummies)</h2>
+<p>Imagine your data is mixed up in a way that drawing any straight line (or plane) can’t separate the categories—no matter how hard you try! SVMs have a superpower called the <strong>kernel trick</strong> for this.</p>
+<p>Here’s the idea: - What if instead of working in the world you see (like drawing a line on paper), you could “lift” the points up into a magical, invisible world with more dimensions? - In this new space, the points might spread out so nicely that a straight line <em>can</em> separate them. (It’s like taking a tangled-up string and spreading it out so it’s straight.)</p>
+<p>But wait: doing all that math sounds super hard, right? Here’s where the magic happens. - The kernel trick lets you “pretend” you’re doing this crazy mapping—<em>without actually doing it!</em> - Instead, it gives you a formula (the <strong>kernel function</strong>) that does all the hard work in the background.</p>
+<p>In math-jargon: - Instead of transforming both points (<span class="math inline">\(\mathbf{x}_i\)</span> and <span class="math inline">\(\mathbf{x}_j\)</span>) to a high dimension and then taking their dot product, - You just use the kernel function: <span class="math inline">\(K(\mathbf{x}_i, \mathbf{x}_j)\)</span>, and it <em>acts</em> like you did all that work.</p>
+<p>So: Kernel = the shortcut that lets SVMs draw wiggly, complicated lines to separate messy data, <em>without</em> doing mind-bending math.</p>
+<section id="types-of-kernels-in-svm" class="level3">
+<h3 class="anchored" data-anchor-id="types-of-kernels-in-svm">Types of Kernels in SVM</h3>
+<p>SVMs get their “superpower” from kernels. Each kernel is like a recipe for how to compare two data points. Here are the common ones, explained simply:</p>
+<p><strong>1. Linear Kernel:</strong> - <em>What it does:</em> Compares two points just by seeing how much they point in the “same direction” — like classic SVM. - <em>Equation:</em> <span class="math inline">\(\mathbf{x}_i^\top \mathbf{x}_j\)</span> (just multiply and add up the features) - <em>For dummies:</em> “Is A like B? Add up their matching parts.” - <em>When to use:</em> When a straight line (or plane) can separate your classes.</p>
+<p><strong>2. Polynomial Kernel:</strong> - <em>What it does:</em> Lets you draw “curvy” separator lines by comparing not just the features, but their combinations as well. - <em>Equation:</em> <span class="math inline">\((\mathbf{x}_i^\top \mathbf{x}_j + c)^d\)</span> (<span class="math inline">\(c\)</span> shifts things; <span class="math inline">\(d\)</span> is how wiggly the line is) - <em>For dummies:</em> “Take the regular A·B, add a number, and make it bigger by multiplying it by itself a few times!” - <em>When to use:</em> When you think a curve (not a line) can separate the data.</p>
+<p><strong>3. RBF (Radial Basis Function) / Gaussian Kernel:</strong> - <em>What it does:</em> Looks at how close or far apart two points are. Close = very similar, far = not similar. - <em>Equation:</em> <span class="math inline">\(\exp\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2\right)\)</span> - (If <span class="math inline">\(x_i = x_j\)</span>, then output is biggest: <span class="math inline">\(e^0 = 1\)</span>; if they’re far, output shrinks.) - <em>For dummies:</em> “If points are close, they’re friends; if far, they’re strangers.” - <em>When to use:</em> The default for messy, tangled data.</p>
+<p><strong>4. Sigmoid Kernel:</strong> - <em>What it does:</em> Acts kind of like a mini neural network layer—squishes values between -1 and 1. - <em>Equation:</em> <span class="math inline">\(\tanh(\kappa \mathbf{x}_i^\top \mathbf{x}_j + c)\)</span> - <em>For dummies:</em> “Do the usual compare, scale/stretch it, add a number, squish the answer so it’s never too big or small.” - <em>When to use:</em> Rare - typically if you want to mimic neural-network-style decisions.</p>
+<p><strong>Summary:</strong> - <em>Kernel = shortcut formula for ‘are these points similar?’</em> - Each kind gives SVM a new way to separate data, from boring lines to wild scribbles, all without actually changing the data’s coordinates!</p>
+<hr>
+</section>
+</section>
+<section id="from-scratch-r-implementation-linear-svm-via-sgd" class="level2">
+<h2 class="anchored" data-anchor-id="from-scratch-r-implementation-linear-svm-via-sgd">7.4 From-Scratch R Implementation (Linear SVM via SGD)</h2>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># svm.R</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>polynomial_kernel <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y, <span class="at">c =</span> <span class="dv">1</span>, <span class="at">d =</span> <span class="dv">2</span>) {</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Polynomial kernel: (x^T y + c)^d</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  (<span class="fu">sum</span>(x <span class="sc">*</span> y) <span class="sc">+</span> c)<span class="sc">^</span>d</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>rbf_kernel <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y, <span class="at">gamma =</span> <span class="fl">1.0</span>) {</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># RBF (Gaussian) kernel: exp(-gamma * ||x-y||^2)</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  squared_dist <span class="ot">&lt;-</span> <span class="fu">sum</span>((x <span class="sc">-</span> y)<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">exp</span>(<span class="sc">-</span>gamma <span class="sc">*</span> squared_dist)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>sigmoid_kernel <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y, <span class="at">kappa =</span> <span class="fl">0.01</span>, <span class="at">c =</span> <span class="fl">0.0</span>) {</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Sigmoid kernel: tanh(kappa * x^T y + c)</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tanh</span>(kappa <span class="sc">*</span> <span class="fu">sum</span>(x <span class="sc">*</span> y) <span class="sc">+</span> c)</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co"># This is a simple implementation of a Linear Support Vector Machine (SVM) using</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Stochastic Gradient Descent (SGD) in plain base R. It's written for clarity, not</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co"># for speed or production use, and doesn't use any modeling libraries!</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co"># The goal: find a line (or hyperplane) that separates two classes with the biggest "gap" (margin).</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co"># The training tries to minimize:</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="co">#   Loss = (How wrong the predictions are) + (how big/complex the weights are)</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="co">#   Specifically: C * average hinge loss + (1/2) * sum of squared weights</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co">#   Here C controls how much you care about classification mistakes vs. keeping weights small.</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>LinearSVM <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>  <span class="st">"LinearSVM"</span>,</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">Cparam =</span> <span class="st">"numeric"</span>, <span class="at">lr =</span> <span class="st">"numeric"</span>, <span class="at">n_iter =</span> <span class="st">"numeric"</span>, <span class="at">w =</span> <span class="st">"numeric"</span>, <span class="at">b =</span> <span class="st">"numeric"</span>),</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    <span class="co"># </span><span class="al">NOTE</span><span class="co">: the constructor argument and field are named `Cparam`, not `C` — a</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    <span class="co"># RefClass field/argument literally named `C` collides with R's `methods::new()`</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    <span class="co"># (partial argument matching against its `Class` parameter), so we avoid it.</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">Cparam =</span> <span class="fl">1.0</span>, <span class="at">learning_rate =</span> <span class="fl">0.001</span>, <span class="at">n_iterations =</span> <span class="dv">1000</span>, ...) {</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Cparam: regularization parameter (tradeoff between margin and mistakes).</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>      <span class="co"># learning_rate: how big are weight updates each step.</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>      <span class="co"># n_iterations: how many full passes over data.</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>      Cparam <span class="ot">&lt;&lt;-</span> Cparam; lr <span class="ot">&lt;&lt;-</span> learning_rate; n_iter <span class="ot">&lt;&lt;-</span> n_iterations</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>      w <span class="ot">&lt;&lt;-</span> <span class="fu">numeric</span>(<span class="dv">0</span>); b <span class="ot">&lt;&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    <span class="at">hinge_loss =</span> <span class="cf">function</span>(X, y) {</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Compute average hinge loss + regularization on all data points.</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>      total <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(<span class="fu">nrow</span>(X))) {</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>        margin <span class="ot">&lt;-</span> y[i] <span class="sc">*</span> (<span class="fu">sum</span>(w <span class="sc">*</span> X[i, ]) <span class="sc">+</span> b)</span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        total <span class="ot">&lt;-</span> total <span class="sc">+</span> <span class="fu">max</span>(<span class="fl">0.0</span>, <span class="fl">1.0</span> <span class="sc">-</span> margin)</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>      Cparam <span class="sc">*</span> total <span class="sc">/</span> <span class="fu">length</span>(y) <span class="sc">+</span> <span class="fl">0.5</span> <span class="sc">*</span> <span class="fu">sum</span>(w<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>    <span class="at">fit =</span> <span class="cf">function</span>(X, y) {</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Learn weights to separate classes using SGD. y: labels (1 or -1).</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>      n <span class="ot">&lt;-</span> <span class="fu">nrow</span>(X); p <span class="ot">&lt;-</span> <span class="fu">ncol</span>(X)</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>      w <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, p)</span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>      b <span class="ot">&lt;&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (iter <span class="cf">in</span> <span class="fu">seq_len</span>(n_iter)) {</span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>        indices <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="fu">seq_len</span>(n))   <span class="co"># Shuffle the training data indices (SGD)</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> (i <span class="cf">in</span> indices) {</span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>          xi <span class="ot">&lt;-</span> X[i, ]; yi <span class="ot">&lt;-</span> y[i]</span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>          z <span class="ot">&lt;-</span> <span class="fu">sum</span>(w <span class="sc">*</span> xi) <span class="sc">+</span> b</span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>          margin <span class="ot">&lt;-</span> yi <span class="sc">*</span> z</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> (margin <span class="sc">&gt;=</span> <span class="dv">1</span>) {</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>            w <span class="ot">&lt;&lt;-</span> w <span class="sc">-</span> lr <span class="sc">*</span> w   <span class="co"># Far enough from the boundary: just shrink weights (regularization)</span></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>          } <span class="cf">else</span> {</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Either wrong side or inside margin: push in right direction and regularize</span></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>            w <span class="ot">&lt;&lt;-</span> w <span class="sc">-</span> lr <span class="sc">*</span> (w <span class="sc">-</span> Cparam <span class="sc">*</span> yi <span class="sc">*</span> xi)</span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>            b <span class="ot">&lt;&lt;-</span> b <span class="sc">+</span> lr <span class="sc">*</span> Cparam <span class="sc">*</span> yi   <span class="co"># Update bias too</span></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>          }</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>      <span class="fu">invisible</span>(.self)</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a>    <span class="at">decision_function =</span> <span class="cf">function</span>(X) {</span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>      <span class="co"># For each sample in X, compute the score (w^T x + b).</span></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>      <span class="fu">as.numeric</span>(X <span class="sc">%*%</span> w) <span class="sc">+</span> b</span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a>    <span class="at">predict =</span> <span class="cf">function</span>(X) {</span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a>      <span class="co"># &gt;=0 goes to 1, otherwise -1.</span></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a>      <span class="fu">ifelse</span>(<span class="fu">decision_function</span>(X) <span class="sc">&gt;=</span> <span class="dv">0</span>, <span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>)</span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a><span class="co"># Kernel SVM using dual hinge-loss SGD.</span></span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a><span class="co"># Decision function: f(x) = b + sum_i alpha_i * y_i * K(x_i, x)</span></span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a>KernelSVM <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a>  <span class="st">"KernelSVM"</span>,</span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">kernel =</span> <span class="st">"character"</span>, <span class="at">kernel_params =</span> <span class="st">"list"</span>, <span class="at">Cparam =</span> <span class="st">"numeric"</span>, <span class="at">lr =</span> <span class="st">"numeric"</span>,</span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a>                <span class="at">n_iter =</span> <span class="st">"numeric"</span>, <span class="at">X_train =</span> <span class="st">"ANY"</span>, <span class="at">y_train =</span> <span class="st">"ANY"</span>, <span class="at">alpha =</span> <span class="st">"numeric"</span>, <span class="at">b =</span> <span class="st">"numeric"</span>),</span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a>    <span class="co"># (see note above LinearSVM — avoid a field/argument literally named `C`)</span></span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">kernel =</span> <span class="st">"linear"</span>, <span class="at">Cparam =</span> <span class="fl">1.0</span>, <span class="at">learning_rate =</span> <span class="fl">0.01</span>,</span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a>                           <span class="at">n_iterations =</span> <span class="dv">2000</span>, <span class="at">kernel_params =</span> <span class="fu">list</span>(), ...) {</span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a>      kernel <span class="ot">&lt;&lt;-</span> kernel; kernel_params <span class="ot">&lt;&lt;-</span> kernel_params</span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a>      Cparam <span class="ot">&lt;&lt;-</span> Cparam; lr <span class="ot">&lt;&lt;-</span> learning_rate; n_iter <span class="ot">&lt;&lt;-</span> n_iterations</span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a>      X_train <span class="ot">&lt;&lt;-</span> <span class="cn">NULL</span>; y_train <span class="ot">&lt;&lt;-</span> <span class="cn">NULL</span>; alpha <span class="ot">&lt;&lt;-</span> <span class="fu">numeric</span>(<span class="dv">0</span>); b <span class="ot">&lt;&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>    <span class="at">K =</span> <span class="cf">function</span>(x, z) {</span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (kernel <span class="sc">==</span> <span class="st">"linear"</span>) {</span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>        <span class="fu">sum</span>(x <span class="sc">*</span> z)</span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>      } <span class="cf">else</span> <span class="cf">if</span> (kernel <span class="sc">==</span> <span class="st">"polynomial"</span>) {</span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a>        <span class="fu">polynomial_kernel</span>(x, z, kernel_params<span class="sc">$</span>c <span class="sc">%||%</span> <span class="dv">1</span>, kernel_params<span class="sc">$</span>d <span class="sc">%||%</span> <span class="dv">2</span>)</span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a>      } <span class="cf">else</span> <span class="cf">if</span> (kernel <span class="sc">==</span> <span class="st">"rbf"</span>) {</span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a>        <span class="fu">rbf_kernel</span>(x, z, kernel_params<span class="sc">$</span>gamma <span class="sc">%||%</span> <span class="fl">1.0</span>)</span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a>      } <span class="cf">else</span> <span class="cf">if</span> (kernel <span class="sc">==</span> <span class="st">"sigmoid"</span>) {</span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>        <span class="fu">sigmoid_kernel</span>(x, z, kernel_params<span class="sc">$</span>kappa <span class="sc">%||%</span> <span class="fl">0.01</span>, kernel_params<span class="sc">$</span>c <span class="sc">%||%</span> <span class="fl">0.0</span>)</span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>      } <span class="cf">else</span> {</span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>        <span class="fu">stop</span>(<span class="fu">sprintf</span>(<span class="st">"Unknown kernel: %s"</span>, kernel))</span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>    <span class="at">score_one =</span> <span class="cf">function</span>(x) {</span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>      b <span class="sc">+</span> <span class="fu">sum</span>(<span class="fu">vapply</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(X_train)),</span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>                      <span class="cf">function</span>(i) alpha[i] <span class="sc">*</span> y_train[i] <span class="sc">*</span> <span class="fu">K</span>(X_train[i, ], x), <span class="fu">numeric</span>(<span class="dv">1</span>)))</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a>    <span class="at">fit =</span> <span class="cf">function</span>(X, y) {</span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a>      n <span class="ot">&lt;-</span> <span class="fu">nrow</span>(X)</span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a>      X_train <span class="ot">&lt;&lt;-</span> X; y_train <span class="ot">&lt;&lt;-</span> y</span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a>      alpha <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, n)</span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a>      b <span class="ot">&lt;&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (iter <span class="cf">in</span> <span class="fu">seq_len</span>(n_iter)) {</span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a>        indices <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="fu">seq_len</span>(n))</span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> (i <span class="cf">in</span> indices) {</span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a>          margin <span class="ot">&lt;-</span> y[i] <span class="sc">*</span> <span class="fu">score_one</span>(X[i, ])</span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> (margin <span class="sc">&lt;</span> <span class="dv">1</span>) {</span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>            alpha[i] <span class="ot">&lt;&lt;-</span> alpha[i] <span class="sc">+</span> lr <span class="sc">*</span> Cparam</span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>            b <span class="ot">&lt;&lt;-</span> b <span class="sc">+</span> lr <span class="sc">*</span> Cparam <span class="sc">*</span> y[i]</span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a>          }</span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>          alpha <span class="ot">&lt;&lt;-</span> alpha <span class="sc">*</span> (<span class="dv">1</span> <span class="sc">-</span> lr <span class="sc">*</span> <span class="fl">0.001</span>)</span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>      <span class="fu">invisible</span>(.self)</span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>    <span class="at">predict =</span> <span class="cf">function</span>(X) {</span>
+<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a>      <span class="fu">vapply</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(X)), <span class="cf">function</span>(i) <span class="cf">if</span> (<span class="fu">score_one</span>(X[i, ]) <span class="sc">&gt;=</span> <span class="dv">0</span>) <span class="dv">1</span> <span class="cf">else</span> <span class="sc">-</span><span class="dv">1</span>, <span class="fu">numeric</span>(<span class="dv">1</span>))</span>
+<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a><span class="co"># small helper: `a %||% b` returns a unless it's NULL, then returns b</span></span>
+<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a><span class="st">`</span><span class="at">%||%</span><span class="st">`</span> <span class="ot">&lt;-</span> <span class="cf">function</span>(a, b) <span class="cf">if</span> (<span class="fu">is.null</span>(a)) b <span class="cf">else</span> a</span>
+<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>accuracy <span class="ot">&lt;-</span> <span class="cf">function</span>(y_true, y_pred) <span class="fu">mean</span>(y_true <span class="sc">==</span> y_pred)</span>
+<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Demo: Kernel Comparison ──────────────────────────────────────────────────</span></span>
+<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a><span class="co"># XOR-style data: not linearly separable, but separable with non-linear kernels</span></span>
+<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a>X_train <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>), <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">1.0</span>), <span class="fu">c</span>(<span class="fl">1.0</span>, <span class="fl">0.0</span>), <span class="fu">c</span>(<span class="fl">1.0</span>, <span class="fl">1.0</span>),</span>
+<span id="cb3-168"><a href="#cb3-168" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(<span class="fl">0.1</span>, <span class="fl">0.1</span>), <span class="fu">c</span>(<span class="fl">0.1</span>, <span class="fl">0.9</span>), <span class="fu">c</span>(<span class="fl">0.9</span>, <span class="fl">0.1</span>), <span class="fu">c</span>(<span class="fl">0.9</span>, <span class="fl">0.9</span>),</span>
+<span id="cb3-169"><a href="#cb3-169" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(<span class="fl">0.2</span>, <span class="fl">0.0</span>), <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.8</span>), <span class="fu">c</span>(<span class="fl">0.8</span>, <span class="fl">0.0</span>), <span class="fu">c</span>(<span class="fl">1.0</span>, <span class="fl">0.8</span>)</span>
+<span id="cb3-170"><a href="#cb3-170" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-171"><a href="#cb3-171" aria-hidden="true" tabindex="-1"></a>y_train <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb3-172"><a href="#cb3-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-173"><a href="#cb3-173" aria-hidden="true" tabindex="-1"></a>X_test <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">c</span>(<span class="fl">0.2</span>, <span class="fl">0.2</span>), <span class="fu">c</span>(<span class="fl">0.2</span>, <span class="fl">0.8</span>), <span class="fu">c</span>(<span class="fl">0.8</span>, <span class="fl">0.2</span>), <span class="fu">c</span>(<span class="fl">0.8</span>, <span class="fl">0.8</span>))</span>
+<span id="cb3-174"><a href="#cb3-174" aria-hidden="true" tabindex="-1"></a>y_test <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb3-175"><a href="#cb3-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-176"><a href="#cb3-176" aria-hidden="true" tabindex="-1"></a>kernel_configs <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb3-177"><a href="#cb3-177" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"Linear"</span>,</span>
+<span id="cb3-178"><a href="#cb3-178" aria-hidden="true" tabindex="-1"></a>       <span class="at">model =</span> LinearSVM<span class="sc">$</span><span class="fu">new</span>(<span class="at">Cparam =</span> <span class="fl">1.0</span>, <span class="at">learning_rate =</span> <span class="fl">0.01</span>, <span class="at">n_iterations =</span> <span class="dv">3000</span>)),</span>
+<span id="cb3-179"><a href="#cb3-179" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"Polynomial (d=2)"</span>,</span>
+<span id="cb3-180"><a href="#cb3-180" aria-hidden="true" tabindex="-1"></a>       <span class="at">model =</span> KernelSVM<span class="sc">$</span><span class="fu">new</span>(<span class="at">kernel =</span> <span class="st">"polynomial"</span>, <span class="at">Cparam =</span> <span class="fl">1.0</span>, <span class="at">learning_rate =</span> <span class="fl">0.05</span>,</span>
+<span id="cb3-181"><a href="#cb3-181" aria-hidden="true" tabindex="-1"></a>                              <span class="at">n_iterations =</span> <span class="dv">5000</span>, <span class="at">kernel_params =</span> <span class="fu">list</span>(<span class="at">c =</span> <span class="dv">1</span>, <span class="at">d =</span> <span class="dv">2</span>))),</span>
+<span id="cb3-182"><a href="#cb3-182" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"RBF (gamma=2.0)"</span>,</span>
+<span id="cb3-183"><a href="#cb3-183" aria-hidden="true" tabindex="-1"></a>       <span class="at">model =</span> KernelSVM<span class="sc">$</span><span class="fu">new</span>(<span class="at">kernel =</span> <span class="st">"rbf"</span>, <span class="at">Cparam =</span> <span class="fl">1.0</span>, <span class="at">learning_rate =</span> <span class="fl">0.05</span>,</span>
+<span id="cb3-184"><a href="#cb3-184" aria-hidden="true" tabindex="-1"></a>                              <span class="at">n_iterations =</span> <span class="dv">5000</span>, <span class="at">kernel_params =</span> <span class="fu">list</span>(<span class="at">gamma =</span> <span class="fl">2.0</span>))),</span>
+<span id="cb3-185"><a href="#cb3-185" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"Sigmoid (kappa=0.5)"</span>,</span>
+<span id="cb3-186"><a href="#cb3-186" aria-hidden="true" tabindex="-1"></a>       <span class="at">model =</span> KernelSVM<span class="sc">$</span><span class="fu">new</span>(<span class="at">kernel =</span> <span class="st">"sigmoid"</span>, <span class="at">Cparam =</span> <span class="fl">1.0</span>, <span class="at">learning_rate =</span> <span class="fl">0.05</span>,</span>
+<span id="cb3-187"><a href="#cb3-187" aria-hidden="true" tabindex="-1"></a>                              <span class="at">n_iterations =</span> <span class="dv">5000</span>, <span class="at">kernel_params =</span> <span class="fu">list</span>(<span class="at">kappa =</span> <span class="fl">0.5</span>, <span class="at">c =</span> <span class="fl">0.0</span>)))</span>
+<span id="cb3-188"><a href="#cb3-188" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-189"><a href="#cb3-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-190"><a href="#cb3-190" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Kernel Comparison on XOR-style data</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-191"><a href="#cb3-191" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%-22s %10s %10s  Predictions</span><span class="sc">\n</span><span class="st">"</span>, <span class="st">"Kernel"</span>, <span class="st">"Train Acc"</span>, <span class="st">"Test Acc"</span>))</span>
+<span id="cb3-192"><a href="#cb3-192" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">strrep</span>(<span class="st">"-"</span>, <span class="dv">62</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-193"><a href="#cb3-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-194"><a href="#cb3-194" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (cfg <span class="cf">in</span> kernel_configs) {</span>
+<span id="cb3-195"><a href="#cb3-195" aria-hidden="true" tabindex="-1"></a>  model <span class="ot">&lt;-</span> cfg<span class="sc">$</span>model</span>
+<span id="cb3-196"><a href="#cb3-196" aria-hidden="true" tabindex="-1"></a>  model<span class="sc">$</span><span class="fu">fit</span>(X_train, y_train)</span>
+<span id="cb3-197"><a href="#cb3-197" aria-hidden="true" tabindex="-1"></a>  train_preds <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">predict</span>(X_train)</span>
+<span id="cb3-198"><a href="#cb3-198" aria-hidden="true" tabindex="-1"></a>  test_preds  <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">predict</span>(X_test)</span>
+<span id="cb3-199"><a href="#cb3-199" aria-hidden="true" tabindex="-1"></a>  train_acc <span class="ot">&lt;-</span> <span class="fu">accuracy</span>(y_train, train_preds)</span>
+<span id="cb3-200"><a href="#cb3-200" aria-hidden="true" tabindex="-1"></a>  test_acc  <span class="ot">&lt;-</span> <span class="fu">accuracy</span>(y_test, test_preds)</span>
+<span id="cb3-201"><a href="#cb3-201" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%-22s %10.2f %10.2f  %s</span><span class="sc">\n</span><span class="st">"</span>, cfg<span class="sc">$</span>name, train_acc, test_acc,</span>
+<span id="cb3-202"><a href="#cb3-202" aria-hidden="true" tabindex="-1"></a>              <span class="fu">paste</span>(test_preds, <span class="at">collapse =</span> <span class="st">" "</span>)))</span>
+<span id="cb3-203"><a href="#cb3-203" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-204"><a href="#cb3-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-205"><a href="#cb3-205" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Linear SVM cannot separate XOR; polynomial and RBF kernels succeed.</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">7.5 Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Core idea</td>
+<td>Maximize margin between classes</td>
+</tr>
+<tr class="even">
+<td>Decision boundary</td>
+<td><span class="math inline">\(\mathbf{w}^\top \mathbf{x} + b = 0\)</span></td>
+</tr>
+<tr class="odd">
+<td>Support vectors</td>
+<td>Points with <span class="math inline">\(y_i(\mathbf{w}^\top \mathbf{x}_i + b) = 1\)</span></td>
+</tr>
+<tr class="even">
+<td>C parameter</td>
+<td>Regularization (small = wide margin)</td>
+</tr>
+<tr class="odd">
+<td>Kernel trick</td>
+<td>Non-linear boundaries without explicit mapping</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="exercises" class="level2">
+<h2 class="anchored" data-anchor-id="exercises">📝 Exercises</h2>
+<ol type="1">
+<li>Implement a <strong>kernel function</strong> <span class="math inline">\(K(\mathbf{a}, \mathbf{b})\)</span> for RBF and modify SVM to use it.</li>
+<li>Compare SVM with C=0.01 vs C=100 on noisy data.</li>
+<li>Why does SVM only depend on the <strong>support vectors</strong> at test time?</li>
+</ol>
+<hr>
+<p><strong>← Previous:</strong> <a href="../Notebook/chapter-06-decision-trees.html">Chapter 06: Decision Trees</a></p>
+<p><strong>→ Next:</strong> <a href="../Notebook/chapter-08-ensemble-methods.html">Chapter 08: Ensemble Methods</a></p>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/zia207\.github\.io\/ML-R");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../Notebook/chapter-06-decision-trees.html" class="pagination-link" aria-label="Ch 06 · Decision Trees">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">Ch 06 · Decision Trees</span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../Notebook/chapter-08-ensemble-methods.html" class="pagination-link" aria-label="Ch 08 · Ensemble Methods">
+        <span class="nav-page-text">Ch 08 · Ensemble Methods</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© CC-By Zia Ahmed, Upatta Analytics, 2026</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-07-svm.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>This page is built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

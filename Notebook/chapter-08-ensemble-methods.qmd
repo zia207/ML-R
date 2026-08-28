@@ -1,0 +1,1841 @@
+---
+title: "Chapter 08: Ensemble Methods"
+subtitle: "Bagging, Random Forest, Extra Trees, AdaBoost, Gradient Boosting, XGBoost, and LightGBM — all from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 08: Ensemble Methods
+
+> **Level**: Intermediate | **Estimated Time**: 6–8 hours | **Prerequisites**: Chapter 06 (Decision Trees)
+
+---
+
+## 8.1 Overview
+
+> *"No single expert knows everything — but a committee of experts usually beats any individual."*
+
+An **ensemble** combines multiple models (called **base learners** or **weak learners**) to produce a prediction that is more accurate and more stable than any single model alone.
+
+Three core strategies:
+
+Imagine you're asking three friends for advice on a hard question, and combining their ideas to get a better answer.
+That's how Ensemble Methods work in machine learning—they mix the "opinions" of several models to get a smarter, more reliable answer than just trusting one model.
+
+There are three main ways to do this:
+
+- **Bagging**: Make lots of models (like decision trees), each one trained on a different random part of your data. Let them all vote or average their answers. This smooths out weird mistakes, making results less jumpy (reduces variance).
+
+- **Boosting**: Start with a model. Notice what it gets wrong, then train the next model to focus on those mistakes. Keep repeating so each new model helps fix the last one's errors. This helps the group get smarter and less biased (reduces bias).
+
+- **Stacking**: First, make different models (could be trees, linear models, etc.). Then, train a new "coach" model that learns how best to mix all these answers into one top prediction. This can reduce both bias and variance.
+
+In this chapter, you'll learn how to build all the big ensemble methods from scratch, for both classification (picking categories) and regression (predicting numbers).
+
+---
+
+## 8.2 Shared Building Blocks
+
+```{r}
+# This code provides some helper functions used throughout ensemble learning methods.
+
+# === Impurity / loss functions ===
+# Impurity and loss functions measure how "mixed" (impure) or "off" (lossy) our predictions are.
+# - Impurity functions (like Gini impurity) tell us how diverse or "uncertain" a set of labels is —
+#   lower impurity means the group is more pure (mostly the same class).
+# - Loss functions (like mean squared error, MSE) measure how far off a model's predictions are
+#   from the true values — lower loss means better predictions.
+
+gini <- function(y) {
+  # Calculates how 'pure' a vector of labels y is.
+  # Gini is 0 if all items are the same; bigger if they're mixed.
+  n <- length(y)
+  if (n == 0) return(0.0)
+  counts <- table(y)
+  1.0 - sum((counts / n)^2)
+}
+
+mse <- function(y) {
+  # Mean squared error ('variance') in a vector of numbers y.
+  # Used in regression trees to decide splits. Lower is better; 0 means all numbers are the same.
+  if (length(y) == 0) return(0.0)
+  m <- sum(y) / length(y)
+  sum((y - m)^2) / length(y)
+}
+
+mean_val <- function(y) {
+  # Returns the average value in y. If empty, returns 0.
+  if (length(y) > 0) sum(y) / length(y) else 0.0
+}
+
+mode_val <- function(y) {
+  # Returns the value that appears most often in y (the 'majority class').
+  tbl <- table(y)
+  best <- names(tbl)[which.max(tbl)]
+  if (is.numeric(y)) as.numeric(best) else best
+}
+
+# === Bootstrap sampling ===
+
+bootstrap_sample <- function(X, y, seed = NULL) {
+  # Randomly samples n items from X and y (with replacement).
+  # Used in Bagging/Random Forest to make random datasets for each tree.
+  if (!is.null(seed)) set.seed(seed)
+  n <- nrow(X)
+  idx <- sample.int(n, n, replace = TRUE)
+  list(X = X[idx, , drop = FALSE], y = y[idx])
+}
+
+# === Evaluation helpers ===
+
+accuracy <- function(y_true, y_pred) mean(y_true == y_pred)   # fraction of items correct
+
+rmse <- function(y_true, y_pred) sqrt(mean((y_true - y_pred)^2))
+
+r2 <- function(y_true, y_pred) {
+  # R^2 (coefficient of determination): 1 is perfect, 0 means no better than predicting the mean.
+  m <- mean_val(y_true)
+  ss_tot <- sum((y_true - m)^2)
+  ss_res <- sum((y_true - y_pred)^2)
+  if (ss_tot > 0) 1 - ss_res / ss_tot else 0.0
+}
+```
+
+---
+
+## 8.3 Base Decision Tree (Classification + Regression)
+
+A shared tree that handles both tasks, controlled by the `task` parameter.
+
+```{r}
+# This is a super simple decision tree.
+# It can work for both:
+# - Classification (choose the most common class)
+# - Regression (predict the average value)
+# Just set the 'task' argument to either 'classification' or 'regression'.
+#
+# Tree nodes are plain R lists: list(feat=, thr=, left=, right=). A leaf is just a bare
+# value (not a list) — mirrors the Python version's `dict` internal node / bare-value leaf.
+
+DecisionTree <- setRefClass(
+  "DecisionTree",
+  fields = list(max_depth = "numeric", min_samples_split = "numeric", max_features = "ANY",
+                task = "character", seed = "ANY", tree = "ANY"),
+  methods = list(
+    initialize = function(max_depth = 5, min_samples_split = 2, max_features = NULL,
+                           task = "classification", seed = 0, ...) {
+      max_depth <<- max_depth               # How deep can the tree go?
+      min_samples_split <<- min_samples_split  # Minimum samples to split a node
+      max_features <<- max_features         # How many features to consider at a split (NULL = all)
+      task <<- task                         # 'classification' or 'regression'
+      seed <<- seed                         # Random seed for reproducibility
+      tree <<- NULL
+      callSuper(...)
+    },
+
+    impurity_fn = function(y) if (task == "classification") gini(y) else mse(y),
+    leaf_value  = function(y) if (task == "classification") mode_val(y) else mean_val(y),
+
+    best_split = function(X, y) {
+      # Try EVERY possible split for EVERY (candidate) feature. Pick the best.
+      n <- nrow(X); n_feats <- ncol(X)
+      imp_parent <- impurity_fn(y)
+
+      if (!is.null(max_features) && max_features < n_feats) {
+        feat_ids <- sample(seq_len(n_feats), max_features)   # random subset (Random Forest style)
+      } else {
+        feat_ids <- seq_len(n_feats)
+      }
+
+      best <- list(gain = -1, feat = NULL, thr = NULL)
+      for (feat in feat_ids) {
+        vals <- sort(unique(X[, feat]))
+        if (length(vals) < 2) next
+        thresholds <- (vals[-length(vals)] + vals[-1]) / 2
+        for (thr in thresholds) {
+          left_mask <- X[, feat] <= thr
+          yl <- y[left_mask]; yr <- y[!left_mask]
+          if (length(yl) == 0 || length(yr) == 0) next
+          gain <- imp_parent - (length(yl) / n) * impurity_fn(yl) - (length(yr) / n) * impurity_fn(yr)
+          if (gain > best$gain) best <- list(gain = gain, feat = feat, thr = thr)
+        }
+      }
+      best
+    },
+
+    build = function(X, y, depth) {
+      # Stop growing if: all y same, too few samples, or max depth reached.
+      if (length(unique(y)) == 1 || length(y) < min_samples_split || depth >= max_depth) {
+        return(leaf_value(y))
+      }
+      split <- best_split(X, y)
+      if (is.null(split$feat)) return(leaf_value(y))
+
+      f <- split$feat; thr <- split$thr
+      left_mask <- X[, f] <= thr
+      list(feat = f, thr = thr,
+           left  = build(X[left_mask, , drop = FALSE],  y[left_mask],  depth + 1),
+           right = build(X[!left_mask, , drop = FALSE], y[!left_mask], depth + 1))
+    },
+
+    fit = function(X, y) {
+      if (!is.null(seed)) set.seed(seed)
+      tree <<- build(X, y, 0)
+      invisible(.self)
+    },
+
+    traverse_one = function(x, node) {
+      if (!is.list(node)) return(node)   # a bare value = leaf
+      branch <- if (x[node$feat] <= node$thr) node$left else node$right
+      traverse_one(x, branch)
+    },
+
+    predict = function(X) sapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], tree)),
+    predict_one = function(x) traverse_one(x, tree)
+  )
+)
+```
+
+---
+
+## 8.4 Bagging
+
+### Theory (Bagging Explained for Dummies)
+
+**What is Bagging?**
+
+Imagine you're trying to predict something — like if someone likes ice cream — and you have a group of friends. Instead of asking just one friend, you ask lots of friends and take a vote.
+
+Bagging ("Bootstrap Aggregating") is a way for computers to do the same thing:
+
+1. Make lots of *random copies* of your training data (by picking rows at random, with repeats allowed — like picking socks from a drawer one at a time, and it's okay to pick the same one again).
+2. Train a separate model on each of these random data copies.
+3. To predict something new, ask all the models and combine their answers:
+    - For classification (choices like "yes"/"no"), use a "majority vote" (what most models say is the answer).
+    - For regression (predicting numbers), take the average of all their answers.
+
+**Why does this help?**
+Each model might be "quirky" and overfit its own random dataset (basically, each one is a little weird), but when you average their results, the mistakes tend to cancel out, making the final answer more reliable.
+
+**Bonus: Out-of-Bag (OOB) Error**
+When making these random data samples, about 1/3 of the original data doesn't get picked for each one. We can use these "left out" bits to check how well our models are doing — for free!
+
+### 8.4.1 Bagging Classifier
+
+```{r}
+# This class is a simple implementation of Bagging for classification problems.
+#
+# Imagine you want to guess if someone likes pizza, and instead of asking just one friend,
+# you ask many friends and go with the answer most people give. Bagging does that, but with
+# "models" (like decision trees) as your friends!
+#
+# How does it work?
+# - We make several copies of the data (with random reshuffling and repeated elements).
+# - For each data copy, we train a separate decision tree (a "mini-expert").
+# - When we want to predict for a new case, each tree gives its vote (its prediction).
+# - The answer is what most trees picked (majority wins!).
+
+BaggingClassifier <- setRefClass(
+  "BaggingClassifier",
+  fields = list(n_estimators = "numeric", max_depth = "numeric", min_samples_split = "numeric",
+                seed = "numeric", estimators = "list"),
+  methods = list(
+    initialize = function(n_estimators = 10, max_depth = 5, min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; max_depth <<- max_depth
+      min_samples_split <<- min_samples_split; seed <<- seed
+      estimators <<- list()
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      # For each model, create a random "bag" of the data (with replacement), train, save it.
+      estimators <<- list()
+      for (b in 0:(n_estimators - 1)) {
+        bs <- bootstrap_sample(X, y, seed = seed + b)
+        tree <- DecisionTree$new(max_depth = max_depth, min_samples_split = min_samples_split,
+                                  task = "classification", seed = seed + b)
+        tree$fit(bs$X, bs$y)
+        estimators[[b + 1]] <<- tree
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      # Ask each tree for its vote on each sample, then use "majority rules".
+      all_preds <- lapply(estimators, function(t) t$predict(X))
+      sapply(seq_len(nrow(X)), function(i) mode_val(sapply(all_preds, function(p) p[i])))
+    },
+
+    predict_proba = function(X) {
+      # For each sample, the fraction of trees that voted for each class.
+      all_preds <- lapply(estimators, function(t) t$predict(X))
+      classes <- sort(unique(unlist(all_preds)))
+      lapply(seq_len(nrow(X)), function(i) {
+        votes <- sapply(all_preds, function(p) p[i])
+        tbl <- table(factor(votes, levels = classes))
+        setNames(as.numeric(tbl) / n_estimators, classes)
+      })
+    }
+  )
+)
+```
+
+### 8.4.2 Bagging Regressor
+
+```{r}
+# Imagine you want to predict a number (like a house price), but you're not sure if one guess is
+# good enough. BaggingRegressor asks a bunch of friends (decision trees), each a bit different,
+# then averages all their answers to get a better, more stable guess.
+
+BaggingRegressor <- setRefClass(
+  "BaggingRegressor",
+  fields = list(n_estimators = "numeric", max_depth = "numeric", min_samples_split = "numeric",
+                seed = "numeric", estimators = "list"),
+  methods = list(
+    initialize = function(n_estimators = 10, max_depth = 5, min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; max_depth <<- max_depth
+      min_samples_split <<- min_samples_split; seed <<- seed
+      estimators <<- list()
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      estimators <<- list()
+      for (b in 0:(n_estimators - 1)) {
+        bs <- bootstrap_sample(X, y, seed = seed + b)
+        tree <- DecisionTree$new(max_depth = max_depth, min_samples_split = min_samples_split,
+                                  task = "regression", seed = seed + b)
+        tree$fit(bs$X, bs$y)
+        estimators[[b + 1]] <<- tree
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      all_preds <- lapply(estimators, function(t) t$predict(X))
+      sapply(seq_len(nrow(X)), function(i) mean_val(sapply(all_preds, function(p) p[i])))
+    }
+  )
+)
+```
+
+---
+
+## 8.5 Random Forest
+
+Random Forest is a powerful machine learning ensemble method that combines the predictions of many decision trees to improve accuracy and robustness.
+
+- It works by creating many decision trees using bootstrapped samples of the training data.
+- Each tree makes predictions independently, and the forest combines their outputs (using majority vote for classification or averaging for regression).
+- At each split, only a random subset of features is considered, which makes the trees more diverse and less correlated.
+
+This approach reduces overfitting compared to a single decision tree and achieves better performance in most cases.
+
+### Theory
+
+Steps to build a Random Forest (with equations and explanations):
+
+1. **Bagging (Bootstrap Aggregating):**
+   - For each of the $B$ trees you want in your forest:
+     - Draw a bootstrap sample from your data (random sample with replacement).
+     - Mathematically: For dataset $D$ of size $n$, create $D_b$ by sampling $n$ times from $D$ with replacement.
+
+2. **Feature Subspacing at Each Split:**
+   - When each tree tries to split at a node, instead of searching over all $p$ features, it can only look at a random subset of $m$ features ($m < p$).
+   - *Equation:* $m = \sqrt{p}$ (for classification), $m = p/3$ (for regression), where $p$ = number of features.
+   - For example, if you have $p$ features, then at each split:
+     - Randomly choose $m$ features from the $p$ possible.
+     - Find the best split among these $m$ features.
+
+   - **Summary Table:**
+     - $m = \sqrt{p}$  (classification)
+     - $m = p/3$    (regression)
+
+3. **Tree Growth:**
+   - Grow each tree to its full depth (or up to a max depth you specify), using only the $m$ random features at each split.
+
+4. **Prediction:**
+   - For classification: Each tree votes on the class, and the class with the most votes wins (majority voting).
+     - Predict label $\hat{y} = \mathrm{mode}(\{\hat{y}^{(b)}\}_{b=1}^B)$
+   - For regression: Average all tree predictions.
+     - Predict value $\hat{y} = \frac{1}{B} \sum_{b=1}^{B} \hat{y}^{(b)}$
+
+**Why does Random Forest work?**
+- If all trees used *all* features, they would be similar—especially if some features are much more "powerful" than others.
+- By forcing each split to consider only a random selection of features, the trees become diverse.
+- When you average (regression) or vote (classification) these diverse trees, the overall forest prediction has lower variance and usually higher accuracy!
+
+### 8.5.1 Random Forest Classifier
+
+```{r}
+# A Random Forest is an ensemble of decision trees, where each tree is trained on a bootstrap
+# sample (random sampling with replacement) from the original data, and at each split only a
+# random subset of features is considered.
+
+RandomForestClassifier <- setRefClass(
+  "RandomForestClassifier",
+  fields = list(n_estimators = "numeric", max_depth = "numeric", max_features = "ANY",
+                min_samples_split = "numeric", seed = "numeric", trees = "list"),
+  methods = list(
+    initialize = function(n_estimators = 10, max_depth = 5, max_features = "sqrt",
+                           min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; max_depth <<- max_depth; max_features <<- max_features
+      min_samples_split <<- min_samples_split; seed <<- seed; trees <<- list()
+      callSuper(...)
+    },
+
+    n_features_for = function(p) {
+      # Determine number of features to sample at each split.
+      if (identical(max_features, "sqrt")) max(1, as.integer(sqrt(p)))
+      else if (identical(max_features, "log2")) max(1, as.integer(log2(p)))
+      else if (is.numeric(max_features)) min(max_features, p)
+      else p   # use all features
+    },
+
+    fit = function(X, y) {
+      trees <<- list()
+      p <- ncol(X)
+      m <- n_features_for(p)
+      for (b in 0:(n_estimators - 1)) {
+        bs <- bootstrap_sample(X, y, seed = seed + b)
+        tree <- DecisionTree$new(max_depth = max_depth, min_samples_split = min_samples_split,
+                                  max_features = m, task = "classification", seed = seed + b)
+        tree$fit(bs$X, bs$y)
+        trees[[b + 1]] <<- tree
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      all_preds <- lapply(trees, function(t) t$predict(X))
+      sapply(seq_len(nrow(X)), function(i) mode_val(sapply(all_preds, function(p) p[i])))
+    },
+
+    predict_proba = function(X) {
+      all_preds <- lapply(trees, function(t) t$predict(X))
+      classes <- sort(unique(unlist(all_preds)))
+      lapply(seq_len(nrow(X)), function(i) {
+        votes <- sapply(all_preds, function(p) p[i])
+        tbl <- table(factor(votes, levels = classes))
+        setNames(as.numeric(tbl) / n_estimators, classes)
+      })
+    },
+
+    feature_importances = function(n_features) {
+      # Estimate feature importance as mean decrease in Gini impurity across all splits.
+      # NOTE: faithfully mirrors the Python original, where tree nodes never actually
+      # store a 'gain' value — so this always returns all zeros (a quirk of the source).
+      importances <- rep(0.0, n_features)
+      traverse_imp <- function(node) {
+        if (!is.list(node)) return(invisible(NULL))
+        importances[node$feat + 1] <<- importances[node$feat + 1] + 0
+        traverse_imp(node$left)
+        traverse_imp(node$right)
+      }
+      for (tree in trees) traverse_imp(tree$tree)
+      total <- sum(importances)
+      if (total > 0) importances / total else rep(0.0, n_features)
+    }
+  )
+)
+```
+
+### 8.5.2 Random Forest Regressor
+
+```{r}
+# Random Forest for regression. Splits on MSE reduction; aggregates by averaging.
+
+RandomForestRegressor <- setRefClass(
+  "RandomForestRegressor",
+  fields = list(n_estimators = "numeric", max_depth = "numeric", max_features = "ANY",
+                min_samples_split = "numeric", seed = "numeric", trees = "list"),
+  methods = list(
+    initialize = function(n_estimators = 10, max_depth = 5, max_features = "third",
+                           min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; max_depth <<- max_depth; max_features <<- max_features
+      min_samples_split <<- min_samples_split; seed <<- seed; trees <<- list()
+      callSuper(...)
+    },
+
+    n_features_for = function(p) {
+      if (identical(max_features, "sqrt")) max(1, as.integer(sqrt(p)))
+      else if (identical(max_features, "third")) max(1, p %/% 3)
+      else if (identical(max_features, "log2")) max(1, as.integer(log2(p)))
+      else if (is.numeric(max_features)) min(max_features, p)
+      else p
+    },
+
+    fit = function(X, y) {
+      trees <<- list()
+      p <- ncol(X)
+      m <- n_features_for(p)
+      for (b in 0:(n_estimators - 1)) {
+        bs <- bootstrap_sample(X, y, seed = seed + b)
+        tree <- DecisionTree$new(max_depth = max_depth, min_samples_split = min_samples_split,
+                                  max_features = m, task = "regression", seed = seed + b)
+        tree$fit(bs$X, bs$y)
+        trees[[b + 1]] <<- tree
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      all_preds <- lapply(trees, function(t) t$predict(X))
+      sapply(seq_len(nrow(X)), function(i) mean_val(sapply(all_preds, function(p) p[i])))
+    }
+  )
+)
+```
+
+## 8.6 What is Extra Trees? (Math for Dummies)
+
+### Theory
+
+Extra Trees (short for Extremely Randomized Trees) is an ensemble method used for making predictions.
+It works a lot like Random Forests but introduces even more randomness, which helps avoid overfitting and makes it very fast.
+
+Imagine you have a bunch of data points with several features (think: lots of columns in a table).
+At each split (decision point) in a tree, Extra Trees does two things at random:
+
+1. **Randomly selects a subset of features (columns) to look at.**
+2. **For each of those features, it picks a split point COMPLETELY at random between the lowest and highest value of that feature (not the best one, just a random one).**
+
+### What does that mean in math terms?
+
+For each tree:
+  - For each split in the tree:
+      - Randomly pick $m$ features out of $p$ total features (where $m$ is usually like $\sqrt{p}$ or $p/3$, depending on your setting).
+      - For each chosen feature $j$, find its minimum value $\min_i x_{ij}$ and maximum value $\max_i x_{ij}$ in your current data.
+      - Pick a random threshold $t_j$:
+        $$ t_j \sim \text{Uniform}(\min_i x_{ij},\ \max_i x_{ij}) $$
+      - Pick the feature/threshold that makes the best (but very rough) split.
+
+----
+
+The key:
+- No bootstrapping (uses the whole dataset, not random samples).
+- Splits are chosen with random thresholds, not by searching for the best one.
+
+Because it's so random, a single tree is "noisy," but combining lots of them averages out to a stable, accurate prediction.
+
+---
+
+## 8.6 Extra Trees (Extremely Randomized Trees)
+
+### Theory
+
+Extra Trees (Geurts et al., 2006) push randomisation further than Random Forest:
+
+| | Random Forest | Extra Trees |
+|--|--------------|-------------|
+| Bootstrap | Yes | No (full dataset) |
+| Feature subset per split | Yes $(\sqrt{p})$ | Yes $(\sqrt{p})$ |
+| Threshold search | Best among candidates | **Completely random** |
+
+Because thresholds are drawn at random (no search), Extra Trees trains **much faster** and introduces more variance-reducing randomisation, often matching or beating Random Forest.
+
+$$\text{threshold} \sim \text{Uniform}(\min_i x_{ij},\ \max_i x_{ij}) \quad \text{for each candidate feature } j$$
+
+### 8.6.1 Extra Trees Classifier
+
+```{r}
+# Extremely Randomized Trees for classification.
+# No bootstrap resampling; random thresholds for each split; trains very fast.
+
+ExtraTreesClassifier <- setRefClass(
+  "ExtraTreesClassifier",
+  fields = list(n_estimators = "numeric", max_depth = "numeric", max_features = "ANY",
+                min_samples_split = "numeric", seed = "numeric", trees = "list"),
+  methods = list(
+    initialize = function(n_estimators = 10, max_depth = 5, max_features = "sqrt",
+                           min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; max_depth <<- max_depth; max_features <<- max_features
+      min_samples_split <<- min_samples_split; seed <<- seed; trees <<- list()
+      callSuper(...)
+    },
+
+    n_features_for = function(p) {
+      if (identical(max_features, "sqrt")) max(1, as.integer(sqrt(p))) else p
+    },
+
+    build_extra = function(X, y, depth, m) {
+      # Stops splitting if all labels are the same, too small, or reached max depth.
+      if (length(unique(y)) == 1 || length(y) < min_samples_split || depth >= max_depth) {
+        return(mode_val(y))
+      }
+
+      n <- nrow(X); p <- ncol(X)
+      feat_ids <- sample(seq_len(p), min(m, p))   # m random features for this split
+      best <- list(gain = -1, feat = NULL, thr = NULL)
+      imp_parent <- gini(y)
+
+      for (feat in feat_ids) {
+        vals <- X[, feat]
+        lo <- min(vals); hi <- max(vals)
+        if (lo == hi) next                        # no split possible on this feature
+        thr <- runif(1, lo, hi)                    # RANDOM threshold, not the best one
+        left_mask <- X[, feat] <= thr
+        yl <- y[left_mask]; yr <- y[!left_mask]
+        if (length(yl) == 0 || length(yr) == 0) next
+        gain <- imp_parent - (length(yl) / n) * gini(yl) - (length(yr) / n) * gini(yr)
+        if (gain > best$gain) best <- list(gain = gain, feat = feat, thr = thr)
+      }
+
+      if (is.null(best$feat)) return(mode_val(y))
+
+      f <- best$feat; thr <- best$thr
+      left_mask <- X[, f] <= thr
+      list(feat = f, thr = thr,
+           left  = build_extra(X[left_mask, , drop = FALSE],  y[left_mask],  depth + 1, m),
+           right = build_extra(X[!left_mask, , drop = FALSE], y[!left_mask], depth + 1, m))
+    },
+
+    traverse_one = function(x, node) {
+      if (!is.list(node)) return(node)
+      branch <- if (x[node$feat] <= node$thr) node$left else node$right
+      traverse_one(x, branch)
+    },
+
+    fit = function(X, y) {
+      p <- ncol(X)
+      m <- n_features_for(p)
+      trees <<- list()
+      for (b in 0:(n_estimators - 1)) {
+        set.seed(seed + b)   # each tree gets its own randomness
+        trees[[b + 1]] <<- build_extra(X, y, 0, m)
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      all_preds <- lapply(trees, function(tr) sapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], tr)))
+      sapply(seq_len(nrow(X)), function(i) mode_val(sapply(all_preds, function(p) p[i])))
+    }
+  )
+)
+```
+
+### 8.6.2 Extra Trees Regressor
+
+```{r}
+# Imagine you want to predict a number, like the price of a house. Instead of making one big
+# decision, this model builds several "random" decision trees and averages their answers to
+# get a better prediction. The randomness helps prevent overthinking / memorizing too much.
+
+ExtraTreesRegressor <- setRefClass(
+  "ExtraTreesRegressor",
+  fields = list(n_estimators = "numeric", max_depth = "numeric", max_features = "ANY",
+                min_samples_split = "numeric", seed = "numeric", trees = "list"),
+  methods = list(
+    initialize = function(n_estimators = 10, max_depth = 5, max_features = "sqrt",
+                           min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; max_depth <<- max_depth; max_features <<- max_features
+      min_samples_split <<- min_samples_split; seed <<- seed; trees <<- list()
+      callSuper(...)
+    },
+
+    n_features_for = function(p) {
+      if (identical(max_features, "sqrt")) max(1, as.integer(sqrt(p))) else max(1, p %/% 3)
+    },
+
+    build_extra = function(X, y, depth, m) {
+      if (length(y) < min_samples_split || depth >= max_depth) return(mean_val(y))
+
+      n <- nrow(X); p <- ncol(X)
+      feat_ids <- sample(seq_len(p), min(m, p))
+      best <- list(gain = -1, feat = NULL, thr = NULL)
+      imp_parent <- mse(y)
+
+      for (feat in feat_ids) {
+        vals <- X[, feat]
+        lo <- min(vals); hi <- max(vals)
+        if (lo == hi) next
+        thr <- runif(1, lo, hi)
+        left_mask <- X[, feat] <= thr
+        yl <- y[left_mask]; yr <- y[!left_mask]
+        if (length(yl) == 0 || length(yr) == 0) next
+        gain <- imp_parent - (length(yl) / n) * mse(yl) - (length(yr) / n) * mse(yr)
+        if (gain > best$gain) best <- list(gain = gain, feat = feat, thr = thr)
+      }
+
+      if (is.null(best$feat)) return(mean_val(y))
+
+      f <- best$feat; thr <- best$thr
+      left_mask <- X[, f] <= thr
+      list(feat = f, thr = thr,
+           left  = build_extra(X[left_mask, , drop = FALSE],  y[left_mask],  depth + 1, m),
+           right = build_extra(X[!left_mask, , drop = FALSE], y[!left_mask], depth + 1, m))
+    },
+
+    traverse_one = function(x, node) {
+      if (!is.list(node)) return(node)
+      branch <- if (x[node$feat] <= node$thr) node$left else node$right
+      traverse_one(x, branch)
+    },
+
+    fit = function(X, y) {
+      p <- ncol(X)
+      m <- n_features_for(p)
+      trees <<- list()
+      for (b in 0:(n_estimators - 1)) {
+        set.seed(seed + b)
+        trees[[b + 1]] <<- build_extra(X, y, 0, m)
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      all_preds <- lapply(trees, function(tr) sapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], tr)))
+      sapply(seq_len(nrow(X)), function(i) mean_val(sapply(all_preds, function(p) p[i])))
+    }
+  )
+)
+```
+
+---
+
+## 8.7 AdaBoost
+
+### Theory
+
+AdaBoost (Freund & Schapire, 1997) builds an ensemble by sequentially training simple classifiers (called "weak learners")—often just decision stumps—where each new classifier tries to focus on the mistakes of the previous ones.
+
+At each step, AdaBoost maintains a set of weights over the training examples. Initially, all examples have equal weight ($w_i^{(1)} = 1/n$). After each weak learner is trained, examples that were misclassified get higher weight ("hard cases"), and correctly classified examples get lower weight ("easy cases"). This way, the next weak learner pays more attention to the examples that previous learners struggled with.
+
+In the case of binary classification, with labels $y \in \{-1, +1\}$:
+
+1. **Initialisation:** Set all sample weights equally: $w_i^{(1)} = 1/n$.
+
+2. **For $t = 1$ to $T$:**
+   - Train weak learner $h_t$ on the dataset, paying attention to the weights $w_i^{(t)}$ (so misclassified points have greater influence).
+   - Compute the weighted error:
+     $$
+     \varepsilon_t = \sum_{i=1}^n w_i^{(t)} \cdot \mathbf{1}[h_t(\mathbf{x}_i) \neq y_i]
+     $$
+     Here, $\mathbf{1}[\cdot]$ is a "dummy" or indicator function, which means it's $1$ if the condition inside is true (i.e., if the prediction is incorrect), and $0$ otherwise.
+   - Compute how much say this learner gets (its "voting weight"):
+     $$
+     \alpha_t = \frac{1}{2} \ln\left(\frac{1 - \varepsilon_t}{\varepsilon_t}\right)
+     $$
+   - Update each training sample's weight for the next round:
+     $$
+     w_i^{(t+1)} = w_i^{(t)} \cdot \exp\left(-\alpha_t\, y_i\, h_t(\mathbf{x}_i)\right)
+     $$
+     If $h_t(\mathbf{x}_i)$ agrees with $y_i$, then the exponent is negative, so the weight decreases; if it disagrees, the weight increases.
+   - Re-normalise the weights so they sum to 1.
+
+3. **Final prediction:** To make a prediction on a new sample $\mathbf{x}$, combine all $T$ weak learners using their weights:
+   $$
+   H(\mathbf{x}) = \text{sign}\left(\sum_{t=1}^T \alpha_t\, h_t(\mathbf{x})\right)
+   $$
+
+**Note on indicator ("dummy") variables:** The notation $\mathbf{1}[condition]$ means an indicator (dummy) variable: it's 1 if the condition is true, and 0 otherwise. For example, $\mathbf{1}[h_t(\mathbf{x}_i) \neq y_i]$ is 1 if the $i$th sample is misclassified by the $t$th learner, and 0 if it's correctly classified.
+
+**For regression (R2Boost):** AdaBoost can be adapted for regression tasks by using a weighted measure of absolute error to update the weights and calculate the learner's influence.
+
+### 8.7.1 Decision Stump (weak learner)
+
+A **decision stump** is the simplest type of decision tree: it is a tree of depth one, meaning it makes a decision based on only a single input feature and a single threshold.
+For classification, it splits the data using one feature/threshold and provides a binary prediction ("left" or "right" leaf).
+For regression, it predicts one value for all examples on the left of the split and another value for those on the right.
+Because it is so simple, a decision stump by itself is a "weak learner"—its accuracy can be only slightly better than random guessing. However, when combined in an ensemble like AdaBoost, multiple stumps can create a powerful and accurate predictor.
+
+```{r}
+# A decision stump is a simple, depth-1 decision tree.
+# It can work for classification or regression:
+#   - In classification: it splits on one feature and threshold, predicting +1/polarity or -1/polarity.
+#   - In regression: it predicts one value on the left of the split, another on the right.
+
+DecisionStump <- setRefClass(
+  "DecisionStump",
+  fields = list(task = "character", feat = "ANY", thr = "ANY", polarity = "numeric",
+                left_val = "ANY", right_val = "ANY"),
+  methods = list(
+    initialize = function(task = "classification", ...) {
+      task <<- task
+      feat <<- NULL; thr <<- NULL; polarity <<- 1
+      left_val <<- NULL; right_val <<- NULL
+      callSuper(...)
+    },
+
+    fit = function(X, y, weights = NULL) {
+      # Searches all features and thresholds for the split that minimizes weighted
+      # classification error (classification) or weighted MSE (regression).
+      # Returns: the best weighted error achieved by this stump.
+      n <- nrow(X)
+      if (is.null(weights)) weights <- rep(1.0 / n, n)
+
+      best_err <- Inf
+
+      for (feat_i in seq_len(ncol(X))) {
+        vals <- sort(unique(X[, feat_i]))
+        if (length(vals) < 2) next
+        thresholds <- (vals[-length(vals)] + vals[-1]) / 2
+
+        for (thr_i in thresholds) {
+          if (task == "classification") {
+            # Try both polarities: polarity=1 predicts +1 if x<=thr, -1 otherwise (flipped if -1)
+            for (pol in c(1, -1)) {
+              preds <- ifelse(X[, feat_i] <= thr_i, pol, -pol)
+              err <- sum(weights[preds != y])
+              if (err < best_err) {
+                best_err <- err
+                feat <<- feat_i; thr <<- thr_i; polarity <<- pol
+              }
+            }
+          } else {
+            left_mask <- X[, feat_i] <= thr_i
+            li <- which(left_mask); ri <- which(!left_mask)
+            if (length(li) == 0 || length(ri) == 0) next
+            lv <- sum(weights[li] * y[li]) / sum(weights[li])   # weighted mean, left side
+            rv <- sum(weights[ri] * y[ri]) / sum(weights[ri])   # weighted mean, right side
+            preds <- ifelse(left_mask, lv, rv)
+            err <- sum(weights * (y - preds)^2)                 # weighted MSE
+            if (err < best_err) {
+              best_err <- err
+              feat <<- feat_i; thr <<- thr_i
+              left_val <<- lv; right_val <<- rv
+            }
+          }
+        }
+      }
+
+      best_err
+    },
+
+    predict = function(X) {
+      if (task == "classification") {
+        ifelse(X[, feat] <= thr, polarity, -polarity)
+      } else {
+        ifelse(X[, feat] <= thr, left_val, right_val)
+      }
+    }
+  )
+)
+```
+
+### 8.7.2 AdaBoost Classifier
+
+```{r}
+# AdaBoost for binary classification.
+#
+# Imagine you want a group of simple 'yes/no' decision makers (these are the "stumps")
+# to decide something together. Each stump is not very smart by itself, but together they
+# can be very powerful if we combine them cleverly. This is what AdaBoost does!
+#
+# - You need your labels to be -1 or +1 (no 0 or other values).
+# - Each "stump" is just a simple rule: like "Is height < 5 feet?".
+
+AdaBoostClassifier <- setRefClass(
+  "AdaBoostClassifier",
+  fields = list(n_estimators = "numeric", stumps = "list", alphas = "numeric"),
+  methods = list(
+    initialize = function(n_estimators = 50, ...) {
+      n_estimators <<- n_estimators
+      stumps <<- list(); alphas <<- numeric(0)
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      # 1. Start with equal weights. 2. For each stump: fit, find error, compute alpha,
+      # reweight (focus on hard points). 3. Store the stump and its weight.
+      n <- length(y)
+      w <- rep(1.0 / n, n)
+      stumps <<- list(); alphas <<- numeric(0)
+
+      for (t in seq_len(n_estimators)) {
+        stump <- DecisionStump$new(task = "classification")
+        err <- stump$fit(X, y, w)
+
+        err <- max(min(err, 1 - 1e-10), 1e-10)         # never too close to 0 or 1
+        alpha <- 0.5 * log((1 - err) / err)             # bigger alpha = more accurate stump
+
+        preds <- stump$predict(X)
+        w <- w * exp(-alpha * y * preds)                # misclassified points become more important
+        w <- w / sum(w)                                 # renormalize
+
+        stumps[[t]] <<- stump
+        alphas[t] <<- alpha
+      }
+      invisible(.self)
+    },
+
+    predict_score = function(X) {
+      # Add up each stump's vote, weighted by alpha.
+      scores <- rep(0.0, nrow(X))
+      for (i in seq_along(stumps)) scores <- scores + alphas[i] * stumps[[i]]$predict(X)
+      scores
+    },
+
+    predict = function(X) ifelse(predict_score(X) >= 0, 1, -1),
+
+    predict_proba = function(X) {
+      # Soft probability estimate via sigmoid of the combined score.
+      scores <- predict_score(X)
+      1 / (1 + exp(-pmin(pmax(scores, -500), 500)))
+    }
+  )
+)
+```
+
+### 8.7.3 AdaBoost Regressor
+
+```{r}
+# Implements AdaBoost.R2 (Drucker, 1997) for regression tasks.
+# - Uses weak regressors (decision stumps).
+# - After each iteration, increases the weight of samples with larger prediction error.
+# - Combines stump predictions using a weighted median.
+
+AdaBoostRegressor <- setRefClass(
+  "AdaBoostRegressor",
+  fields = list(n_estimators = "numeric", learning_rate = "numeric",
+                stumps = "list", stump_weights = "numeric"),
+  methods = list(
+    initialize = function(n_estimators = 50, learning_rate = 1.0, ...) {
+      n_estimators <<- n_estimators; learning_rate <<- learning_rate
+      stumps <<- list(); stump_weights <<- numeric(0)
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      n <- length(y)
+      w <- rep(1.0 / n, n)
+      stumps <<- list(); stump_weights <<- numeric(0)
+
+      for (t in seq_len(n_estimators)) {
+        stump <- DecisionStump$new(task = "regression")
+        stump$fit(X, y, w)
+        preds <- stump$predict(X)
+
+        abs_errs <- abs(y - preds)
+        max_err <- if (max(abs_errs) > 0) max(abs_errs) else 1.0
+        rel_errs <- abs_errs / max_err                    # scaled to [0, 1]
+
+        loss <- sum(w * rel_errs)
+        loss <- max(min(loss, 1 - 1e-10), 1e-10)
+
+        beta <- loss / (1 - loss)
+        stump_weight <- learning_rate * log(1.0 / beta)
+
+        w <- w * (beta^(1 - rel_errs))                     # good predictions -> lower weight
+        total <- sum(w)
+        if (total == 0) break
+        w <- w / total
+
+        stumps[[length(stumps) + 1]] <<- stump
+        stump_weights[length(stump_weights) + 1] <<- stump_weight
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      # Weighted median of predictions across all stumps.
+      if (length(stumps) == 0) return(rep(0.0, nrow(X)))
+
+      all_preds <- lapply(stumps, function(s) s$predict(X))
+      total_w <- sum(stump_weights)
+      results <- numeric(nrow(X))
+
+      for (i in seq_len(nrow(X))) {
+        vals <- sapply(all_preds, function(p) p[i])
+        ord <- order(vals)
+        vals_sorted <- vals[ord]; w_sorted <- stump_weights[ord]
+        cumsum_w <- 0.0; half <- total_w / 2
+        found <- FALSE
+        for (k in seq_along(vals_sorted)) {
+          cumsum_w <- cumsum_w + w_sorted[k]
+          if (cumsum_w >= half) { results[i] <- vals_sorted[k]; found <- TRUE; break }
+        }
+        if (!found) results[i] <- vals_sorted[length(vals_sorted)]
+      }
+      results
+    }
+  )
+)
+```
+
+---
+
+## 8.8 Gradient Boosting
+
+### Theory
+
+Gradient Boosting is a way to build a strong predictor by adding together several simple ones, step by step.
+It works sort of like learning from your mistakes at each step, and fixing them.
+Let's break down the steps, with simple math, in a way that's friendly for 'math for dummies':
+
+**Step 1: Start with a simple guess**
+- Make an initial prediction that's just a single number for all inputs. For example, for regression, it's just the average of all target values:
+  $$ F_0(\mathbf{x}) = \text{the value of } c \text{ that makes } \sum_i \mathcal{L}(y_i, c) \text{ as small as possible} $$
+  For squared-error loss, that's just the mean of $y_i$.
+
+**Step 2: Repeat the following $T$ times:**
+  1. **See how much you are off (the mistakes):**
+     - For each point, figure out how "wrong" your prediction is, and in which direction. This is called the "pseudo-residual".
+     - For squared-error (regression): how much is predicted minus actual?
+        $$ r_i^{(t)} = y_i - F_{t-1}(\mathbf{x}_i) $$
+     - More generally, it's the negative gradient (the direction that reduces error the fastest):
+        $$ r_i^{(t)} = -\left[ \frac{\partial \mathcal{L}(y_i, F(\mathbf{x}_i))}{\partial F(\mathbf{x}_i)} \right]_{F = F_{t-1}} $$
+
+  2. **Fit a new tree to those mistakes**
+     - Build a new tiny tree that tries to predict these $r_i$ values, using the features.
+
+  3. **Add the correction, gently**
+     - Update your prediction by moving a little bit in the direction the new tree suggests:
+       $$ F_t(\mathbf{x}) = F_{t-1}(\mathbf{x}) + \eta \times h_t(\mathbf{x}) $$
+     - Here, $\eta$ is the "learning rate", like a volume knob (usually between 0 and 1), and $h_t$ is the new mini-tree.
+
+**Summary Table** (for common losses):
+
+| Task                      | Loss function                              | Pseudo-residual (correction)      |
+|---------------------------|--------------------------------------------|-----------------------------------|
+| Regression (MSE)          | $\frac{1}{2}(y_i - F)^2$                   | $y_i - F(\mathbf{x}_i)$           |
+| Classification (log-loss) | $-y_i \log p_i - (1-y_i)\log(1-p_i)$       | $y_i - \sigma(F(\mathbf{x}_i))$   |
+
+- (For regression, the correction is just the difference between the true value and your guess.)
+- (For classification, it's the label minus the predicted probability.)
+
+### 8.8.1 Gradient Boosting Regressor
+
+```{r}
+# Gradient Boosting for regression (using squared-error loss).
+#
+# Imagine you want to guess a number (like house prices). You're not good at it, so you get a
+# friend (a very simple decision tree) to help you. But your friend also makes mistakes.
+# So each time, you look at what your last guess was, see how far off you were (the errors),
+# and ask a new friend (another tree) to guess those errors. You keep adding up all your
+# friends' guesses (but only a little bit, not too much), so their group answer gets better
+# and better.
+
+GradientBoostingRegressor <- setRefClass(
+  "GradientBoostingRegressor",
+  fields = list(n_estimators = "numeric", learning_rate = "numeric", max_depth = "numeric",
+                min_samples_split = "numeric", seed = "numeric", trees = "list", F0 = "ANY"),
+  methods = list(
+    initialize = function(n_estimators = 100, learning_rate = 0.1, max_depth = 3,
+                          min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; learning_rate <<- learning_rate; max_depth <<- max_depth
+      min_samples_split <<- min_samples_split; seed <<- seed; trees <<- list(); F0 <<- NULL
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      # Step 1: start with a really basic guess: the average value of y.
+      F0 <<- mean_val(y)
+      Fv <- rep(F0, length(y))
+      trees <<- list()
+
+      # Step 2: fix mistakes, n_estimators times.
+      for (t in 0:(n_estimators - 1)) {
+        residuals <- y - Fv   # how wrong is the current guess, for each point?
+
+        tree <- DecisionTree$new(max_depth = max_depth, min_samples_split = min_samples_split,
+                                  task = "regression", seed = seed + t)
+        tree$fit(X, residuals)
+        trees[[t + 1]] <<- tree
+
+        updates <- tree$predict(X)
+        Fv <- Fv + learning_rate * updates   # gentle correction
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      Fv <- rep(F0, nrow(X))
+      for (tree in trees) Fv <- Fv + learning_rate * tree$predict(X)
+      Fv
+    }
+  )
+)
+```
+
+### 8.8.2 Gradient Boosting Classifier
+
+```{r}
+# Imagine you want to teach a group of friends to guess something tricky—like if a person in a
+# picture is smiling or not, using only 0 (not smiling) or 1 (smiling).
+#
+# The first guess is really silly: just guess the "average"—how many people in your data are
+# smiling, roughly. After the first (bad) guess, ask a friend (a decision tree!) to look at what
+# you got wrong (the mistakes) and help fix them a little bit. You do this over and over: each
+# new friend focuses only on what all your previous friends still get wrong. At the end, squish
+# all their "scores" with the sigmoid function to get a probability between 0 and 1.
+
+GradientBoostingClassifier <- setRefClass(
+  "GradientBoostingClassifier",
+  fields = list(n_estimators = "numeric", learning_rate = "numeric", max_depth = "numeric",
+                min_samples_split = "numeric", seed = "numeric", trees = "list", F0 = "ANY"),
+  methods = list(
+    initialize = function(n_estimators = 100, learning_rate = 0.1, max_depth = 3,
+                          min_samples_split = 2, seed = 0, ...) {
+      n_estimators <<- n_estimators; learning_rate <<- learning_rate; max_depth <<- max_depth
+      min_samples_split <<- min_samples_split; seed <<- seed; trees <<- list(); F0 <<- NULL
+      callSuper(...)
+    },
+
+    sigmoid = function(x) 1.0 / (1.0 + exp(-pmin(pmax(x, -500), 500))),
+
+    fit = function(X, y) {
+      n <- length(y)
+      # Step 1: first, extremely basic guess: the average "smile rate", in log-odds form.
+      p0 <- max(min(mean_val(y), 1 - 1e-7), 1e-7)
+      F0 <<- log(p0 / (1 - p0))
+      Fv <- rep(F0, n)
+      trees <<- list()
+
+      # Step 2: each round, improve your guess by fixing mistakes (residuals).
+      for (t in 0:(n_estimators - 1)) {
+        probs <- sigmoid(Fv)
+        residuals <- y - probs   # pseudo-residual: real label - current probability
+
+        tree <- DecisionTree$new(max_depth = max_depth, min_samples_split = min_samples_split,
+                                  task = "regression", seed = seed + t)
+        tree$fit(X, residuals)
+        trees[[t + 1]] <<- tree
+
+        updates <- tree$predict(X)
+        Fv <- Fv + learning_rate * updates
+      }
+      invisible(.self)
+    },
+
+    predict_proba = function(X) {
+      Fv <- rep(F0, nrow(X))
+      for (tree in trees) Fv <- Fv + learning_rate * tree$predict(X)
+      sigmoid(Fv)
+    },
+
+    predict = function(X, threshold = 0.5) {
+      as.integer(predict_proba(X) >= threshold)
+    }
+  )
+)
+```
+
+---
+
+## 8.9 XGBoost
+
+### Theory
+
+XGBoost is a super-charged version of gradient boosting—basically, a way to build a team of "decision tree friends" that each correct the errors of the older ones, but with special tricks to make learning fast, powerful, and less likely to overfit.
+
+Here's how XGBoost works, step by step, with the essential math in "for dummies" form:
+
+1. **The goal (objective):** Find predictions ($\hat{y}$) that make the total loss (error) small, but also **penalize complexity** so our trees don't get wild. The math looks like:
+
+$$\text{Total Loss} = \text{Errors} + \text{Penalty for making trees too fancy}$$
+
+Or, more mathematically:
+
+$$\mathcal{L} = \sum_i \ell(y_i, \hat{y}_i) + \sum_\text{trees} \text{Complexity}$$
+
+The complexity of each tree is:
+
+$$\Omega(\text{tree}) = \gamma \times (\text{number of leaves}) + \frac{1}{2} \lambda \times \sum_\text{leaves} (\text{weight})^2$$
+
+Where:
+- $\gamma$ = how much you "charge" to add a new leaf (splitting penalty)
+- $\lambda$ = how much you prefer small weights (shrinks scores back toward zero)
+
+2. **Math trick:** Instead of just using basic error, XGBoost looks at **both the slope and the curve** (i.e., gradient and curvature) of the loss function at each data point, using a second-order Taylor expansion. These are:
+- $g_i$: "Gradient", just means how quickly the loss changes if you nudge the prediction ($\hat{y}$)
+- $h_i$: "Hessian", tells how much the gradient is changing (the "curvature")
+
+Write it like:
+
+$$g_i = \frac{\partial \ell}{\partial \hat{y}_i}$$
+$$h_i = \frac{\partial^2 \ell}{\partial (\hat{y}_i)^2}$$
+
+3. **How much to trust a leaf's advice?**
+XGBoost sets each leaf's score ("weight") cleverly, using all the gradients and Hessians for the points in that leaf:
+
+$$w^* = -\frac{\text{sum of gradients in leaf}}{\text{sum of Hessians in leaf} + \lambda}$$
+
+(The minus gets us moving to lower loss; $\lambda$ keeps weights from being too large.)
+
+4. **Should you split? How good is a split?**
+To decide if a split is worth it, XGBoost computes the "gain":
+
+$$\text{Gain} = \frac{1}{2}\left[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L+G_R)^2}{H_L+H_R+\lambda}\right] - \gamma$$
+
+Where $G_L, H_L$ are gradient/Hessian sums for the left child; $G_R, H_R$ for the right.
+- If Gain $>$ 0, it's a good split!
+- $\gamma$ makes you require a minimum improvement before adding complexity.
+
+5. **Special cases:**
+For mean-squared error regression: gradients are just errors ($\hat{y}-y$), curvature is $1$.
+For binary classification: gradients are (probability - true label), curvature is $p(1-p)$.
+
+### 8.9.1 XGBoost Base Tree
+
+```{r}
+# XGBoost's decision tree:
+# - This tree tries to split your data in smart ways to predict your target variable.
+# - At each split it uses special math (gradients and Hessians) to figure out if that split helps.
+# - It also tries to not make the tree too complex (regularization), to avoid overfitting.
+
+XGBTree <- setRefClass(
+  "XGBTree",
+  fields = list(max_depth = "numeric", min_child_weight = "numeric", reg_lambda = "numeric",
+                gamma = "numeric", seed = "numeric", tree = "ANY"),
+  methods = list(
+    initialize = function(max_depth = 3, min_child_weight = 1, reg_lambda = 1.0,
+                          gamma = 0.0, seed = 0, ...) {
+      max_depth <<- max_depth; min_child_weight <<- min_child_weight
+      reg_lambda <<- reg_lambda; gamma <<- gamma; seed <<- seed; tree <<- NULL
+      callSuper(...)
+    },
+
+    leaf_weight = function(G, H) -G / (H + reg_lambda),
+
+    gain_fn = function(GL, HL, GR, HR) {
+      lam <- reg_lambda
+      0.5 * (GL^2 / (HL + lam) + GR^2 / (HR + lam) - (GL + GR)^2 / (HL + HR + lam)) - gamma
+    },
+
+    build = function(X, g, h, depth) {
+      G <- sum(g); H <- sum(h)
+      if (depth >= max_depth || H < min_child_weight) return(leaf_weight(G, H))
+
+      n <- nrow(X)
+      best <- list(gain = 0.0, feat = NULL, thr = NULL)
+
+      for (feat in seq_len(ncol(X))) {
+        ord <- order(X[, feat])       # sort data points by this feature's value
+        GL <- 0.0; HL <- 0.0          # running totals for left split
+        for (k in seq_len(n - 1)) {
+          i <- ord[k]
+          GL <- GL + g[i]; HL <- HL + h[i]
+          GR <- G - GL; HR <- H - HL
+          if (HL < min_child_weight || HR < min_child_weight) next
+          if (X[ord[k], feat] == X[ord[k + 1], feat]) next   # skip ties
+          gn <- gain_fn(GL, HL, GR, HR)
+          if (gn > best$gain) {
+            best <- list(gain = gn, feat = feat,
+                         thr = (X[ord[k], feat] + X[ord[k + 1], feat]) / 2)
+          }
+        }
+      }
+
+      if (is.null(best$feat)) return(leaf_weight(G, H))
+
+      f <- best$feat; thr <- best$thr
+      left_mask <- X[, f] <= thr
+      list(feat = f, thr = thr,
+           left  = build(X[left_mask, , drop = FALSE],  g[left_mask],  h[left_mask],  depth + 1),
+           right = build(X[!left_mask, , drop = FALSE], g[!left_mask], h[!left_mask], depth + 1))
+    },
+
+    fit = function(X, g, h) {
+      tree <<- build(X, g, h, 0)
+      invisible(.self)
+    },
+
+    traverse_one = function(x, node) {
+      if (!is.list(node)) return(node)
+      branch <- if (x[node$feat] <= node$thr) node$left else node$right
+      traverse_one(x, branch)
+    },
+
+    predict = function(X) sapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], tree))
+  )
+)
+```
+
+### 8.9.2 XGBoost Regressor
+
+```{r}
+# This model predicts numbers by building lots of little decision trees.
+# Each new tree tries to fix what the old trees got wrong.
+# g_i is the gradient (current guess minus real answer); h_i is the Hessian (always 1 for MSE).
+
+XGBoostRegressor <- setRefClass(
+  "XGBoostRegressor",
+  fields = list(n_estimators = "numeric", learning_rate = "numeric", max_depth = "numeric",
+                reg_lambda = "numeric", gamma = "numeric", min_child_weight = "numeric",
+                seed = "numeric", trees = "list", F0 = "ANY"),
+  methods = list(
+    initialize = function(n_estimators = 100, learning_rate = 0.1, max_depth = 3,
+                          reg_lambda = 1.0, gamma = 0.0, min_child_weight = 1, seed = 0, ...) {
+      n_estimators <<- n_estimators; learning_rate <<- learning_rate; max_depth <<- max_depth
+      reg_lambda <<- reg_lambda; gamma <<- gamma; min_child_weight <<- min_child_weight
+      seed <<- seed; trees <<- list(); F0 <<- NULL
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      F0 <<- mean_val(y)
+      Fv <- rep(F0, length(y))
+      trees <<- list()
+
+      for (t in 0:(n_estimators - 1)) {
+        g <- Fv - y                # gradient for MSE
+        h <- rep(1.0, length(y))   # Hessian for MSE is always 1
+
+        tree <- XGBTree$new(max_depth = max_depth, min_child_weight = min_child_weight,
+                            reg_lambda = reg_lambda, gamma = gamma, seed = seed + t)
+        tree$fit(X, g, h)
+        trees[[t + 1]] <<- tree
+
+        updates <- tree$predict(X)
+        Fv <- Fv + learning_rate * updates
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      Fv <- rep(F0, nrow(X))
+      for (tree in trees) Fv <- Fv + learning_rate * tree$predict(X)
+      Fv
+    }
+  )
+)
+```
+
+### 8.9.3 XGBoost Classifier
+
+```{r}
+# A super-simplified version of XGBoost for binary classification.
+# g = current_probability - true_label ; h = current_probability * (1 - current_probability)
+
+XGBoostClassifier <- setRefClass(
+  "XGBoostClassifier",
+  fields = list(n_estimators = "numeric", learning_rate = "numeric", max_depth = "numeric",
+                reg_lambda = "numeric", gamma = "numeric", min_child_weight = "numeric",
+                seed = "numeric", trees = "list", F0 = "ANY"),
+  methods = list(
+    initialize = function(n_estimators = 100, learning_rate = 0.1, max_depth = 3,
+                          reg_lambda = 1.0, gamma = 0.0, min_child_weight = 1, seed = 0, ...) {
+      n_estimators <<- n_estimators; learning_rate <<- learning_rate; max_depth <<- max_depth
+      reg_lambda <<- reg_lambda; gamma <<- gamma; min_child_weight <<- min_child_weight
+      seed <<- seed; trees <<- list(); F0 <<- NULL
+      callSuper(...)
+    },
+
+    sigmoid = function(x) 1.0 / (1.0 + exp(-pmin(pmax(x, -500), 500))),
+
+    fit = function(X, y) {
+      # Start from the log-odds of the base rate.
+      p0 <- max(min(mean_val(y), 1 - 1e-7), 1e-7)
+      F0 <<- log(p0 / (1 - p0))
+      Fv <- rep(F0, length(y))
+      trees <<- list()
+
+      for (t in 0:(n_estimators - 1)) {
+        probs <- sigmoid(Fv)
+        g <- probs - y                     # gradient of log-loss
+        h <- probs * (1 - probs)           # Hessian of log-loss
+
+        tree <- XGBTree$new(max_depth = max_depth, min_child_weight = min_child_weight,
+                            reg_lambda = reg_lambda, gamma = gamma, seed = seed + t)
+        tree$fit(X, g, h)
+        trees[[t + 1]] <<- tree
+
+        updates <- tree$predict(X)
+        Fv <- Fv + learning_rate * updates
+      }
+      invisible(.self)
+    },
+
+    predict_proba = function(X) {
+      Fv <- rep(F0, nrow(X))
+      for (tree in trees) Fv <- Fv + learning_rate * tree$predict(X)
+      sigmoid(Fv)
+    },
+
+    predict = function(X, threshold = 0.5) as.integer(predict_proba(X) >= threshold)
+  )
+)
+```
+
+## Light GBM
+
+### Theory
+
+LightGBM is a machine learning algorithm that helps computers make
+fast and accurate predictions, especially when you have lots of data.
+It's mostly used for tasks like classification (e.g., spam or not spam)
+and regression (predicting numbers).
+
+#### High level idea:
+LightGBM builds lots of simple decision trees, one after another,
+where each new tree tries to fix the mistakes made by the previous trees.
+The final prediction is the sum of all these small corrections.
+
+#### Step-by-step:
+
+1. **Guess everyone's answer**
+   At first, LightGBM makes a "base guess" for each data point (like all zeros).
+
+2. **Find out how wrong that guess is**
+   For every data point, compute:
+     - "Gradient": How badly are we missing the right answer?
+       (For math folks: `gradient = (current prediction - true label)` for classification)
+
+3. **Grow a decision tree**
+   Build a small tree that looks for patterns in the data which help to fix
+   the mistakes (i.e., fix the gradients/errors).
+
+4. **Update the guesses**
+   Use the tree's advice to slightly improve our guess for each data point:
+     - `new prediction = old prediction + learning_rate * (tree's output)`
+
+5. **Repeat**
+   Go back to step 2 and repeat these steps (grow a new tree to patch remaining mistakes),
+   often hundreds of times.
+
+6. **Combine all trees**
+   The final prediction is the sum of the contribution of all trees:
+     - `final prediction = base_guess + sum(over all trees)[tree's output * learning_rate]`
+
+#### Why is LightGBM special?
+- It builds trees in a very clever and efficient way, using "histograms"
+  and "leaf-wise" growth, making it much faster than classic tree algorithms.
+- It handles big datasets, missing values, and even categorical features out-of-the-box.
+
+(Don't worry if the word "gradient" sounds weird — just remember it's about seeing how badly we're off, and fixing it bit by bit!)
+
+#### Leaf-wise vs depth-wise growth (the key difference from XGBoost)
+
+Both use the **same math** (second-order gain, regularised leaf weights). The difference is *which* leaf gets split next:
+
+- **XGBoost (depth-wise / level-wise)**: splits *every* leaf at the current level before going deeper. A `max_depth=2` tree always has up to 4 leaves in a fixed, balanced shape.
+- **LightGBM (leaf-wise / best-first)**: at every step it looks at **all** current leaves, finds the single split with the *highest gain anywhere in the tree*, and applies only that one. It stops when the tree hits the **`num_leaves`** budget.
+
+Leaf-wise growth spends the leaf budget where it helps most (often producing deep, lopsided trees), which usually lowers loss faster per leaf — but it can overfit more easily, which is why `num_leaves` is LightGBM's most important hyperparameter. With `num_leaves = 2**max_depth` (e.g. 4 leaves for depth 2), a leaf-wise tree has the same capacity as a full depth-wise tree, which makes the comparison with XGBoost in the demo fair.
+
+> The real LightGBM adds **histogram binning**, **GOSS** (gradient-based one-side sampling) and **EFB** (exclusive feature bundling) for speed on huge datasets — those are engineering optimisations; the statistical core we implement below is the leaf-wise growth.
+
+### 8.10.1 Light-GBM Classification
+
+```{r}
+# Single LightGBM-style tree.
+#
+# Uses the same second-order (gradient + Hessian) split gain and leaf weights as XGBoost's
+# XGBTree, but the tree is grown LEAF-WISE (best-first): at every step we look at ALL current
+# leaves, find the single split with the highest gain anywhere in the tree, and apply only that
+# one — until the `num_leaves` budget is used up.
+#
+# Tree nodes here are R *environments* (not lists), because leaf-wise growth needs to mutate
+# a specific leaf in place (turn it into an internal node) while it's still referenced from the
+# `leaves` bookkeeping list — environments have reference semantics in R, exactly like Python's
+# mutable dicts, which is what the original implementation relies on.
+
+LightGBMTree <- setRefClass(
+  "LightGBMTree",
+  fields = list(num_leaves = "numeric", max_depth = "numeric", min_child_weight = "numeric",
+                reg_lambda = "numeric", gamma = "numeric", root = "ANY"),
+  methods = list(
+    initialize = function(num_leaves = 4, max_depth = 3, min_child_weight = 1,
+                          reg_lambda = 1.0, gamma = 0.0, ...) {
+      num_leaves <<- num_leaves; max_depth <<- max_depth; min_child_weight <<- min_child_weight
+      reg_lambda <<- reg_lambda; gamma <<- gamma; root <<- NULL
+      callSuper(...)
+    },
+
+    leaf_weight = function(G, H) -G / (H + reg_lambda),   # same as XGBoost
+
+    gain_fn = function(GL, HL, GR, HR) {                  # same as XGBoost
+      lam <- reg_lambda
+      0.5 * (GL^2 / (HL + lam) + GR^2 / (HR + lam) - (GL + GR)^2 / (HL + HR + lam)) - gamma
+    },
+
+    best_split_for = function(X, g, h, idx) {
+      # Find the best (feature, threshold) split for the samples in `idx`.
+      G <- sum(g[idx]); H <- sum(h[idx])
+      best <- NULL
+      for (feat in seq_len(ncol(X))) {
+        ord <- idx[order(X[idx, feat])]
+        GL <- 0.0; HL <- 0.0
+        for (k in seq_len(length(ord) - 1)) {
+          i <- ord[k]
+          GL <- GL + g[i]; HL <- HL + h[i]
+          GR <- G - GL; HR <- H - HL
+          if (HL < min_child_weight || HR < min_child_weight) next
+          if (X[ord[k], feat] == X[ord[k + 1], feat]) next
+          gn <- gain_fn(GL, HL, GR, HR)
+          if (is.null(best) || gn > best$gain) {
+            best <- list(gain = gn, feat = feat,
+                        thr = (X[ord[k], feat] + X[ord[k + 1], feat]) / 2)
+          }
+        }
+      }
+      best
+    },
+
+    fit = function(X, g, h) {
+      idx_all <- seq_len(nrow(X))
+      root <<- new.env()
+      root$leaf <- TRUE; root$idx <- idx_all; root$depth <- 0
+      root$weight <- leaf_weight(sum(g), sum(h))
+      leaves <- list(root)
+
+      # Leaf-wise growth: split the best leaf anywhere in the tree, repeat until
+      # the num_leaves budget is used up.
+      while (length(leaves) < num_leaves) {
+        best_leaf <- NULL; best_split <- NULL
+        for (leaf in leaves) {
+          if (leaf$depth >= max_depth || length(leaf$idx) < 2) next
+          split <- best_split_for(X, g, h, leaf$idx)
+          if (is.null(split) || split$gain <= 0) next
+          if (is.null(best_split) || split$gain > best_split$gain) {
+            best_leaf <- leaf; best_split <- split
+          }
+        }
+        if (is.null(best_split)) break   # no leaf has a positive-gain split left
+
+        f <- best_split$feat; thr <- best_split$thr
+        li <- best_leaf$idx[X[best_leaf$idx, f] <= thr]
+        ri <- best_leaf$idx[X[best_leaf$idx, f] >  thr]
+
+        left <- new.env(); left$leaf <- TRUE; left$idx <- li; left$depth <- best_leaf$depth + 1
+        left$weight <- leaf_weight(sum(g[li]), sum(h[li]))
+        right <- new.env(); right$leaf <- TRUE; right$idx <- ri; right$depth <- best_leaf$depth + 1
+        right$weight <- leaf_weight(sum(g[ri]), sum(h[ri]))
+
+        # Turn the chosen leaf into an internal node (mutated in place via the environment)
+        best_leaf$leaf <- FALSE
+        best_leaf$feat <- f; best_leaf$thr <- thr
+        best_leaf$left <- left; best_leaf$right <- right
+
+        leaves <- leaves[!vapply(leaves, identical, logical(1), best_leaf)]
+        leaves <- c(leaves, list(left, right))
+      }
+      invisible(.self)
+    },
+
+    traverse_one = function(x, node) {
+      if (node$leaf) return(node$weight)
+      branch <- if (x[node$feat] <= node$thr) node$left else node$right
+      traverse_one(x, branch)
+    },
+
+    predict = function(X) sapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], root))
+  )
+)
+
+# Simplified LightGBM for binary classification (log-loss).
+# Identical boosting loop to XGBoostClassifier, but each round fits a leaf-wise
+# LightGBMTree instead of a depth-wise XGBTree. Labels must be 0 or 1.
+
+LightGBMClassifier <- setRefClass(
+  "LightGBMClassifier",
+  fields = list(num_leaves = "numeric", n_estimators = "numeric", learning_rate = "numeric",
+                max_depth = "numeric", reg_lambda = "numeric", gamma = "numeric",
+                min_child_weight = "numeric", random_state = "ANY", trees = "list", F0 = "ANY"),
+  methods = list(
+    initialize = function(num_leaves = 4, n_estimators = 100, learning_rate = 0.1,
+                          max_depth = 3, reg_lambda = 1.0, gamma = 0.0,
+                          min_child_weight = 1, random_state = 0, ...) {
+      num_leaves <<- num_leaves; n_estimators <<- n_estimators; learning_rate <<- learning_rate
+      max_depth <<- max_depth; reg_lambda <<- reg_lambda; gamma <<- gamma
+      min_child_weight <<- min_child_weight; random_state <<- random_state
+      trees <<- list(); F0 <<- NULL
+      callSuper(...)
+    },
+
+    sigmoid = function(x) 1.0 / (1.0 + exp(-pmin(pmax(x, -500), 500))),
+
+    fit = function(X, y) {
+      p0 <- max(min(mean_val(y), 1 - 1e-7), 1e-7)
+      F0 <<- log(p0 / (1 - p0))     # start from the log-odds of the base rate
+      Fv <- rep(F0, length(y))
+      trees <<- list()
+      for (t in seq_len(n_estimators)) {
+        probs <- sigmoid(Fv)
+        g <- probs - y                   # gradient of log-loss
+        h <- probs * (1 - probs)         # Hessian of log-loss
+        tree <- LightGBMTree$new(num_leaves = num_leaves, max_depth = max_depth,
+                                 min_child_weight = min_child_weight,
+                                 reg_lambda = reg_lambda, gamma = gamma)
+        tree$fit(X, g, h)
+        trees[[t]] <<- tree
+        updates <- tree$predict(X)
+        Fv <- Fv + learning_rate * updates
+      }
+      invisible(.self)
+    },
+
+    predict_proba = function(X) {
+      Fv <- rep(F0, nrow(X))
+      for (tree in trees) Fv <- Fv + learning_rate * tree$predict(X)
+      sigmoid(Fv)
+    },
+
+    predict = function(X, threshold = 0.5) as.integer(predict_proba(X) >= threshold)
+  )
+)
+
+# Factory with a lightgbm-style lowercase name, used in the demo below
+lightgbm_classification <- function(...) LightGBMClassifier$new(...)
+```
+
+### 8.10.2 Light-GBM Regression
+
+```{r}
+# Simplified LightGBM for regression (MSE loss).
+# Identical boosting loop to XGBoostRegressor, but each round fits a leaf-wise
+# LightGBMTree instead of a depth-wise XGBTree.
+
+LightGBMRegressor <- setRefClass(
+  "LightGBMRegressor",
+  fields = list(num_leaves = "numeric", n_estimators = "numeric", learning_rate = "numeric",
+                max_depth = "numeric", reg_lambda = "numeric", gamma = "numeric",
+                min_child_weight = "numeric", random_state = "ANY", trees = "list", F0 = "ANY"),
+  methods = list(
+    initialize = function(num_leaves = 4, n_estimators = 100, learning_rate = 0.1,
+                          max_depth = 3, reg_lambda = 1.0, gamma = 0.0,
+                          min_child_weight = 1, random_state = 0, ...) {
+      num_leaves <<- num_leaves; n_estimators <<- n_estimators; learning_rate <<- learning_rate
+      max_depth <<- max_depth; reg_lambda <<- reg_lambda; gamma <<- gamma
+      min_child_weight <<- min_child_weight; random_state <<- random_state
+      trees <<- list(); F0 <<- NULL
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      F0 <<- mean_val(y)            # start from the mean of the targets
+      Fv <- rep(F0, length(y))
+      trees <<- list()
+      for (t in seq_len(n_estimators)) {
+        g <- Fv - y                 # gradient of MSE
+        h <- rep(1.0, length(y))    # Hessian of MSE = 1
+        tree <- LightGBMTree$new(num_leaves = num_leaves, max_depth = max_depth,
+                                 min_child_weight = min_child_weight,
+                                 reg_lambda = reg_lambda, gamma = gamma)
+        tree$fit(X, g, h)
+        trees[[t]] <<- tree
+        updates <- tree$predict(X)
+        Fv <- Fv + learning_rate * updates
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      Fv <- rep(F0, nrow(X))
+      for (tree in trees) Fv <- Fv + learning_rate * tree$predict(X)
+      Fv
+    }
+  )
+)
+
+# Factory with a lightgbm-style lowercase name, used in the demo below
+lightgbm_regression <- function(...) LightGBMRegressor$new(...)
+```
+
+---
+
+## 8.11 Full Demo: Classification and Regression
+
+```{r}
+# ── Toy datasets ──────────────────────────────────────────────────────────
+
+# Classification: 2 moons (linearly non-separable)
+make_moons_ch8 <- function(n = 80, noise = 0.15, seed = 42) {
+  set.seed(seed)
+  half <- n %/% 2
+  X <- matrix(0.0, nrow = 2 * half, ncol = 2)
+  y <- integer(2 * half)
+  for (i in 0:(half - 1)) {
+    angle <- pi * i / half
+    X[i + 1, ] <- c(cos(angle) + rnorm(1, 0, noise), sin(angle) + rnorm(1, 0, noise))
+    y[i + 1] <- 0
+  }
+  for (i in 0:(half - 1)) {
+    angle <- pi * i / half
+    X[half + i + 1, ] <- c(1 - cos(angle) + rnorm(1, 0, noise), 0.5 - sin(angle) + rnorm(1, 0, noise))
+    y[half + i + 1] <- 1
+  }
+  list(X = X, y = y)
+}
+
+# Regression: noisy sine wave
+make_sine <- function(n = 80, noise = 0.2, seed = 42) {
+  set.seed(seed)
+  X <- matrix(runif(n, -3, 3), ncol = 1)
+  y <- sin(X[, 1]) + rnorm(n, 0, noise)
+  list(X = X, y = y)
+}
+
+set.seed(42)
+moons <- make_moons_ch8(n = 80, seed = 42)
+X_cls <- moons$X; y_cls <- moons$y
+sine <- make_sine(n = 80, seed = 42)
+X_reg <- sine$X; y_reg <- sine$y
+
+# Train/test split (70/30)
+split_data <- function(X, y, test_ratio = 0.3, seed = 42) {
+  set.seed(seed)
+  n <- nrow(X)
+  idx <- sample(n)
+  cut <- floor(n * (1 - test_ratio))
+  tr <- idx[1:cut]; te <- idx[(cut + 1):n]
+  list(X_tr = X[tr, , drop = FALSE], y_tr = y[tr], X_te = X[te, , drop = FALSE], y_te = y[te])
+}
+
+split_c <- split_data(X_cls, y_cls)
+Xtr_c <- split_c$X_tr; ytr_c <- split_c$y_tr; Xte_c <- split_c$X_te; yte_c <- split_c$y_te
+
+split_r <- split_data(X_reg, y_reg)
+Xtr_r <- split_r$X_tr; ytr_r <- split_r$y_tr; Xte_r <- split_r$X_te; yte_r <- split_r$y_te
+
+# AdaBoost needs {-1,+1} labels
+ytr_c_ada <- 2 * ytr_c - 1
+
+# ── Classification benchmark ──────────────────────────────────────────────
+
+cat(strrep("=", 62), "\n")
+cat(sprintf("%-30s %10s %10s\n", "MODEL", "Train Acc", "Test Acc"))
+cat(strrep("=", 62), "\n")
+
+models_cls <- list(
+  list(name = "Bagging Classifier",
+       model = BaggingClassifier$new(n_estimators = 20, max_depth = 4, seed = 0)),
+  list(name = "Random Forest Classifier",
+       model = RandomForestClassifier$new(n_estimators = 20, max_depth = 4, seed = 0)),
+  list(name = "Extra Trees Classifier",
+       model = ExtraTreesClassifier$new(n_estimators = 20, max_depth = 4, seed = 0)),
+  list(name = "Gradient Boosting Classifier",
+       model = GradientBoostingClassifier$new(n_estimators = 50, learning_rate = 0.1, max_depth = 2, seed = 0)),
+  list(name = "XGBoost Classifier",
+       model = XGBoostClassifier$new(n_estimators = 50, learning_rate = 0.1, max_depth = 2,
+                                     reg_lambda = 1.0, gamma = 0.0, seed = 0)),
+  # LightGBM: parameters mirror XGBoost for a fair comparison;
+  # num_leaves = 2**max_depth is the leaf budget of a full depth-2 tree
+  list(name = "LightGBM Classifier",
+       model = lightgbm_classification(num_leaves = 2^2, n_estimators = 50, learning_rate = 0.1,
+                                       max_depth = 2, reg_lambda = 1.0, random_state = 0))
+)
+
+for (cfg in models_cls) {
+  mdl <- cfg$model
+  mdl$fit(Xtr_c, ytr_c)
+  tr_acc <- accuracy(ytr_c, mdl$predict(Xtr_c))
+  te_acc <- accuracy(yte_c, mdl$predict(Xte_c))
+  cat(sprintf("%-30s %10.3f %10.3f\n", cfg$name, tr_acc, te_acc))
+}
+
+# AdaBoost needs {-1,+1}
+ada_cls <- AdaBoostClassifier$new(n_estimators = 50)
+ada_cls$fit(Xtr_c, ytr_c_ada)
+tr_acc <- accuracy(ytr_c, (ada_cls$predict(Xtr_c) + 1) %/% 2)
+te_acc <- accuracy(yte_c, (ada_cls$predict(Xte_c) + 1) %/% 2)
+cat(sprintf("%-30s %10.3f %10.3f\n", "AdaBoost Classifier", tr_acc, te_acc))
+
+# ── Regression benchmark ───────────────────────────────────────────────────
+
+cat("\n")
+cat(strrep("=", 62), "\n")
+cat(sprintf("%-30s %10s %10s\n", "MODEL", "Train R2", "Test R2"))
+cat(strrep("=", 62), "\n")
+
+models_reg <- list(
+  list(name = "Bagging Regressor",
+       model = BaggingRegressor$new(n_estimators = 20, max_depth = 4, seed = 0)),
+  list(name = "Random Forest Regressor",
+       model = RandomForestRegressor$new(n_estimators = 20, max_depth = 4, seed = 0)),
+  list(name = "Extra Trees Regressor",
+       model = ExtraTreesRegressor$new(n_estimators = 20, max_depth = 4, seed = 0)),
+  list(name = "AdaBoost Regressor",
+       model = AdaBoostRegressor$new(n_estimators = 50, learning_rate = 1.0)),
+  list(name = "Gradient Boosting Regressor",
+       model = GradientBoostingRegressor$new(n_estimators = 100, learning_rate = 0.1, max_depth = 2, seed = 0)),
+  list(name = "XGBoost Regressor",
+       model = XGBoostRegressor$new(n_estimators = 100, learning_rate = 0.1, max_depth = 2,
+                                    reg_lambda = 1.0, gamma = 0.0, seed = 0)),
+  # LightGBM: parameters mirror XGBoost for a fair comparison
+  list(name = "LightGBM Regressor",
+       model = lightgbm_regression(num_leaves = 2^2, n_estimators = 100, learning_rate = 0.1,
+                                   max_depth = 2, reg_lambda = 1.0, random_state = 0))
+)
+
+for (cfg in models_reg) {
+  mdl <- cfg$model
+  mdl$fit(Xtr_r, ytr_r)
+  tr_r2 <- r2(ytr_r, mdl$predict(Xtr_r))
+  te_r2 <- r2(yte_r, mdl$predict(Xte_r))
+  cat(sprintf("%-30s %10.3f %10.3f\n", cfg$name, tr_r2, te_r2))
+}
+```
+
+---
+
+## 8.11 Comparison Table
+
+### Classification
+
+| Model | Bias | Variance | Training | Key Strength |
+|-------|------|----------|----------|-------------|
+| Bagging | Low | Lower | Medium | Simple, stable |
+| Random Forest | Low | Low | Medium | Best general baseline |
+| Extra Trees | Low | Lowest | Fast | Very low variance, fast |
+| AdaBoost | Lower | Low | Slower | Excellent on clean data |
+| Gradient Boosting | Very Low | Low | Slow | High accuracy |
+| XGBoost | Very Low | Low | Slow | Regularised, industry standard |
+| LightGBM | Very Low | Low* | Fast | Leaf-wise growth: best accuracy per leaf |
+
+*\*Variance is low if `num_leaves` is kept in check — leaf-wise trees overfit more easily than depth-wise ones.*
+
+### Regression
+
+| Model | Interpolates | Extrapolates | Handles Noise | Key Strength |
+|-------|-------------|-------------|--------------|-------------|
+| Bagging Regressor | Good | Poor | Good | Simple ensemble |
+| RF Regressor | Good | Poor | Very Good | Robust, parallelisable |
+| Extra Trees Regressor | Good | Poor | Good | Fastest training |
+| AdaBoost Regressor | Good | Poor | Moderate | Weighted median output |
+| GB Regressor | Excellent | Poor | Good | Stage-wise optimisation |
+| XGBoost Regressor | Excellent | Poor | Good | L1/L2 regularisation, pruning |
+| LightGBM Regressor | Excellent | Poor | Good | Leaf-wise trees, fast on large data |
+
+---
+
+## 8.12 Hyperparameter Guide
+
+| Parameter | Affects | Typical range |
+|-----------|---------|--------------|
+| `n_estimators` | Variance ↓ as $B \uparrow$ | 50–500 |
+| `max_depth` | Bias-variance trade-off | 2–6 (boosting), 5–20 (bagging) |
+| `learning_rate` (boosting) | Step size; smaller needs more trees | 0.01–0.3 |
+| `max_features` | De-correlation of trees | `sqrt` (cls), `third` (reg) |
+| `reg_lambda` (XGBoost) | L2 regularisation on leaf weights | 0.1–10 |
+| `gamma` (XGBoost) | Minimum gain to allow split | 0–5 |
+| `min_child_weight` (XGBoost) | Minimum Hessian sum in leaf | 1–10 |
+| `num_leaves` (LightGBM) | Tree capacity; the main overfitting knob | 4–128 (≤ `2**max_depth`) |
+
+---
+
+## 8.13 Exercises
+
+1. **OOB error**: For `BaggingClassifier`, track which samples are left out of each bootstrap and compute out-of-bag accuracy without a separate test set.
+2. **Feature importance**: Use the `feature_importances` method of `RandomForestClassifier` to rank features. Compare to the result from a single decision tree.
+3. **Early stopping**: Add early stopping to `GradientBoostingRegressor` — stop adding trees when validation loss stops improving.
+4. **Stacking**: Build a meta-learner (logistic regression from Chapter 03) that takes the predictions of `RandomForestClassifier`, `GradientBoostingClassifier`, and `AdaBoostClassifier` as input features.
+5. **XGBoost column subsampling**: Add `colsample_bytree` to `XGBoostClassifier` — randomly select a fraction of features before building each tree (similar to Random Forest's `max_features`).
+6. **Multiclass AdaBoost**: Extend `AdaBoostClassifier` to handle $K > 2$ classes using the SAMME algorithm.
+
+---
+
+## ✅ Summary
+
+| Algorithm | Task | Aggregation | Key Idea |
+|-----------|------|------------|---------|
+| Bagging | Both | Vote / Mean | Bootstrap samples reduce variance |
+| Random Forest | Both | Vote / Mean | Bagging + random feature subsets |
+| Extra Trees | Both | Vote / Mean | RF + random thresholds (no search) |
+| AdaBoost | Both | Weighted vote / Weighted median | Reweight samples on errors |
+| Gradient Boosting | Both | Additive | Fit trees to negative gradient |
+| XGBoost | Both | Additive | GB + 2nd-order gradients + regularisation |
+| LightGBM | Both | Additive | XGBoost math + leaf-wise (best-first) tree growth |
+
+---
+
+**← Previous:** [Chapter 07: Support Vector Machines](chapter-07-svm.qmd)
+**→ Next:** [Chapter 09: K-Means Clustering](chapter-09-kmeans.qmd)
+**← Back to Start:** [Home](../index.qmd)

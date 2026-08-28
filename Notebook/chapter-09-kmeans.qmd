@@ -1,0 +1,315 @@
+---
+title: "Chapter 09: K-Means Clustering"
+subtitle: "K-Means++ initialization, the elbow method, and silhouette score — from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 09: K-Means Clustering
+
+> **Level**: Intermediate | **Estimated Time**: 3 hours
+
+---
+
+## 9.1 Overview
+
+K-Means is the most widely used **unsupervised** clustering algorithm.
+
+**Goal**: partition $n$ data points into $K$ clusters such that each point belongs to the cluster with the nearest mean (centroid).
+
+No labels needed — the algorithm discovers structure on its own.
+
+---
+
+## 9.2 The Algorithm
+
+Imagine you have a bunch of points and you want to group them so that similar points end up together. That's what K-Means does! Here's how it works in simple terms:
+
+1. Pick a number, K. This is how many groups (clusters) you want to find.
+2. Randomly put down K points—think of them as "group centers" (centroids).
+3. Do these steps over and over until things stop changing:
+   - For each point, figure out which group center (centroid) it's closest to. Assign the point to that group.
+   - For each group, move its center to the average location of all the points now in that group. (This is like saying, "Where is the middle of my group now?")
+
+You stop when the groups don't really change anymore (either the points stop jumping from group to group, or the group centers barely move).
+
+---
+
+## 9.3 Mathematical Objective
+
+**What does K-Means try to do — for dummies, with math:**
+
+The goal of K-Means is to group your data points so that points in the same group (cluster) are as close as possible to each other, using their mean as the "center."
+
+Here's what it's trying to minimize:
+
+$$J = \sum_{k=1}^{K} \sum_{\mathbf{x}_i \in C_k} \|\mathbf{x}_i - \boldsymbol{\mu}_k\|^2$$
+
+Let's break this down:
+
+1. You choose $K$ — how many clusters you want.
+2. For each cluster $k$, you have a center (called a centroid) $\boldsymbol{\mu}_k$. It's just the average (mean) of all the points in that cluster.
+3. For every data point $\mathbf{x}_i$, you look at which cluster it's assigned to (let's call that group $C_k$).
+4. You measure the squared distance ($\|\mathbf{x}_i - \boldsymbol{\mu}_k\|^2$) from that point to its cluster center.
+5. The algorithm adds up all these squared distances, for all the points and all clusters.
+
+In plain English: K-Means keeps trying to group the points and move the cluster centers to make this total "sum of squared distances to centers" as small as possible. (Picture it as people huddling as close to their group leader as they can!)
+
+Fun fact: This is called the **Within-Cluster Sum of Squares (WCSS)**.
+
+Math can be tricky: Since this problem isn't "nice" (non-convex), where you start (initial cluster centers) can change the result you get.
+
+---
+
+## 9.4 From-Scratch R Implementation
+
+```{r}
+# kmeans.R
+# --- EXPLANATION OF THE CODE FOR KMEANS IMPLEMENTATION ---
+
+euclidean <- function(a, b) {
+  # Euclidean distance between points a and b (numeric vectors of the same length).
+  sqrt(sum((a - b)^2))
+}
+
+# Implements the K-Means clustering algorithm (with K-Means++ initialization).
+# This class does not use external ML libraries — it is a pure base-R implementation.
+
+KMeans <- setRefClass(
+  "KMeans",
+  fields = list(k = "numeric", max_iter = "numeric", tol = "numeric", n_init = "numeric",
+                seed = "numeric", centroids = "ANY", labels = "ANY", inertia = "ANY"),
+  methods = list(
+    initialize = function(k = 3, max_iter = 300, tol = 1e-4, n_init = 10, seed = 42, ...) {
+      # k: number of clusters
+      # max_iter: maximum number of iterations for each run
+      # tol: convergence threshold (when centroids move less than this, stop)
+      # n_init: how many times to run the algorithm, picking the best outcome
+      # seed: random seed
+      k <<- k; max_iter <<- max_iter; tol <<- tol; n_init <<- n_init; seed <<- seed
+      centroids <<- NULL   # Final cluster centers
+      labels <<- NULL      # Cluster assignment for each data point
+      inertia <<- NULL     # Final sum of squares within clusters
+      callSuper(...)
+    },
+
+    init_centroids_plus_plus = function(X) {
+      # K-Means++ smart seeding of initial centroids.
+      # - The first centroid is chosen randomly.
+      # - Each new centroid is chosen with probability proportional to its squared distance
+      #   from the closest existing centroid (spread centroids out).
+      set.seed(seed)
+      n <- nrow(X)
+      centroids <- matrix(X[sample(n, 1), ], nrow = 1)
+      for (i in seq_len(k - 1)) {
+        distances <- sapply(seq_len(n), function(r) {
+          min(sapply(seq_len(nrow(centroids)), function(c) euclidean(X[r, ], centroids[c, ])^2))
+        })
+        total <- sum(distances)
+        rr <- runif(1) * total   # choose new centroid randomly, weighted by distance squared
+        cumulative <- 0.0
+        chosen <- n
+        for (idx in seq_len(n)) {
+          cumulative <- cumulative + distances[idx]
+          if (cumulative >= rr) { chosen <- idx; break }
+        }
+        centroids <- rbind(centroids, X[chosen, ])
+      }
+      centroids
+    },
+
+    assign_ = function(X, centroids) {
+      # For each data point, find its nearest centroid. Returns 0-indexed cluster labels.
+      sapply(seq_len(nrow(X)), function(i) {
+        dists <- sapply(seq_len(nrow(centroids)), function(c) euclidean(X[i, ], centroids[c, ]))
+        which.min(dists) - 1L
+      })
+    },
+
+    update_centroids = function(X, labs) {
+      # Recalculate centroids as the mean position of all points assigned to each cluster.
+      # If a cluster gets no assigned points, a random point is picked as its new centroid.
+      n_features <- ncol(X)
+      new_centroids <- matrix(0.0, nrow = k, ncol = n_features)
+      for (kk in 0:(k - 1)) {
+        cluster_mask <- labs == kk
+        if (any(cluster_mask)) {
+          new_centroids[kk + 1, ] <- colMeans(X[cluster_mask, , drop = FALSE])
+        } else {
+          new_centroids[kk + 1, ] <- X[sample(nrow(X), 1), ]
+        }
+      }
+      new_centroids
+    },
+
+    compute_inertia = function(X, labs, centroids) {
+      # Total sum of squared distances from each point to its assigned centroid.
+      sum(sapply(seq_len(nrow(X)), function(i) euclidean(X[i, ], centroids[labs[i] + 1, ])^2))
+    },
+
+    fit_once = function(X) {
+      # Run one K-Means clustering from a fresh random initialization.
+      centroids <- init_centroids_plus_plus(X)
+
+      for (iter in seq_len(max_iter)) {
+        labs <- assign_(X, centroids)
+        new_centroids <- update_centroids(X, labs)
+
+        # Shift = largest distance any centroid moved; stop if below tolerance
+        shift <- max(sapply(seq_len(k), function(kk) euclidean(centroids[kk, ], new_centroids[kk, ])))
+        centroids <- new_centroids
+        if (shift < tol) break
+      }
+
+      labs <- assign_(X, centroids)   # final assignment
+      inertia_val <- compute_inertia(X, labs, centroids)
+      list(centroids = centroids, labels = labs, inertia = inertia_val)
+    },
+
+    fit = function(X) {
+      # Runs K-Means multiple times (n_init), each with a different initialization.
+      # Keeps the result with the lowest inertia (best clustering).
+      best_inertia <- Inf
+      for (run in 0:(n_init - 1)) {
+        seed <<- seed + run
+        result <- fit_once(X)
+        if (result$inertia < best_inertia) {
+          best_inertia <- result$inertia
+          centroids <<- result$centroids
+          labels <<- result$labels
+          inertia <<- result$inertia
+        }
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) assign_(X, centroids),
+
+    fit_predict = function(X) { fit(X); labels }
+  )
+)
+
+# ── Elbow Method ──────────────────────────────────────────────────────────
+# The Elbow Method is a technique used to determine the optimal number of clusters (K).
+# It runs K-Means for different values of K and records the corresponding "inertia".
+# Inertia typically decreases as K increases. Plotting inertia vs K, the optimal K is
+# suggested where the rate of decrease sharply shifts — forming an "elbow" in the plot.
+
+elbow_method <- function(X, k_range = 1:10) {
+  # Compute inertia for each K to find the 'elbow'.
+  inertias <- list()
+  for (kk in k_range) {
+    km <- KMeans$new(k = kk, n_init = 5)
+    km$fit(X)
+    inertias[[as.character(kk)]] <- km$inertia
+    cat(sprintf("  K=%2d  Inertia=%.2f\n", kk, km$inertia))
+  }
+  inertias
+}
+
+# ── Silhouette Score ──────────────────────────────────────────────────────
+# Measures how similar an object is to its own cluster compared to other clusters.
+# Range: [-1, 1], higher is better.
+
+silhouette_score <- function(X, labs) {
+  n <- nrow(X)
+  scores <- numeric(n)
+  k_set <- sort(unique(labs))
+
+  for (i in seq_len(n)) {
+    # a(i): mean distance to points in same cluster
+    same_mask <- (labs == labs[i]) & (seq_len(n) != i)
+    same <- X[same_mask, , drop = FALSE]
+    a <- if (nrow(same) > 0) mean(sapply(seq_len(nrow(same)), function(j) euclidean(X[i, ], same[j, ]))) else 0
+
+    # b(i): minimum mean distance to other clusters
+    b <- Inf
+    for (kk in k_set) {
+      if (kk == labs[i]) next
+      other <- X[labs == kk, , drop = FALSE]
+      if (nrow(other) > 0) {
+        mean_dist <- mean(sapply(seq_len(nrow(other)), function(j) euclidean(X[i, ], other[j, ])))
+        b <- min(b, mean_dist)
+      }
+    }
+    if (is.infinite(b)) b <- 0
+    scores[i] <- if (max(a, b) > 0) (b - a) / max(a, b) else 0
+  }
+
+  mean(scores)
+}
+
+# ── Demo ──────────────────────────────────────────────────────────────────
+set.seed(0)
+
+gaussian_cluster <- function(cx, cy, n = 20, spread = 0.5) {
+  cbind(rnorm(n, cx, spread), rnorm(n, cy, spread))
+}
+
+# Generate 3 Gaussian clusters
+X <- rbind(gaussian_cluster(0, 0), gaussian_cluster(5, 0), gaussian_cluster(2.5, 4))
+true_labels <- c(rep(0, 20), rep(1, 20), rep(2, 20))
+
+km <- KMeans$new(k = 3, n_init = 5)
+labs <- km$fit_predict(X)
+
+cat("K-Means Clustering Results:\n")
+cat(sprintf("  Inertia: %.2f\n", km$inertia))
+cat(sprintf("  Silhouette Score: %.3f\n", silhouette_score(X, labs)))
+cat("\n  Centroids:\n")
+for (i in seq_len(nrow(km$centroids))) {
+  cat(sprintf("    Cluster %d: (%.2f, %.2f)\n", i - 1, km$centroids[i, 1], km$centroids[i, 2]))
+}
+
+cat("\nElbow Method:\n")
+invisible(elbow_method(X, 1:6))
+```
+
+---
+
+## 9.5 Choosing K
+
+| Method | Approach |
+|--------|---------|
+| **Elbow method** | Plot inertia vs K; choose the "elbow" |
+| **Silhouette score** | Maximize silhouette score |
+| **Domain knowledge** | You know the expected number of groups |
+| **Gap statistic** | Compare WCSS to random baseline |
+
+---
+
+## 9.6 Limitations of K-Means
+
+- Assumes **spherical, similarly-sized clusters** (Euclidean distance)
+- Sensitive to **outliers** and **initialization** (use K-Means++)
+- Must specify K in advance
+- Fails on non-convex shapes → use DBSCAN or Gaussian Mixture Models instead
+
+---
+
+## ✅ Chapter Summary
+
+| Step | Math |
+|------|------|
+| Objective | Minimize $\sum_k \sum_{\mathbf{x}_i \in C_k} \|\mathbf{x}_i - \boldsymbol{\mu}_k\|^2$ |
+| Assignment | Each point → nearest centroid |
+| Update | Centroid = mean of assigned points |
+| K selection | Elbow method or silhouette score |
+
+---
+
+## 📝 Exercises
+
+1. Prove that K-Means always converges (hint: inertia is non-increasing).
+2. Implement **K-Medoids** where centroids must be actual data points.
+3. What happens if two centroids collapse to the same point? How does K-Means++ prevent this?
+
+---
+
+**← Previous:** [Chapter 08: Ensemble Methods](chapter-08-ensemble-methods.qmd)
+**→ Next:** [Chapter 10: PCA](chapter-10-pca.qmd)

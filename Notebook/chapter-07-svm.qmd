@@ -1,0 +1,489 @@
+---
+title: "Chapter 07: Support Vector Machines (SVM)"
+subtitle: "Margins, soft margins, hinge loss, kernels, and a from-scratch SGD implementation"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 07: Support Vector Machines (SVM)
+
+> **Level**: Intermediate | **Estimated Time**: 4–5 hours
+
+---
+
+## 7.1 Overview
+
+Imagine you want to separate two groups with a straight line (or a flat surface in more dimensions). SVM tries to draw this line so that it is as far away as possible from any point in both groups.
+
+Instead of just finding any line that splits the groups, SVM looks for the line that gives the biggest "buffer zone" (margin) between them. This helps the model make better predictions on new, unseen data.
+
+"Support vectors" are the specific data points that are closest to this separating line. They are important because they determine exactly where this line is placed.
+
+---
+
+## 7.2 Mathematical Formulation
+
+### Linear SVM (Hard Margin)
+
+We want to split two groups using a straight line (or flat surface in higher dimensions).
+
+SVM wants to find the line that has the *biggest gap* (margin) between the two groups — not just any line that separates them.
+
+Imagine you lined up two groups of people and put the widest possible rope between them. The people closest to the rope decide where it goes — these are the "support vectors."
+
+Mathematically, SVM tries to:
+- Place a line (hyperplane) as far away from both groups as possible
+- Make sure all points are on the correct side, and not too close to the line
+
+The rule for classifying each dot is:
+- If it's on the right side of the line for its own group and at least 1 "unit" away, we're happy.
+
+The wider the margin (gap), the better. To get the widest gap, the mathy way is:
+- Make the numbers ($\mathbf{w}$) that define the line as small as possible, but still keep all points on the correct side.
+
+Formal-ish:
+$$y_i(\mathbf{w}^\top \mathbf{x}_i + b) \geq 1$$
+for all points $i$. (This just means: each point is on the correct side and not too close to the line.)
+
+The training goal is:
+$$ \text{Make } \frac{1}{2}\|\mathbf{w}\|^2 \text{ as small as possible, so the gap is as big as possible!} $$
+
+All while making sure every point is separated by at least a margin of 1 from the line.
+
+```{r}
+# We use e1071::svm() here (an R interface to libsvm, the same engine behind
+# sklearn.svm.SVC) purely to draw an illustrative margin/boundary plot — the
+# from-scratch SVM implementation comes later in Section 7.4.
+
+set.seed(7)
+X1 <- sweep(matrix(rnorm(9 * 2), ncol = 2), 2, c(-2, -2), "+")
+X2 <- sweep(matrix(rnorm(9 * 2), ncol = 2), 2, c(2, 2), "+")
+X <- rbind(X1, X2)
+y <- factor(c(rep(-1, 9), rep(1, 9)), levels = c(-1, 1))
+
+# Fit linear SVM (for demo purpose only)
+clf <- e1071::svm(X, y, kernel = "linear", cost = 1000, scale = FALSE)
+
+# Plot the data
+plot(X1[, 1], X1[, 2], col = "red", pch = 16,
+     xlim = range(X[, 1]) + c(-1, 1), ylim = range(X[, 2]) + c(-1, 1),
+     xlab = expression(x[1]), ylab = expression(x[2]),
+     main = "Linear SVM: Decision Boundary and Margins")
+points(X2[, 1], X2[, 2], col = "blue", pch = 16)
+
+# Plot separator: build a grid and evaluate the decision function on it
+xlim <- range(X[, 1]) + c(-1, 1); ylim <- range(X[, 2]) + c(-1, 1)
+xx <- seq(xlim[1], xlim[2], length.out = 60)
+yy <- seq(ylim[1], ylim[2], length.out = 60)
+grid <- as.matrix(expand.grid(xx, yy))
+colnames(grid) <- colnames(X)
+Z <- matrix(attr(predict(clf, grid, decision.values = TRUE), "decision.values"), nrow = length(xx))
+
+# Decision boundary and margins
+contour(xx, yy, Z, levels = c(-1, 1), lty = 2, add = TRUE, drawlabels = FALSE)
+contour(xx, yy, Z, levels = 0, lty = 1, lwd = 2, add = TRUE, drawlabels = FALSE)
+
+# Highlight Support Vectors
+sv <- clf$SV
+points(sv[, 1], sv[, 2], pch = 1, cex = 2.2, lwd = 1.5)
+
+legend("topleft", legend = c("Class -1", "Class +1", "Support Vectors", "Boundary (solid)", "Margin (dashed)"),
+       col = c("red", "blue", "black", "black", "black"), pch = c(16, 16, 1, NA, NA),
+       lty = c(NA, NA, NA, 1, 2), bty = "n")
+```
+
+### Soft Margin SVM (for beginners)
+
+Sometimes, in real life, there's no way to perfectly separate two types of things (classes) with a straight line. A Soft Margin SVM lets us make some mistakes ("misclassifications") to get a better overall result.
+
+To do this, we introduce something called **slack variables** $\xi_i$, which are just numbers that measure how much each point is breaking the rule. Bigger $\xi_i$ means the point is either inside the margin or on the wrong side of the boundary.
+
+The SVM now tries to:
+- Make the margin as wide as possible (keep $\|\mathbf{w}\|^2$ small)
+- But it also allows mistakes, and adds up how "bad" they are (the sum of the $\xi_i$)
+- The trade-off is controlled by a parameter called **C**
+
+In simple terms, the SVM solves this:
+$$
+\text{Minimize: } \frac{1}{2}\|\mathbf{w}\|^2 + C \sum_i \xi_i \\
+\text{Subject to: } y_i(\mathbf{w}^\top \mathbf{x}_i + b) \geq 1 - \xi_i\ \text{and}\ \xi_i \geq 0
+$$
+
+What does **C** do?
+- Small C (low value): The SVM will allow more mistakes (wider margin, but sloppier), which can help prevent overfitting ("high bias").
+- Large C (high value): The SVM will be strict with mistakes (narrower margin, fits the data better), but might overfit ("high variance").
+
+In summary:
+- Soft Margin SVM lets some points be on the wrong side, but tries to keep the margin wide.
+- **C** lets you decide what's more important: fewer mistakes or a bigger safety margin.
+
+```{r}
+# Generate some data that is not perfectly separable
+set.seed(1)
+X <- rbind(sweep(matrix(rnorm(15 * 2), ncol = 2), 2, c(2, 2), "-"),
+           sweep(matrix(rnorm(15 * 2), ncol = 2), 2, c(2, 2), "+"))
+Y <- c(rep(1, 15), rep(-1, 15))
+# Add some noise - flip the label of 3 points to force misclassification
+Y[1]  <- -1   # (Python index 0)
+Y[17] <- 1    # (Python index 16)
+Y[26] <- 1    # (Python index 25)
+Y <- factor(Y, levels = c(-1, 1))
+
+# Fit SVM model with soft margin (small C allows some errors)
+clf <- e1071::svm(X, Y, kernel = "linear", cost = 0.7, scale = FALSE)
+
+# Plot data points, coloring by label
+plot(X[Y == 1, 1], X[Y == 1, 2], col = "blue", pch = 16,
+     xlim = range(X[, 1]) + c(-0.5, 0.5), ylim = range(X[, 2]) + c(-0.5, 0.5),
+     xlab = expression(x[1]), ylab = expression(x[2]),
+     main = "Soft Margin SVM: Imperfectly Separable Data")
+points(X[Y == -1, 1], X[Y == -1, 2], col = "red", pch = 16)
+
+# Show support vectors
+sv <- clf$SV
+points(sv[, 1], sv[, 2], pch = 1, cex = 2.2, lwd = 2)
+
+# Create grid to plot decision boundary and margins
+xlim <- range(X[, 1]) + c(-0.5, 0.5); ylim <- range(X[, 2]) + c(-0.5, 0.5)
+xx <- seq(xlim[1], xlim[2], length.out = 150)
+yy <- seq(ylim[1], ylim[2], length.out = 150)
+grid <- as.matrix(expand.grid(xx, yy))
+colnames(grid) <- colnames(X)
+Z <- matrix(attr(predict(clf, grid, decision.values = TRUE), "decision.values"), nrow = length(xx))
+
+# Plot decision boundary and soft margins
+contour(xx, yy, Z, levels = c(-1, 1), lty = 2, add = TRUE, drawlabels = FALSE)
+contour(xx, yy, Z, levels = 0, lty = 1, lwd = 2, add = TRUE, drawlabels = FALSE)
+
+legend("topright", legend = c("Class +1", "Class -1", "Support Vectors"),
+       col = c("blue", "red", "black"), pch = c(16, 16, 1), bty = "n")
+```
+
+### Hinge Loss
+
+The **hinge loss** is a way for SVMs to figure out how "bad" a guess was. Imagine you want your SVM to not just get the answer right, but to be *really* sure—so sure that every point is not just on the right side, but far from the border.
+
+For each point, hinge loss does this:
+- If the point is on the correct side *and* a safe distance away: loss = 0 (no penalty).
+- If the point is either wrong or too close to the border: the farther it is from a comfortable margin, the bigger the penalty.
+
+The formula looks like this (don't worry if it seems scary):
+
+$$
+L_{\text{hinge}}(y, \hat{y}) = \max(0, 1 - y \cdot \hat{y})
+$$
+
+- $y$ is the real answer (+1 or -1).
+- $\hat{y}$ is your SVM's guess for the point (it's a score, not just a class).
+- If $y \cdot \hat{y}$ is 1 or more, life is good (loss is 0).
+- If not, the "badness" grows the further you get from perfect.
+
+Why do we care? Because SVM doesn't just want correct answers, it wants answers that are *confident*.
+
+In practice, SVMs balance two things:
+1. Hinge loss (make as few and as small mistakes as possible),
+2. Keeping the weights small (so the separation isn't wild—called **regularization**).
+
+That total objective looks like:
+
+$$
+J(\mathbf{w}) = \frac{1}{n} \sum_i \max(0, 1 - y_i(\mathbf{w}^\top \mathbf{x}_i + b)) + \lambda\|\mathbf{w}\|^2
+$$
+
+This just means: "Let's minimize mistakes (hinge loss) + don't get too crazy with the separator (regularization)." That's what makes SVMs powerful and reliable.
+
+---
+
+## 7.3 The Kernel Trick (For Dummies)
+
+Imagine your data is mixed up in a way that drawing any straight line (or plane) can't separate the categories—no matter how hard you try! SVMs have a superpower called the **kernel trick** for this.
+
+Here's the idea:
+- What if instead of working in the world you see (like drawing a line on paper), you could "lift" the points up into a magical, invisible world with more dimensions?
+- In this new space, the points might spread out so nicely that a straight line *can* separate them. (It's like taking a tangled-up string and spreading it out so it's straight.)
+
+But wait: doing all that math sounds super hard, right? Here's where the magic happens.
+- The kernel trick lets you "pretend" you're doing this crazy mapping—*without actually doing it!*
+- Instead, it gives you a formula (the **kernel function**) that does all the hard work in the background.
+
+In math-jargon:
+- Instead of transforming both points ($\mathbf{x}_i$ and $\mathbf{x}_j$) to a high dimension and then taking their dot product,
+- You just use the kernel function: $K(\mathbf{x}_i, \mathbf{x}_j)$, and it *acts* like you did all that work.
+
+So: Kernel = the shortcut that lets SVMs draw wiggly, complicated lines to separate messy data, *without* doing mind-bending math.
+
+### Types of Kernels in SVM
+
+SVMs get their "superpower" from kernels. Each kernel is like a recipe for how to compare two data points. Here are the common ones, explained simply:
+
+**1. Linear Kernel:**
+- *What it does:* Compares two points just by seeing how much they point in the "same direction" — like classic SVM.
+- *Equation:* $\mathbf{x}_i^\top \mathbf{x}_j$ (just multiply and add up the features)
+- *For dummies:* "Is A like B? Add up their matching parts."
+- *When to use:* When a straight line (or plane) can separate your classes.
+
+**2. Polynomial Kernel:**
+- *What it does:* Lets you draw "curvy" separator lines by comparing not just the features, but their combinations as well.
+- *Equation:* $(\mathbf{x}_i^\top \mathbf{x}_j + c)^d$ ($c$ shifts things; $d$ is how wiggly the line is)
+- *For dummies:* "Take the regular A·B, add a number, and make it bigger by multiplying it by itself a few times!"
+- *When to use:* When you think a curve (not a line) can separate the data.
+
+**3. RBF (Radial Basis Function) / Gaussian Kernel:**
+- *What it does:* Looks at how close or far apart two points are. Close = very similar, far = not similar.
+- *Equation:* $\exp\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2\right)$
+-  (If $x_i = x_j$, then output is biggest: $e^0 = 1$; if they're far, output shrinks.)
+- *For dummies:* "If points are close, they're friends; if far, they're strangers."
+- *When to use:* The default for messy, tangled data.
+
+**4. Sigmoid Kernel:**
+- *What it does:* Acts kind of like a mini neural network layer—squishes values between -1 and 1.
+- *Equation:* $\tanh(\kappa \mathbf{x}_i^\top \mathbf{x}_j + c)$
+- *For dummies:* "Do the usual compare, scale/stretch it, add a number, squish the answer so it's never too big or small."
+- *When to use:* Rare - typically if you want to mimic neural-network-style decisions.
+
+**Summary:**
+- *Kernel = shortcut formula for 'are these points similar?'*
+- Each kind gives SVM a new way to separate data, from boring lines to wild scribbles, all without actually changing the data's coordinates!
+
+---
+
+## 7.4 From-Scratch R Implementation (Linear SVM via SGD)
+
+```{r}
+# svm.R
+
+polynomial_kernel <- function(x, y, c = 1, d = 2) {
+  # Polynomial kernel: (x^T y + c)^d
+  (sum(x * y) + c)^d
+}
+
+rbf_kernel <- function(x, y, gamma = 1.0) {
+  # RBF (Gaussian) kernel: exp(-gamma * ||x-y||^2)
+  squared_dist <- sum((x - y)^2)
+  exp(-gamma * squared_dist)
+}
+
+sigmoid_kernel <- function(x, y, kappa = 0.01, c = 0.0) {
+  # Sigmoid kernel: tanh(kappa * x^T y + c)
+  tanh(kappa * sum(x * y) + c)
+}
+
+# This is a simple implementation of a Linear Support Vector Machine (SVM) using
+# Stochastic Gradient Descent (SGD) in plain base R. It's written for clarity, not
+# for speed or production use, and doesn't use any modeling libraries!
+# The goal: find a line (or hyperplane) that separates two classes with the biggest "gap" (margin).
+#
+# The training tries to minimize:
+#   Loss = (How wrong the predictions are) + (how big/complex the weights are)
+#   Specifically: C * average hinge loss + (1/2) * sum of squared weights
+#   Here C controls how much you care about classification mistakes vs. keeping weights small.
+
+LinearSVM <- setRefClass(
+  "LinearSVM",
+  fields = list(Cparam = "numeric", lr = "numeric", n_iter = "numeric", w = "numeric", b = "numeric"),
+  methods = list(
+    # NOTE: the constructor argument and field are named `Cparam`, not `C` — a
+    # RefClass field/argument literally named `C` collides with R's `methods::new()`
+    # (partial argument matching against its `Class` parameter), so we avoid it.
+    initialize = function(Cparam = 1.0, learning_rate = 0.001, n_iterations = 1000, ...) {
+      # Cparam: regularization parameter (tradeoff between margin and mistakes).
+      # learning_rate: how big are weight updates each step.
+      # n_iterations: how many full passes over data.
+      Cparam <<- Cparam; lr <<- learning_rate; n_iter <<- n_iterations
+      w <<- numeric(0); b <<- 0.0
+      callSuper(...)
+    },
+
+    hinge_loss = function(X, y) {
+      # Compute average hinge loss + regularization on all data points.
+      total <- 0.0
+      for (i in seq_len(nrow(X))) {
+        margin <- y[i] * (sum(w * X[i, ]) + b)
+        total <- total + max(0.0, 1.0 - margin)
+      }
+      Cparam * total / length(y) + 0.5 * sum(w^2)
+    },
+
+    fit = function(X, y) {
+      # Learn weights to separate classes using SGD. y: labels (1 or -1).
+      n <- nrow(X); p <- ncol(X)
+      w <<- rep(0.0, p)
+      b <<- 0.0
+
+      for (iter in seq_len(n_iter)) {
+        indices <- sample(seq_len(n))   # Shuffle the training data indices (SGD)
+
+        for (i in indices) {
+          xi <- X[i, ]; yi <- y[i]
+          z <- sum(w * xi) + b
+          margin <- yi * z
+
+          if (margin >= 1) {
+            w <<- w - lr * w   # Far enough from the boundary: just shrink weights (regularization)
+          } else {
+            # Either wrong side or inside margin: push in right direction and regularize
+            w <<- w - lr * (w - Cparam * yi * xi)
+            b <<- b + lr * Cparam * yi   # Update bias too
+          }
+        }
+      }
+      invisible(.self)
+    },
+
+    decision_function = function(X) {
+      # For each sample in X, compute the score (w^T x + b).
+      as.numeric(X %*% w) + b
+    },
+
+    predict = function(X) {
+      # >=0 goes to 1, otherwise -1.
+      ifelse(decision_function(X) >= 0, 1, -1)
+    }
+  )
+)
+
+
+# Kernel SVM using dual hinge-loss SGD.
+# Decision function: f(x) = b + sum_i alpha_i * y_i * K(x_i, x)
+
+KernelSVM <- setRefClass(
+  "KernelSVM",
+  fields = list(kernel = "character", kernel_params = "list", Cparam = "numeric", lr = "numeric",
+                n_iter = "numeric", X_train = "ANY", y_train = "ANY", alpha = "numeric", b = "numeric"),
+  methods = list(
+    # (see note above LinearSVM — avoid a field/argument literally named `C`)
+    initialize = function(kernel = "linear", Cparam = 1.0, learning_rate = 0.01,
+                           n_iterations = 2000, kernel_params = list(), ...) {
+      kernel <<- kernel; kernel_params <<- kernel_params
+      Cparam <<- Cparam; lr <<- learning_rate; n_iter <<- n_iterations
+      X_train <<- NULL; y_train <<- NULL; alpha <<- numeric(0); b <<- 0.0
+      callSuper(...)
+    },
+
+    K = function(x, z) {
+      if (kernel == "linear") {
+        sum(x * z)
+      } else if (kernel == "polynomial") {
+        polynomial_kernel(x, z, kernel_params$c %||% 1, kernel_params$d %||% 2)
+      } else if (kernel == "rbf") {
+        rbf_kernel(x, z, kernel_params$gamma %||% 1.0)
+      } else if (kernel == "sigmoid") {
+        sigmoid_kernel(x, z, kernel_params$kappa %||% 0.01, kernel_params$c %||% 0.0)
+      } else {
+        stop(sprintf("Unknown kernel: %s", kernel))
+      }
+    },
+
+    score_one = function(x) {
+      b + sum(vapply(seq_len(nrow(X_train)),
+                      function(i) alpha[i] * y_train[i] * K(X_train[i, ], x), numeric(1)))
+    },
+
+    fit = function(X, y) {
+      n <- nrow(X)
+      X_train <<- X; y_train <<- y
+      alpha <<- rep(0.0, n)
+      b <<- 0.0
+
+      for (iter in seq_len(n_iter)) {
+        indices <- sample(seq_len(n))
+        for (i in indices) {
+          margin <- y[i] * score_one(X[i, ])
+          if (margin < 1) {
+            alpha[i] <<- alpha[i] + lr * Cparam
+            b <<- b + lr * Cparam * y[i]
+          }
+          alpha <<- alpha * (1 - lr * 0.001)
+        }
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      vapply(seq_len(nrow(X)), function(i) if (score_one(X[i, ]) >= 0) 1 else -1, numeric(1))
+    }
+  )
+)
+
+# small helper: `a %||% b` returns a unless it's NULL, then returns b
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+accuracy <- function(y_true, y_pred) mean(y_true == y_pred)
+
+
+# ── Demo: Kernel Comparison ──────────────────────────────────────────────────
+set.seed(42)
+
+# XOR-style data: not linearly separable, but separable with non-linear kernels
+X_train <- rbind(
+  c(0.0, 0.0), c(0.0, 1.0), c(1.0, 0.0), c(1.0, 1.0),
+  c(0.1, 0.1), c(0.1, 0.9), c(0.9, 0.1), c(0.9, 0.9),
+  c(0.2, 0.0), c(0.0, 0.8), c(0.8, 0.0), c(1.0, 0.8)
+)
+y_train <- c(1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1)
+
+X_test <- rbind(c(0.2, 0.2), c(0.2, 0.8), c(0.8, 0.2), c(0.8, 0.8))
+y_test <- c(1, -1, -1, 1)
+
+kernel_configs <- list(
+  list(name = "Linear",
+       model = LinearSVM$new(Cparam = 1.0, learning_rate = 0.01, n_iterations = 3000)),
+  list(name = "Polynomial (d=2)",
+       model = KernelSVM$new(kernel = "polynomial", Cparam = 1.0, learning_rate = 0.05,
+                              n_iterations = 5000, kernel_params = list(c = 1, d = 2))),
+  list(name = "RBF (gamma=2.0)",
+       model = KernelSVM$new(kernel = "rbf", Cparam = 1.0, learning_rate = 0.05,
+                              n_iterations = 5000, kernel_params = list(gamma = 2.0))),
+  list(name = "Sigmoid (kappa=0.5)",
+       model = KernelSVM$new(kernel = "sigmoid", Cparam = 1.0, learning_rate = 0.05,
+                              n_iterations = 5000, kernel_params = list(kappa = 0.5, c = 0.0)))
+)
+
+cat("Kernel Comparison on XOR-style data\n")
+cat(sprintf("%-22s %10s %10s  Predictions\n", "Kernel", "Train Acc", "Test Acc"))
+cat(strrep("-", 62), "\n")
+
+for (cfg in kernel_configs) {
+  model <- cfg$model
+  model$fit(X_train, y_train)
+  train_preds <- model$predict(X_train)
+  test_preds  <- model$predict(X_test)
+  train_acc <- accuracy(y_train, train_preds)
+  test_acc  <- accuracy(y_test, test_preds)
+  cat(sprintf("%-22s %10.2f %10.2f  %s\n", cfg$name, train_acc, test_acc,
+              paste(test_preds, collapse = " ")))
+}
+
+cat("\nLinear SVM cannot separate XOR; polynomial and RBF kernels succeed.\n")
+```
+
+---
+
+## 7.5 Summary Table
+
+| Aspect | Detail |
+|--------|--------|
+| Core idea | Maximize margin between classes |
+| Decision boundary | $\mathbf{w}^\top \mathbf{x} + b = 0$ |
+| Support vectors | Points with $y_i(\mathbf{w}^\top \mathbf{x}_i + b) = 1$ |
+| C parameter | Regularization (small = wide margin) |
+| Kernel trick | Non-linear boundaries without explicit mapping |
+
+---
+
+## 📝 Exercises
+
+1. Implement a **kernel function** $K(\mathbf{a}, \mathbf{b})$ for RBF and modify SVM to use it.
+2. Compare SVM with C=0.01 vs C=100 on noisy data.
+3. Why does SVM only depend on the **support vectors** at test time?
+
+---
+
+**← Previous:** [Chapter 06: Decision Trees](chapter-06-decision-trees.qmd)
+
+**→ Next:** [Chapter 08: Ensemble Methods](chapter-08-ensemble-methods.qmd)

@@ -1,0 +1,360 @@
+---
+title: "Chapter 10: Principal Component Analysis (PCA)"
+subtitle: "Covariance, eigendecomposition via power iteration, and projection — from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 10: Principal Component Analysis (PCA)
+
+> **Level**: Intermediate-Advanced | **Estimated Time**: 4–5 hours
+
+---
+
+## 10.1 Overview
+
+PCA finds the directions of **maximum variance** in high-dimensional data and projects the data onto a lower-dimensional subspace.
+
+Think of it as finding the "best viewing angles" for your data:
+- Principal Component 1 (PC1): direction explaining the most variance
+- PC2: direction explaining the second-most variance, perpendicular to PC1
+- ...
+
+Applications: dimensionality reduction, visualization, noise reduction, feature extraction.
+
+---
+
+## 10.2 Mathematical Foundation
+
+### Covariance Matrix
+
+Imagine you have a table of numbers, where each column is a type of measurement (like height, weight, etc.) and each row is a person.
+
+The covariance matrix is just a big table that tells you how each pair of measurements (columns) change together.
+- If two measurements go up and down together, their value in this matrix will be big and positive.
+- If one goes up while the other goes down, the value will be big and negative.
+- If they are totally unrelated, the value will be close to zero.
+
+To make this matrix, you first subtract the average from each column (mean-center it).
+Then you do a special math trick (multiply the table by itself in a certain way), and you get the covariance matrix!
+
+In simple terms: It's a summary that tells you which features "move together" and how strong their relationship is.
+
+### Eigendecomposition
+
+Let's pretend our covariance matrix ($\boldsymbol{\Sigma}$) is like a magic table that summarizes how all our measurements are related.
+
+Now, imagine we're looking for the "main directions" in our data, kind of like finding the best ways to look at a cloud of points so we can describe it simply. These main directions are called **eigenvectors**, and each one comes with a number, called the **eigenvalue**, which tells us how important that direction is.
+
+In math-speak, we find numbers $\lambda$ (eigenvalues) and matching arrows $\mathbf{v}$ (eigenvectors) so that:
+
+$$\boldsymbol{\Sigma} \cdot \mathbf{v} = \lambda \cdot \mathbf{v}$$
+
+In very simple terms:
+- Each $\mathbf{v}$ is a special direction where, if you push the table that way, it points right back at itself (just gets longer or shorter).
+- The bigger the $\lambda$, the more "spread" or "variation" there is along that direction in our data.
+
+We pick the directions with the biggest $\lambda$s first, because they tell us most about how our data varies. These special directions (eigenvectors) are always at right angles (orthogonal), so they give us a new "straightened-out" coordinate system that makes the data easier to understand.
+
+So: sort these directions by their $\lambda$ (biggest to smallest), and the first one tells you the most important "axis" of your data cloud!
+
+### Projection
+
+To reduce from $p$ dimensions to $d$ dimensions ($d < p$):
+
+$$\mathbf{Z} = \mathbf{X} \cdot \mathbf{V}_d \quad \text{where } \mathbf{V}_d = \text{matrix of top } d \text{ eigenvectors}$$
+
+---
+
+## 10.3 From-Scratch R Implementation
+
+```{r}
+# Let's explain what this code does for complete beginners.
+
+# --- Math Helper Functions ---
+# These are little tools we'll need to do the math for PCA.
+
+mean_center <- function(X) {
+  # Subtract the average value from each column, so everything is centered around zero.
+  # Returns both the mean-centered data and the means.
+  means <- colMeans(X)
+  list(X = sweep(X, 2, means, "-"), means = means)
+}
+
+covariance_matrix <- function(X) {
+  # How much each pair of features varies together. Assumes X is already mean-centered!
+  n <- nrow(X)
+  (t(X) %*% X) / n
+}
+
+vec_norm <- function(v) sqrt(sum(v^2))          # length of the vector (Pythagorean theorem)
+vec_normalize <- function(v) v / vec_norm(v)    # make the vector length 1
+
+# --- Finding the "Main Directions" (Eigenvectors) ---
+
+power_iteration <- function(A, n_iter = 1000, tol = 1e-9) {
+  # Like spinning a bottle repeatedly to discover the strongest direction in your data.
+  # Finds the main 'axis' (eigenvector) in the matrix A, and how important it is (eigenvalue).
+  n <- nrow(A)
+  v <- vec_normalize(rnorm(n))    # start with a random direction
+
+  for (i in seq_len(n_iter)) {
+    Av <- as.numeric(A %*% v)     # stretch in the main direction
+    v_new <- vec_normalize(Av)
+    if (vec_norm(v_new - v) < tol) { v <- v_new; break }   # nearly the same as before: done!
+    v <- v_new
+  }
+
+  eigenvalue <- as.numeric(v %*% (A %*% v))   # how much the data stretches along this direction
+  list(eigenvalue = eigenvalue, vector = v)
+}
+
+deflate <- function(A, eigenvalue, eigenvector) {
+  # After finding one main direction, peel its effects out of the matrix so we can
+  # find the next most important axis.
+  v <- eigenvector
+  A - eigenvalue * outer(v, v)
+}
+
+eigen_decompose <- function(A, n_components) {
+  # Finds the top n_components main directions and their importance, one by one.
+  eigenvalues <- numeric(0)
+  eigenvectors <- list()
+  A_deflated <- A
+
+  for (i in seq_len(n_components)) {
+    res <- power_iteration(A_deflated)        # find 1st, then 2nd, etc.
+    eigenvalues <- c(eigenvalues, res$eigenvalue)
+    eigenvectors[[i]] <- res$vector
+    A_deflated <- deflate(A_deflated, res$eigenvalue, res$vector)   # remove what we just found
+  }
+
+  list(eigenvalues = eigenvalues, eigenvectors = eigenvectors)
+}
+
+# --- The Actual PCA Tool (The Big Class) ---
+#
+# This is a DIY "Principal Component Analysis" machine. You give it a table of numbers.
+# It figures out the main directions where the data is spread out most, so you can squish
+# your data down to just 1, 2, or a few columns, making it easier to understand and plot.
+# All this is done using only base R, no help from fancy libraries!
+
+PCA <- setRefClass(
+  "PCA",
+  fields = list(n_components = "numeric", components = "ANY", explained_variance = "ANY",
+                explained_variance_ratio = "ANY", mean = "ANY"),
+  methods = list(
+    initialize = function(n_components = 2, ...) {
+      # How many main directions should we keep? (2 is good for plotting)
+      n_components <<- n_components
+      components <<- NULL              # main axes/directions found
+      explained_variance <<- NULL      # how important each axis is
+      explained_variance_ratio <<- NULL   # what percent of total variance each explains
+      mean <<- NULL
+      callSuper(...)
+    },
+
+    fit = function(X) {
+      # "Train" the PCA: figure out where the main data directions are.
+      mc <- mean_center(X)
+      X_centered <- mc$X; mean <<- mc$means
+      C <- covariance_matrix(X_centered)
+      ed <- eigen_decompose(C, n_components)
+
+      components <<- ed$eigenvectors
+      explained_variance <<- ed$eigenvalues
+
+      total_var <- sum(diag(C))   # how much of all possible variance these components explain
+      explained_variance_ratio <<- ed$eigenvalues / total_var
+
+      invisible(.self)   # so you can chain fit()$transform() easily
+    },
+
+    transform = function(X) {
+      # Project your data onto the new axes. Turns your data table into fewer
+      # columns — but keeps as much information as possible.
+      X_centered <- sweep(X, 2, mean, "-")   # subtract the mean again, in case X is new data
+      t(vapply(seq_len(nrow(X_centered)), function(i) {
+        vapply(components, function(pc) sum(X_centered[i, ] * pc), numeric(1))
+      }, numeric(n_components)))
+    },
+
+    fit_transform = function(X) { fit(X); transform(X) },
+
+    inverse_transform = function(Z) {
+      # Try to reconstruct the original data from just the few main axes.
+      # It's like taking a shadow and guessing back the 3D object. Not perfect, but close!
+      p <- length(components[[1]])
+      result <- matrix(0.0, nrow = nrow(Z), ncol = p)
+      for (i in seq_len(nrow(Z))) {
+        reconstruction <- rep(0.0, p)
+        for (k in seq_len(n_components)) {
+          reconstruction <- reconstruction + Z[i, k] * components[[k]]
+        }
+        result[i, ] <- reconstruction + mean   # move from center back to original location
+      }
+      result
+    },
+
+    print_summary = function() {
+      # Print out a friendly summary so you know what each principal component is doing.
+      cat(sprintf("PCA Summary (%d components):\n", n_components))
+      cumulative <- 0.0
+      for (i in seq_along(explained_variance)) {
+        cumulative <- cumulative + explained_variance_ratio[i]
+        cat(sprintf("  PC%d: variance=%.4f  ratio=%.3f  cumulative=%.3f\n",
+                    i, explained_variance[i], explained_variance_ratio[i], cumulative))
+      }
+    }
+  )
+)
+```
+
+```{r}
+# ── Demo ──────────────────────────────────────────────────────────────────
+
+set.seed(42)
+
+# Generate correlated 3D data (lives near a 2D plane)
+n <- 30
+X <- matrix(0.0, nrow = n, ncol = 3)
+for (i in seq_len(n)) {
+  t_val <- rnorm(1, 0, 2)
+  s_val <- rnorm(1, 0, 1)
+  x1 <- t_val + rnorm(1, 0, 0.1)
+  x2 <- 0.7 * t_val + s_val + rnorm(1, 0, 0.1)
+  x3 <- 0.3 * t_val - 0.5 * s_val + rnorm(1, 0, 0.1)
+  X[i, ] <- c(x1, x2, x3)
+}
+
+pca <- PCA$new(n_components = 2)
+Z <- pca$fit_transform(X)
+pca$print_summary()
+
+cat(sprintf("\nOriginal shape: %d x %d\n", nrow(X), ncol(X)))
+cat(sprintf("Reduced shape:  %d x %d\n", nrow(Z), ncol(Z)))
+cat("\nFirst 5 projected points:\n")
+for (i in 1:5) {
+  cat(sprintf("  [%6.3f, %6.3f]\n", Z[i, 1], Z[i, 2]))
+}
+
+# Reconstruction error
+X_reconstructed <- pca$inverse_transform(Z)
+mse_val <- mean((X - X_reconstructed)^2)
+cat(sprintf("\nReconstruction MSE: %.4f\n", mse_val))
+```
+
+---
+
+## 10.4 Explained Variance
+
+Think of PCA like finding new "axes" for your data so that you keep as much of the important information as possible with fewer numbers.
+
+Each new axis (principal component) captures a slice of the total "spread" (variance) in your data.
+
+The "explained variance ratio" tells you how much of the total information each axis carries. Mathematically, for each new axis (PC $k$):
+
+$$\text{Explained variance ratio for PC}_k = \frac{\text{variance captured by PC}_k}{\text{total variance in data}}$$
+
+In simple terms: The first axis grabs the biggest chunk of the information, the second axis grabs the next biggest, and so on.
+
+A common tip: Keep adding axes until, together, they contain about 95% of the information from your original data. That way, you shrink your data but don't lose much of what's important.
+
+---
+
+## 10.5 PCA vs Feature Selection
+
+| Aspect | PCA | Feature Selection |
+|--------|-----|------------------|
+| Output | New transformed features | Subset of original features |
+| Interpretability | Low (combinations) | High (original features) |
+| Removes redundancy | Yes | Partially |
+| Unsupervised | Yes | Usually yes |
+
+---
+
+### 10.6 Visualization
+
+```{r}
+# This version mirrors the numpy/np.linalg.eigh-based helper from the Python original —
+# it uses R's built-in `eigen()` (a proper, general-purpose symmetric eigen-decomposition)
+# rather than the from-scratch power-iteration PCA class above, purely for the plot below.
+
+my_pca <- function(X, n_components) {
+  # Center the data
+  X_mean <- colMeans(X)
+  X_centered <- sweep(X, 2, X_mean, "-")
+
+  # Covariance matrix
+  cov_matrix <- cov(X_centered)
+
+  # Eigen decomposition (R's eigen() already returns values sorted descending for symmetric matrices)
+  eig <- eigen(cov_matrix, symmetric = TRUE)
+  eigvals <- eig$values
+  eigvecs <- eig$vectors
+
+  # Select first n_components
+  components <- t(eigvecs[, seq_len(n_components), drop = FALSE])
+  explained_variance <- eigvals[seq_len(n_components)]
+
+  # Mimic sklearn-style attributes for compatibility
+  list(
+    components_ = components,
+    mean_ = X_mean,
+    explained_variance_ = explained_variance,
+    transform = function(X_new) sweep(X_new, 2, X_mean, "-") %*% eigvecs[, seq_len(n_components), drop = FALSE]
+  )
+}
+
+# Generate some synthetic 2D data
+set.seed(42)
+X <- t(matrix(rnorm(2 * 2), 2, 2) %*% matrix(rnorm(2 * 200), 2, 200))
+
+# Fit PCA using our function (calling PCA$new(...) here would use the from-scratch
+# class from Section 10.3, which expects a plain numeric matrix same as this — either
+# works, but this mirrors the Python demo's use of a numpy-based helper)
+pca_viz <- my_pca(X, n_components = 2)
+X_pca <- pca_viz$transform(X)
+
+# Plot original data and principal axes
+plot(X[, 1], X[, 2], col = adjustcolor("steelblue", alpha.f = 0.5), pch = 16,
+     xlab = "Feature 1", ylab = "Feature 2", main = "PCA: Original Data and Principal Axes", asp = 1)
+grid()
+origin <- pca_viz$mean_
+
+# Draw principal components
+for (i in 1:2) {
+  length_i <- sqrt(pca_viz$explained_variance_[i])
+  vector_i <- pca_viz$components_[i, ]
+  v <- vector_i * 3 * length_i   # scale for illustration
+  arrows(origin[1], origin[2], origin[1] + v[1], origin[2] + v[2],
+         col = "red", lwd = 2, length = 0.1)
+  text(origin[1] + v[1], origin[2] + v[2], "PC", col = "red", pos = 3)
+}
+legend("topleft", legend = "Original data", col = "steelblue", pch = 16, bty = "n")
+
+# Now plot reduced data (1D projection on PC1)
+plot(X_pca[, 1], rep(0, nrow(X_pca)), col = "darkgreen", pch = 16,
+     xlab = "First principal component", ylab = "", yaxt = "n",
+     main = "Data projected onto first principal component")
+```
+
+---
+
+## 📝 Exercises
+
+1. Prove that eigenvectors of a symmetric matrix are orthogonal.
+2. What is **whitening** (PCA whitening) and when is it used?
+3. Implement **Kernel PCA** by replacing the covariance matrix with a kernel matrix.
+4. When would PCA **hurt** model performance?
+
+---
+
+**← Previous:** [Chapter 09: K-Means](chapter-09-kmeans.qmd)
+
+**→ Next:** [Chapter 11: Neural Networks](chapter-11-neural-networks.qmd)

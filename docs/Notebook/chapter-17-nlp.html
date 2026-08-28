@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Chapter 17: Natural Language Processing (NLP) – Machine Learning in R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../Notebook/chapter-18-generative-models.html" rel="next">
+<link href="../Notebook/chapter-16-gnn.html" rel="prev">
+<link href="../Images/favicon.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-b13248f691110a3a988f32c964d6cd84.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-298d7a5bc0bdaa8e2d8fcf4df7d2d684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<style>
+  #quarto-document-content > header#title-block-header { display: none !important; }
+</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Machine Learning in R</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> <i class="bi bi-house" role="img" aria-label="Home">
+</i> 
+<span class="menu-text">Machine Learning in R</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/zia207/ML-R"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/zia-ahmed207"> <i class="bi bi-linkedin" role="img" aria-label="LinkedIn">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="mailto:zia207@gmail.com"> <i class="bi bi-mailbox" role="img" aria-label="Email">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-11-neural-networks.html"><strong>🔴 Advanced</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-17-nlp.html">Ch 17 · NLP</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-center sidebar-header">
+      <a href="../index.html" class="sidebar-logo-link">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo light-content py-0 d-lg-inline d-none">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo dark-content py-0 d-lg-inline d-none">
+      </a>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>Machine Learning in R</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟢 Beginner</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-00-prerequisites.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 00 · Prerequisites &amp; Setup</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-01-intro-to-ml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 01 · Introduction to ML</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-02-linear-regression.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 02 · Linear Regression</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-03-glm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 03 · Generalized Linear Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-04-knn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 04 · K-Nearest Neighbors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-05-naive-bayes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 05 · Naive Bayes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟡 Intermediate</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-06-decision-trees.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 06 · Decision Trees</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-07-svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 07 · Support Vector Machines</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-08-ensemble-methods.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 08 · Ensemble Methods</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-09-kmeans.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 09 · K-Means Clustering</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-10-pca.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 10 · PCA</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>🔴 Advanced</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-11-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 11 · Neural Networks (MLP)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-12-cnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 12 · Convolutional Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-13-cnn-advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 13 · CNNs — Advanced</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-14-rnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 14 · Recurrent Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-15-lstm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 15 · LSTM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-16-gnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 16 · Graph Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-17-nlp.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Ch 17 · NLP</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-18-generative-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 18 · Generative Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-19-reinforcement-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 19 · Reinforcement Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>📊 Best Practices</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-20-model-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 20 · Model Evaluation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#chapter-17-natural-language-processing-nlp" id="toc-chapter-17-natural-language-processing-nlp" class="nav-link active" data-scroll-target="#chapter-17-natural-language-processing-nlp">Chapter 17: Natural Language Processing (NLP)</a>
+  <ul class="collapse">
+  <li><a href="#oerview" id="toc-oerview" class="nav-link" data-scroll-target="#oerview">17.1 Oerview</a></li>
+  <li><a href="#text-preprocessing" id="toc-text-preprocessing" class="nav-link" data-scroll-target="#text-preprocessing">17.2 Text Preprocessing</a>
+  <ul class="collapse">
+  <li><a href="#tokenisation" id="toc-tokenisation" class="nav-link" data-scroll-target="#tokenisation">17.2.1 Tokenisation</a></li>
+  <li><a href="#byte-pair-encoding-bpe" id="toc-byte-pair-encoding-bpe" class="nav-link" data-scroll-target="#byte-pair-encoding-bpe">17.2.2 Byte-Pair Encoding (BPE)</a></li>
+  </ul></li>
+  <li><a href="#bag-of-words-and-tf-idf" id="toc-bag-of-words-and-tf-idf" class="nav-link" data-scroll-target="#bag-of-words-and-tf-idf">17.3 Bag of Words and TF-IDF</a>
+  <ul class="collapse">
+  <li><a href="#bag-of-words" id="toc-bag-of-words" class="nav-link" data-scroll-target="#bag-of-words">17.3.1 Bag of Words</a></li>
+  <li><a href="#tf-idf" id="toc-tf-idf" class="nav-link" data-scroll-target="#tf-idf">17.3.2 TF-IDF</a></li>
+  </ul></li>
+  <li><a href="#word-embeddings-word2vec-skip-gram" id="toc-word-embeddings-word2vec-skip-gram" class="nav-link" data-scroll-target="#word-embeddings-word2vec-skip-gram">17.4 Word Embeddings (Word2Vec Skip-gram)</a>
+  <ul class="collapse">
+  <li><a href="#but-how-does-it-actually-work-math-for-dummies" id="toc-but-how-does-it-actually-work-math-for-dummies" class="nav-link" data-scroll-target="#but-how-does-it-actually-work-math-for-dummies">But how does it actually work? (Math for dummies)</a></li>
+  </ul></li>
+  <li><a href="#attention-mechanism" id="toc-attention-mechanism" class="nav-link" data-scroll-target="#attention-mechanism">17.5 Attention Mechanism</a>
+  <ul class="collapse">
+  <li><a href="#scaled-dot-product-attention-simple-math-version" id="toc-scaled-dot-product-attention-simple-math-version" class="nav-link" data-scroll-target="#scaled-dot-product-attention-simple-math-version">Scaled Dot-Product Attention (Simple Math Version)</a></li>
+  </ul></li>
+  <li><a href="#the-transformer" id="toc-the-transformer" class="nav-link" data-scroll-target="#the-transformer">17.6 The Transformer</a>
+  <ul class="collapse">
+  <li><a href="#multi-head-attention-what-is-it-why-do-we-use-it" id="toc-multi-head-attention-what-is-it-why-do-we-use-it" class="nav-link" data-scroll-target="#multi-head-attention-what-is-it-why-do-we-use-it">Multi-Head Attention (What is it? Why do we use it?)</a></li>
+  <li><a href="#positional-encoding-because-transformers-cant-count-by-themselves" id="toc-positional-encoding-because-transformers-cant-count-by-themselves" class="nav-link" data-scroll-target="#positional-encoding-because-transformers-cant-count-by-themselves">Positional Encoding (Because Transformers can’t “count” by themselves)</a></li>
+  <li><a href="#transformer-encoder-block" id="toc-transformer-encoder-block" class="nav-link" data-scroll-target="#transformer-encoder-block">Transformer Encoder Block</a></li>
+  </ul></li>
+  <li><a href="#classic-nlp-tasks" id="toc-classic-nlp-tasks" class="nav-link" data-scroll-target="#classic-nlp-tasks">17.7 Classic NLP Tasks</a>
+  <ul class="collapse">
+  <li><a href="#text-classification-naive-tf-idf" id="toc-text-classification-naive-tf-idf" class="nav-link" data-scroll-target="#text-classification-naive-tf-idf">Text Classification (Naive + TF-IDF)</a></li>
+  </ul></li>
+  <li><a href="#exercises" id="toc-exercises" class="nav-link" data-scroll-target="#exercises">Exercises</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-17-nlp.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-11-neural-networks.html"><strong>🔴 Advanced</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-17-nlp.html">Ch 17 · NLP</a></li></ol></nav><h1 class="title display-7">Chapter 17: Natural Language Processing (NLP)</h1></header>
+
+<header id="title-block-header">
+
+<p class="subtitle lead">Tokenisation, BPE, TF-IDF, Word2Vec skip-gram, scaled dot-product attention, and a from-scratch Transformer encoder block</p>
+
+</header>
+
+
+<div class="page-banner">
+<p><img src="../Images/banner_ml_r.png" class="img-fluid" alt="Machine Learning in R — From Scratch without Tears"></p>
+</div>
+<section id="chapter-17-natural-language-processing-nlp" class="level1">
+<h1>Chapter 17: Natural Language Processing (NLP)</h1>
+<blockquote class="blockquote">
+<p><strong>Level</strong>: Advanced | <strong>Estimated Time</strong>: 8–10 hours | <strong>Prerequisites</strong>: Chapter 11 (Neural Networks), Chapter 15 (LSTM)</p>
+</blockquote>
+<hr>
+<section id="oerview" class="level2">
+<h2 class="anchored" data-anchor-id="oerview">17.1 Oerview</h2>
+<p>Natural Language Processing (NLP) is a branch of artificial intelligence that helps computers understand, interpret, and generate human language — the way people actually write and speak.</p>
+<p>Here’s the core idea. Computers naturally work with numbers, not words. When you type a sentence like “I loved this movie,” the computer doesn’t automatically know what it means, whether it’s positive or negative, or what “it” refers to. NLP is the set of techniques that bridges that gap, turning messy human language into something a machine can process and act on.</p>
+<p>You already use NLP every day, probably without noticing:</p>
+<ul>
+<li><strong>Autocomplete and predictive text</strong> on your phone suggesting the next word</li>
+<li><strong>Spam filters</strong> in email deciding what’s junk</li>
+<li><strong>Voice assistants</strong> like Siri or Alexa understanding your spoken requests</li>
+<li><strong>Google Translate</strong> converting text between languages</li>
+<li><strong>Chatbots</strong> (including me) reading your question and writing a reply</li>
+<li><strong>Search engines</strong> figuring out what you actually mean when you type a query</li>
+</ul>
+<p>Why is this hard? Human language is genuinely messy and full of ambiguity. Consider the sentence “I saw the man with the telescope.” Did you use a telescope to see him, or did the man have a telescope? A human uses context to guess; a computer has to be taught how. Language also has sarcasm, slang, typos, words with multiple meanings (“bank” as in river vs.&nbsp;money), and the same idea can be phrased a hundred different ways. All of this makes NLP a challenging field.</p>
+<p>At a high level, NLP usually works in a few steps. First it <strong>breaks text into pieces</strong> (splitting a sentence into individual words or “tokens”). Then it <strong>cleans and standardizes</strong> those pieces (lowercasing, removing filler words, reducing “running” to “run”). Next it <strong>converts words into numbers</strong> — since models only understand math, words get represented as numerical vectors that capture meaning. Finally, a <strong>model uses those numbers</strong> to do a task: classify the text, answer a question, translate it, and so on.</p>
+<p>Some common things NLP is used for include: <strong>sentiment analysis</strong> (is this review happy or angry?), <strong>translation</strong>, <strong>summarization</strong> (condensing a long article), <strong>named entity recognition</strong> (pulling out names, dates, and places from text), <strong>question answering</strong>, and <strong>text generation</strong> (writing new text, which is what large language models do).</p>
+<p>A quick note on how the field has evolved: early NLP relied on hand-written rules and grammar, which was rigid and broke easily. Then came statistical and machine-learning methods that learned patterns from data. Today, the field is dominated by <strong>deep learning</strong> and especially <strong>transformer models</strong> (the technology behind tools like ChatGPT and me), which learn language from enormous amounts of text and handle context remarkably well.</p>
+<p>Given your background in data science and health analytics, if you’d like, I can go a level deeper — for example, walking through tokenization and word embeddings with actual code, or showing how a simple sentiment classifier works end to end. Want me to put together a beginner-friendly notebook on any of these?</p>
+<p>Language is discrete, variable-length, and context-dependent. The key challenges:</p>
+<ol type="1">
+<li><strong>Representing text</strong>: convert words to numbers without losing meaning</li>
+<li><strong>Capturing context</strong>: “bank” means different things in “river bank” vs “bank account”</li>
+<li><strong>Handling variable length</strong>: sentences have different numbers of words</li>
+<li><strong>Long-range dependencies</strong>: a pronoun might refer to a noun 50 words back</li>
+</ol>
+<p>This chapter builds the NLP stack from scratch: tokenisation → bag-of-words → TF-IDF → word2vec → attention → the Transformer architecture.</p>
+<hr>
+</section>
+<section id="text-preprocessing" class="level2">
+<h2 class="anchored" data-anchor-id="text-preprocessing">17.2 Text Preprocessing</h2>
+<p>Text preprocessing is a crucial step in any NLP pipeline. The goal is to transform raw, messy text into a clean, consistent format that can be analyzed or used as input to models. The typical steps in text preprocessing include:</p>
+<ol type="1">
+<li><strong>Text Cleaning:</strong> Remove unwanted characters, HTML tags, punctuation, or non-ASCII symbols. This step may also involve fixing encoding issues or expanding contractions (e.g., “can’t” → “cannot”).</li>
+<li><strong>Lowercasing:</strong> Convert all characters to lowercase so that “The” and “the” are treated as the same word.</li>
+<li><strong>Tokenization:</strong> Split the text into smaller units, typically words or subwords. Tokenization determines how models “see” text.</li>
+<li><strong>Removing stopwords:</strong> Remove common, uninformative words like “the”, “and”, “is”, which often don’t contribute much meaning.</li>
+<li><strong>Stemming/Lemmatization:</strong> Convert words to their root form (e.g., “running”, “ran”, “runs” → “run”). Stemming is a crude cut, while lemmatization is linguistically informed.</li>
+<li><strong>Handling rare words / Out-of-vocabulary terms:</strong> Replace or flag words not present in your vocabulary, often with a special token like <code>&lt;UNK&gt;</code>.</li>
+<li><strong>Padding or truncating sequences:</strong> For models expecting fixed-length input, add padding tokens or truncate sentences to a certain length.</li>
+</ol>
+<p>Effective text preprocessing improves the performance of downstream NLP tasks by reducing noise and standardizing input.</p>
+<section id="tokenisation" class="level3">
+<h3 class="anchored" data-anchor-id="tokenisation">17.2.1 Tokenisation</h3>
+<p><strong>Tokenisation</strong> is the process of splitting a piece of text into smaller units called <em>tokens</em>. These tokens are usually words, but could also be subwords, characters, or even sentences, depending on the use case.</p>
+<p>Tokenisation is the very first step in nearly all NLP workflows, because models and algorithms need a way to break down raw text into parts they can analyze or represent as numbers.</p>
+<p>For example, the sentence <code>"Time flies like an arrow; fruit flies like a banana."</code> could be tokenised (using a simple word splitter) into:</p>
+<pre><code>["time", "flies", "like", "an", "arrow", "fruit", "flies", "like", "a", "banana"]</code></pre>
+<p>Good tokenisation is important because it: - Determines how meaning and context are captured - Affects the vocabulary size for your model - Impacts downstream model performance</p>
+<p>There are many ways to tokenise text, from simple regular expressions to sophisticated algorithms that handle punctuation, contractions (“don’t” → [“do”, “n’t”]), or even rare words (subword tokenisation, such as in BPE or WordPiece).</p>
+<p>In the next code cell, we’ll implement a simple word-level tokeniser in R.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># "Tokenise" means splitting up a sentence into individual words</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>tokenise <span class="ot">&lt;-</span> <span class="cf">function</span>(text, <span class="at">lower =</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Split a sentence into words.</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - text: The sentence/string you want to split up.</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - lower: If True, make everything lowercase (so "Dog" and "dog" count as the same).</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Example: "Hello, world!" -&gt; c("hello", "world")</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (lower) text <span class="ot">&lt;-</span> <span class="fu">tolower</span>(text)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># This weird pattern just finds the words:</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># [a-z0-9']+ means: any sequence of letters, numbers or apostrophes</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># So "dog's" becomes "dog's" as one token (kept together, matching the Python regex)</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> <span class="fu">gregexpr</span>(<span class="st">"[a-z0-9']+"</span>, text)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">regmatches</span>(text, m)[[<span class="dv">1</span>]]  <span class="co"># Returns a vector like c("the", "cat", "sat")</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co"># "Vocabulary" here means: a lookup of all the unique words we've seen, with each one getting its own number.</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>build_vocab <span class="ot">&lt;-</span> <span class="cf">function</span>(corpus, <span class="at">min_freq =</span> <span class="dv">1</span>, <span class="at">max_size =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Create a vector of all unique words (the vocabulary) and assign each one a number (an index).</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - corpus: a list of character vectors, where each inner vector is the tokens of a sentence</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   Example: list(c("the","cat"), c("the","dog"))</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - min_freq: ignore words that appear less than this many times</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - max_size: don't include more than this many words (most common first)</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns:</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   - word2idx: named integer vector ("cat" -&gt; 4), 0-indexed to mirror the Python dict</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   - idx2word: character vector (index 4 [R position 5] gives you "cat")</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Count up all the words in all the sentences</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>  freq <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">table</span>(<span class="fu">unlist</span>(corpus)), <span class="at">decreasing =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(max_size)) freq <span class="ot">&lt;-</span> freq[<span class="fu">seq_len</span>(<span class="fu">min</span>(max_size, <span class="fu">length</span>(freq)))]</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Get the most common words, and filter out rare ones</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>  vocab_words <span class="ot">&lt;-</span> <span class="fu">names</span>(freq)[freq <span class="sc">&gt;=</span> min_freq]</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Some special tokens computers need for padding, unknown words, etc.</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>  specials <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"&lt;PAD&gt;"</span>, <span class="st">"&lt;UNK&gt;"</span>, <span class="st">"&lt;BOS&gt;"</span>, <span class="st">"&lt;EOS&gt;"</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>  vocab_words <span class="ot">&lt;-</span> <span class="fu">c</span>(specials, vocab_words)   <span class="co"># special stuff goes at the start</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Give each word a unique number: "the" -&gt; 4, "cat" -&gt; 5, etc. (0-indexed)</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>  word2idx <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">seq_along</span>(vocab_words) <span class="sc">-</span> <span class="dv">1</span>, vocab_words)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>  idx2word <span class="ot">&lt;-</span> vocab_words                    <span class="co"># the opposite: index -&gt; word</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">word2idx =</span> word2idx, <span class="at">idx2word =</span> idx2word)</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="co"># Small helper used throughout this chapter: look up a token's index, falling back to &lt;UNK&gt;.</span></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>get_idx <span class="ot">&lt;-</span> <span class="cf">function</span>(tok, word2idx) {</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (tok <span class="sc">%in%</span> <span class="fu">names</span>(word2idx)) word2idx[[tok]] <span class="cf">else</span> word2idx[[<span class="st">"&lt;UNK&gt;"</span>]]</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="co"># DEMO: Let's see how it works!</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>sentences <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>  <span class="st">"the cat sat on the mat"</span>,</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>  <span class="st">"the dog sat on the log"</span>,</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>  <span class="st">"cats and dogs are great pets"</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn each sentence into a vector of words</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>corpus <span class="ot">&lt;-</span> <span class="fu">lapply</span>(sentences, tokenise)</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the vocabulary from all the sentences above</span></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>vb <span class="ot">&lt;-</span> <span class="fu">build_vocab</span>(corpus, <span class="at">min_freq =</span> <span class="dv">1</span>)</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>word2idx <span class="ot">&lt;-</span> vb<span class="sc">$</span>word2idx; idx2word <span class="ot">&lt;-</span> vb<span class="sc">$</span>idx2word</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"=== Tokenisation &amp; Vocabulary ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Corpus sentences: %d</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(corpus)))          <span class="co"># Should be 3</span></span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Vocabulary size:  %d</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(word2idx)))        <span class="co"># How many unique words (plus special tokens)</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Sample tokens:   "</span>, corpus[[<span class="dv">1</span>]], <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)                     <span class="co"># Tokens from the first sentence</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Encoded:         "</span>, <span class="fu">sapply</span>(corpus[[<span class="dv">1</span>]], get_idx, <span class="at">word2idx =</span> word2idx), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)  <span class="co"># The numbers for each word</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="byte-pair-encoding-bpe" class="level3">
+<h3 class="anchored" data-anchor-id="byte-pair-encoding-bpe">17.2.2 Byte-Pair Encoding (BPE)</h3>
+<p>BPE is a way to split words into smaller pieces (subwords) so computers can better understand text. Imagine you start by cutting every word into single letters. Then, you look for the two letters that are next to each other the most, and combine them into a new “chunk”. You repeat this process, merging the most common pairs into bigger and bigger chunks. This gives the computer a smart way to handle new words it has never seen, because it can break them into familiar pieces. BPE is used by models like GPT-2 and RoBERTa to help turn text into numbers.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>learn_bpe <span class="ot">&lt;-</span> <span class="cf">function</span>(corpus_str, <span class="at">num_merges =</span> <span class="dv">20</span>) {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># What does BPE (Byte Pair Encoding) do?</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - It chops words into letters.</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - It finds the pair of letters that sticks together most often.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - It glues that pair into a new "chunk" (imagine 'th' or 'an' becoming a single piece).</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - Repeats: keeps gluing the most frequent pairs, making longer pieces as it goes.</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - Result: Common letter groups (and word bits) are joined together, so the computer can better</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   handle new or rare words.</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns:</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   - vocab: the new "vocabulary" made of glued sequences, as a named list (name = glued sequence,</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     value = count)</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   - merges: the rules for what pairs it glued together (in which order), each a 2-element vector</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 1. Make every word into single letters separated by spaces, with an end mark &lt;/w&gt;</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  words <span class="ot">&lt;-</span> <span class="fu">strsplit</span>(<span class="fu">tolower</span>(corpus_str), <span class="st">"</span><span class="sc">\\</span><span class="st">s+"</span>)[[<span class="dv">1</span>]]</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  vocab <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (word <span class="cf">in</span> words) {</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># E.g. "cat" turns into "c a t &lt;/w&gt;"</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    letter_seq <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">c</span>(<span class="fu">strsplit</span>(word, <span class="st">""</span>)[[<span class="dv">1</span>]], <span class="st">"&lt;/w&gt;"</span>), <span class="at">collapse =</span> <span class="st">" "</span>)</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    vocab[[letter_seq]] <span class="ot">&lt;-</span> (<span class="cf">if</span> (<span class="fu">is.null</span>(vocab[[letter_seq]])) <span class="dv">0</span> <span class="cf">else</span> vocab[[letter_seq]]) <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  merges <span class="ot">&lt;-</span> <span class="fu">list</span>()  <span class="co"># We'll store all our "glue this pair!" steps here</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (step <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>num_merges) {</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Look at all pairs of symbols that are next to each other in the vocab.</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    <span class="co"># We key each pair by a separator character that can never appear in a token, and keep</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># the actual two symbols alongside it -- this matters once a symbol itself becomes a</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># multi-character glued chunk (e.g. "th"), since we can no longer split the key apart</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    <span class="co"># by character to recover the two original pieces.</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    pair_counts <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>    pair_lookup <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (w <span class="cf">in</span> <span class="fu">names</span>(vocab)) {</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>      freq <span class="ot">&lt;-</span> vocab[[w]]</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>      symbols <span class="ot">&lt;-</span> <span class="fu">strsplit</span>(w, <span class="st">" "</span>)[[<span class="dv">1</span>]]      <span class="co"># Turns "c a t &lt;/w&gt;" -&gt; c("c","a","t","&lt;/w&gt;")</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">length</span>(symbols) <span class="sc">&lt;</span> <span class="dv">2</span>) <span class="cf">next</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(<span class="fu">length</span>(symbols) <span class="sc">-</span> <span class="dv">1</span>)) {</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        pair_key <span class="ot">&lt;-</span> <span class="fu">paste</span>(symbols[i], symbols[i <span class="sc">+</span> <span class="dv">1</span>], <span class="at">sep =</span> <span class="st">"␟"</span>)</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>        pair_counts[[pair_key]] <span class="ot">&lt;-</span> (<span class="cf">if</span> (<span class="fu">is.null</span>(pair_counts[[pair_key]])) <span class="dv">0</span> <span class="cf">else</span> pair_counts[[pair_key]]) <span class="sc">+</span> freq</span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>        pair_lookup[[pair_key]] <span class="ot">&lt;-</span> <span class="fu">c</span>(symbols[i], symbols[i <span class="sc">+</span> <span class="dv">1</span>])</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">length</span>(pair_counts) <span class="sc">==</span> <span class="dv">0</span>) <span class="cf">break</span>  <span class="co"># No more pairs to merge</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. Find the most frequent pair to glue together</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    best_key <span class="ot">&lt;-</span> <span class="fu">names</span>(pair_counts)[<span class="fu">which.max</span>(<span class="fu">unlist</span>(pair_counts))]</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    best_pair <span class="ot">&lt;-</span> pair_lookup[[best_key]]</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    merges[[step]] <span class="ot">&lt;-</span> best_pair  <span class="co"># Remember what we glued!</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 4. Actually glue the pair, replace everywhere in vocab</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>    bigram <span class="ot">&lt;-</span> <span class="fu">paste</span>(best_pair, <span class="at">collapse =</span> <span class="st">" "</span>)       <span class="co"># e.g. "t h"</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>    replacement <span class="ot">&lt;-</span> <span class="fu">paste</span>(best_pair, <span class="at">collapse =</span> <span class="st">""</span>)   <span class="co"># e.g. "th"</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>    new_vocab <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (w <span class="cf">in</span> <span class="fu">names</span>(vocab)) {</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Replace all bigrams in the word with their merged version (glued up string)</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>      <span class="co"># E.g. "t h e &lt;/w&gt;" -&gt; "th e &lt;/w&gt;"</span></span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>      new_w <span class="ot">&lt;-</span> <span class="fu">gsub</span>(bigram, replacement, w, <span class="at">fixed =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>      new_vocab[[new_w]] <span class="ot">&lt;-</span> (<span class="cf">if</span> (<span class="fu">is.null</span>(new_vocab[[new_w]])) <span class="dv">0</span> <span class="cf">else</span> new_vocab[[new_w]]) <span class="sc">+</span> vocab[[w]]</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>    vocab <span class="ot">&lt;-</span> new_vocab  <span class="co"># Update for the next loop!</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">vocab =</span> vocab, <span class="at">merges =</span> merges)</span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a><span class="co"># Example for dummies:</span></span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>text <span class="ot">&lt;-</span> <span class="st">"the cat sat on the mat the dog sat on the log"</span></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>bpe_out <span class="ot">&lt;-</span> <span class="fu">learn_bpe</span>(text, <span class="at">num_merges =</span> <span class="dv">10</span>)</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== BPE (10 merges) ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"First 5 merge rules (these are the pairs joined together):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (m <span class="cf">in</span> bpe_out<span class="sc">$</span>merges[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]) <span class="fu">cat</span>(<span class="st">"  "</span>, <span class="fu">paste</span>(m, <span class="at">collapse =</span> <span class="st">" + "</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"What does some of the final 'words' look like after all this merging?</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">head</span>(bpe_out<span class="sc">$</span>vocab, <span class="dv">5</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="bag-of-words-and-tf-idf" class="level2">
+<h2 class="anchored" data-anchor-id="bag-of-words-and-tf-idf">17.3 Bag of Words and TF-IDF</h2>
+<p>This section introduces two fundamental ways of representing documents as numeric vectors: - <strong>Bag of Words (BoW)</strong> simply counts how often each word appears in each document, creating a vector of word frequencies. - <strong>TF-IDF (Term Frequency-Inverse Document Frequency)</strong> weighs word counts by how unique or informative they are, so frequent words that appear in many documents are downweighted, and rare, distinctive words are upweighted.</p>
+<section id="bag-of-words" class="level3">
+<h3 class="anchored" data-anchor-id="bag-of-words">17.3.1 Bag of Words</h3>
+<p>The Bag of Words (BoW) model is a simple and widely used method to represent text data numerically.</p>
+<p>How it works: - For a given collection of documents, we first build a vocabulary containing every unique word seen across all documents. - Each document is then represented as a vector whose length is equal to the size of the vocabulary. - The value at each position in the vector corresponds to the number of times the associated word (from the vocabulary) occurs in that document. - The ordering of words in the original document is not preserved—BoW only cares about word counts.</p>
+<p>For example, if our vocabulary is [‘cat’, ‘dog’, ‘sat’], and a document is “cat sat cat”, then its BoW vector is [2, 0, 1], meaning ‘cat’ appears 2 times, ‘dog’ 0 times, and ‘sat’ 1 time.</p>
+<p>This representation allows us to compare documents using their word frequencies, enabling basic text analysis and feeding data into machine learning models.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># -- Bag of Words for Dummies --</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>bag_of_words <span class="ot">&lt;-</span> <span class="cf">function</span>(tokens, word2idx) {</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Make a "bag" (vector) with one slot for every word in the vocabulary</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  V <span class="ot">&lt;-</span> <span class="fu">length</span>(word2idx)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  vec <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">0</span>, V)  <span class="co"># Start with everything at zero</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (tok <span class="cf">in</span> tokens) {</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># For each token, find its index in our vocab (0-indexed, so +1 for R's vector)</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    idx <span class="ot">&lt;-</span> <span class="fu">get_idx</span>(tok, word2idx)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    vec[idx <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;-</span> vec[idx <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">+</span> <span class="dv">1</span>  <span class="co"># Add one every time we see a word</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  vec  <span class="co"># Return the word-count vector</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Now, make a bag-of-words vector for every sentence in our small dataset!</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>bows <span class="ot">&lt;-</span> <span class="fu">lapply</span>(corpus, <span class="cf">function</span>(s) <span class="fu">bag_of_words</span>(s, word2idx))</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== Bag of Words ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"BoW vector for sentence 0 (non-zero entries):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(bows[[<span class="dv">1</span>]])) {</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (bows[[<span class="dv">1</span>]][i] <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  '%s': %d</span><span class="sc">\n</span><span class="st">"</span>, idx2word[i], bows[[<span class="dv">1</span>]][i]))  <span class="co"># only words that appear!</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="tf-idf" class="level3">
+<h3 class="anchored" data-anchor-id="tf-idf">17.3.2 TF-IDF</h3>
+<p>Suppose you want to figure out which words in a document are truly “important”—not just common words like “the”, but words that are especially meaningful for that specific document. That’s what TF-IDF helps with!</p>
+<p><strong>TF-IDF</strong> stands for <strong>Term Frequency-Inverse Document Frequency</strong>. It ranks words higher if they are common in one document but rare across the collection.</p>
+<p>The TF-IDF score for a word <em>w</em> in document <em>d</em>, out of <em>N</em> documents, is:</p>
+<p><span class="math display">\[
+\text{TF-IDF}(w, d) = \text{TF}(w, d) \times \text{IDF}(w)
+\]</span></p>
+<p>Where: - <strong>Term Frequency (TF):</strong></p>
+<p><span class="math display">\[
+  \text{TF}(w, d) = \frac{\text{Number of times word } w \text{ appears in } d}{\text{Total number of words in } d}
+  \]</span> For example, if “cat” appears 3 times in a 10-word sentence: <span class="math display">\[
+  \text{TF}(\text{cat}, d) = \frac{3}{10} = 0.3
+  \]</span></p>
+<ul>
+<li><p><strong>Inverse Document Frequency (IDF):</strong></p>
+<p><span class="math display">\[
+\text{IDF}(w) = \log \left( \frac{N + 1}{n_w + 1}\right) + 1
+\]</span> Where:</p>
+<ul>
+<li><span class="math inline">\(N\)</span> = Total number of documents</li>
+<li><span class="math inline">\(n_w\)</span> = Number of documents containing word <span class="math inline">\(w\)</span> This means: If a word appears in many documents, its IDF shrinks; if it shows up in only a few, its IDF grows.</li>
+</ul></li>
+<li><p><strong>TF-IDF Score:</strong> Multiply TF and IDF! A word gets a high TF-IDF if it appears often in a specific document (high TF), but not in many documents overall (high IDF).</p></li>
+</ul>
+<p>In short, TF-IDF highlights words that are: - Frequent in this one document - Infrequent in the rest of the collection</p>
+<p>This makes TF-IDF great for finding keywords and summarizing what each document is truly <em>about</em>.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># === TF-IDF Calculation ===</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>tfidf <span class="ot">&lt;-</span> <span class="cf">function</span>(corpus_tokens, word2idx) {</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Makes a TF-IDF matrix for a set of documents.</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># (TF-IDF tells you which words are important in which document.)</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Inputs:</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   corpus_tokens: list of token vectors; one vector per document.</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   word2idx: named vector mapping each word in the vocabulary to a 0-indexed column number.</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Output:</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   - matrix: a list of vectors. Each element is a document; each entry is a word's</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     TF-IDF importance.</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   - idf: vector where idf[i] is the IDF score for word i (1-indexed).</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  V <span class="ot">&lt;-</span> <span class="fu">length</span>(word2idx)               <span class="co"># How many words in our vocabulary?</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  N <span class="ot">&lt;-</span> <span class="fu">length</span>(corpus_tokens)          <span class="co"># How many documents?</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># STEP 1: Figure out how many documents each word appears in ("document frequency").</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">0</span>, V)                     <span class="co"># df[i] counts docs containing word i</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (tokens <span class="cf">in</span> corpus_tokens) {     <span class="co"># For every document...</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    seen <span class="ot">&lt;-</span> <span class="fu">c</span>()                       <span class="co"># Track which words we've already counted for this doc!</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (tok <span class="cf">in</span> tokens) {             <span class="co"># For every word in the doc...</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>      idx <span class="ot">&lt;-</span> <span class="fu">get_idx</span>(tok, word2idx)   <span class="co"># Get that word's column in TF-IDF.</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (<span class="sc">!</span>(idx <span class="sc">%in%</span> seen)) {         <span class="co"># Don't double-count words in the same document!</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>        df[idx <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;-</span> df[idx <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>        seen <span class="ot">&lt;-</span> <span class="fu">c</span>(seen, idx)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># STEP 2: Compute IDF ("rarity") for each word. High IDF = rare word.</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>  idf <span class="ot">&lt;-</span> <span class="fu">log</span>((N <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> (df <span class="sc">+</span> <span class="dv">1</span>)) <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># STEP 3: For each document, compute TF ("word frequency") and then the TF-IDF vector:</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>  matrix_ <span class="ot">&lt;-</span> <span class="fu">vector</span>(<span class="st">"list"</span>, N)</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (d <span class="cf">in</span> <span class="fu">seq_len</span>(N)) {</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>    tokens <span class="ot">&lt;-</span> corpus_tokens[[d]]</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    total <span class="ot">&lt;-</span> <span class="fu">length</span>(tokens)           <span class="co"># Total number of words in this doc</span></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    tf <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, V)                 <span class="co"># tf[i] is frequency of word i in this doc</span></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (tok <span class="cf">in</span> tokens) {</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>      idx <span class="ot">&lt;-</span> <span class="fu">get_idx</span>(tok, word2idx)</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>      tf[idx <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;-</span> tf[idx <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">+</span> <span class="fl">1.0</span> <span class="sc">/</span> total  <span class="co"># Add 1/length for each occurrence</span></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Now multiply TF by IDF for each word, to get each word's final score in this doc:</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>    row <span class="ot">&lt;-</span> tf <span class="sc">*</span> idf</span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Finally: Normalize the whole vector (so longer docs don't dominate):</span></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>    norm <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(row<span class="sc">^</span><span class="dv">2</span>)) <span class="sc">+</span> <span class="fl">1e-9</span></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>    matrix_[[d]] <span class="ot">&lt;-</span> row <span class="sc">/</span> norm</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">matrix =</span> matrix_, <span class="at">idf =</span> idf)</span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a><span class="co"># Actually use it:</span></span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>tfo <span class="ot">&lt;-</span> <span class="fu">tfidf</span>(corpus, word2idx)</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>tfidf_matrix <span class="ot">&lt;-</span> tfo<span class="sc">$</span>matrix; idf_vec <span class="ot">&lt;-</span> tfo<span class="sc">$</span>idf</span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a><span class="co"># === Cosine Similarity, for Dummies ===</span></span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a><span class="co"># This tells us how "similar" two documents are (1 = same, 0 = nothing in common).</span></span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a>cosine_sim <span class="ot">&lt;-</span> <span class="cf">function</span>(a, b) {</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>  dot <span class="ot">&lt;-</span> <span class="fu">sum</span>(a <span class="sc">*</span> b)          <span class="co"># Multiply each matching word's score together and add up (dot product)</span></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a>  na <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(a<span class="sc">^</span><span class="dv">2</span>))       <span class="co"># Length of document a in this "word space"</span></span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>  nb <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(b<span class="sc">^</span><span class="dv">2</span>))       <span class="co"># Length of document b in this "word space"</span></span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>  dot <span class="sc">/</span> (na <span class="sc">*</span> nb <span class="sc">+</span> <span class="fl">1e-9</span>)     <span class="co"># Cosine of the angle between their "word importance" vectors</span></span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== TF-IDF Cosine Similarities ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  Doc0 vs Doc1 (both about sitting): %.3f</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">cosine_sim</span>(tfidf_matrix[[<span class="dv">1</span>]], tfidf_matrix[[<span class="dv">2</span>]])))</span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  Doc0 vs Doc2 (different topic):    %.3f</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">cosine_sim</span>(tfidf_matrix[[<span class="dv">1</span>]], tfidf_matrix[[<span class="dv">3</span>]])))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="word-embeddings-word2vec-skip-gram" class="level2">
+<h2 class="anchored" data-anchor-id="word-embeddings-word2vec-skip-gram">17.4 Word Embeddings (Word2Vec Skip-gram)</h2>
+<p><strong>TF-IDF</strong> just counts how important each word is, treating every word as totally separate. <strong>Word2Vec</strong> is way cooler: it gives each word a list of numbers (“embedding”) so that <em>similar words have similar coordinates</em>. Even “word math” works:</p>
+<pre><code>king - man + woman ≈ queen</code></pre>
+<section id="but-how-does-it-actually-work-math-for-dummies" class="level3">
+<h3 class="anchored" data-anchor-id="but-how-does-it-actually-work-math-for-dummies">But how does it actually work? (Math for dummies)</h3>
+<p>Imagine you slide a window over your text. For every word (the “center” word, call it <strong>w</strong>), you try to guess the words near it (“context” words, call them <strong>c</strong>).</p>
+<p>The model wants to make the <strong>center vector</strong> (<strong>v_w</strong>) and <strong>context vector</strong> (<strong>u_c</strong>) “line up” (big dot product) if they appear together and <em>not</em> line up for random words.</p>
+<p>So, for every place where a center word sees a context word, we want to <strong>give a high score to real pairs, and low score to fake pairs</strong>.</p>
+<p>The math:</p>
+<p><span class="math display">\[
+\text{Maximize:} \quad \sum_{(w,c)} \log P(c \mid w)
+\]</span></p>
+<p>Where <span class="math inline">\(P(c \mid w)\)</span> is: <span class="math display">\[
+P(c \mid w) = \frac{
+     \exp(\mathbf{v}_w \cdot \mathbf{u}_c)
+  }{
+     \sum_{\text{all words }v} \exp(\mathbf{v}_w \cdot \mathbf{u}_v)
+  }
+\]</span></p>
+<p>In plain English: - “Make the dot product for <em>correct</em> context words big” - “Try not to give high dot products to <em>random</em> other words”</p>
+<p>(<strong>v_w</strong> = center-word vector, <strong>u_c</strong> = context-word vector.)</p>
+<p><strong>The denominator is huge!</strong> It sums over all words. That’s slow.</p>
+<p><strong>Negative Sampling Trick:</strong> Instead of checking <em>every</em> possible word for the denominator, just sample a few “negative” words (ones that shouldn’t be there), and make sure their dot products stay low.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This class learns to turn each word into a list of numbers (embeddings)</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># so that similar words are close together, and "word math" works.</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Skip-gram with negative sampling (from scratch, for dummies!)</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co"># - Each word gets two sets of numbers: one for "center", one for "context".</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># - For each (center, context) real pair, make their numbers similar.</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># - For random (center, NOT context) "negative" pairs, make their numbers NOT similar.</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># - Uses simple math: dot products and the sigmoid function.</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>Word2Vec <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Word2Vec"</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">Vn =</span> <span class="st">"numeric"</span>, <span class="at">D =</span> <span class="st">"numeric"</span>, <span class="at">W_in =</span> <span class="st">"matrix"</span>, <span class="at">W_out =</span> <span class="st">"matrix"</span>),</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">vocab_size =</span> <span class="dv">1</span>, <span class="at">embed_dim =</span> <span class="dv">16</span>, <span class="at">seed =</span> <span class="dv">42</span>, ...) {</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Random number generator for reproducibility</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(seed)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>      scale <span class="ot">&lt;-</span> <span class="fl">0.01</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>      Vn <span class="ot">&lt;&lt;-</span> vocab_size  <span class="co"># how many words in vocab</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>      D <span class="ot">&lt;&lt;-</span> embed_dim    <span class="co"># how many numbers per word</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>      <span class="co"># These are the "center word" vectors -- each word gets one row</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>      W_in <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(vocab_size <span class="sc">*</span> embed_dim, <span class="dv">0</span>, scale), <span class="at">nrow =</span> vocab_size, <span class="at">ncol =</span> embed_dim)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>      <span class="co"># These are the "context word" vectors -- each word gets one row</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>      W_out <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(vocab_size <span class="sc">*</span> embed_dim, <span class="dv">0</span>, scale), <span class="at">nrow =</span> vocab_size, <span class="at">ncol =</span> embed_dim)</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">dot_ =</span> <span class="cf">function</span>(a, b) <span class="fu">sum</span>(a <span class="sc">*</span> b),  <span class="co"># Multiplies two vectors and adds up the results</span></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">sigmoid_ =</span> <span class="cf">function</span>(x) <span class="fl">1.0</span> <span class="sc">/</span> (<span class="fl">1.0</span> <span class="sc">+</span> <span class="fu">exp</span>(<span class="sc">-</span><span class="fu">pmax</span>(<span class="fu">pmin</span>(x, <span class="dv">30</span>), <span class="sc">-</span><span class="dv">30</span>))),  <span class="co"># squashes into 0..1</span></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">train_pair =</span> <span class="cf">function</span>(center_idx, pos_idx, neg_indices, <span class="at">lr =</span> <span class="fl">0.025</span>) {</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Does one learning update for:</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>      <span class="co"># - center_idx = the "anchor" word (0-indexed)</span></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>      <span class="co"># - pos_idx = a REAL context word found nearby (0-indexed)</span></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>      <span class="co"># - neg_indices = a bunch of RANDOM (shouldn't be context!) words (0-indexed)</span></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>      <span class="co">#</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>      <span class="co"># 1. Make center and positive context get a HIGH dot product</span></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>      <span class="co"># 2. Make center and negatives get a LOW dot product</span></span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>      <span class="co"># 3. Adjust all their numbers a little so this happens next time</span></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>      ci <span class="ot">&lt;-</span> center_idx <span class="sc">+</span> <span class="dv">1</span>; pI <span class="ot">&lt;-</span> pos_idx <span class="sc">+</span> <span class="dv">1</span>   <span class="co"># convert 0-indexed ids to R's 1-indexed rows</span></span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>      v_c <span class="ot">&lt;-</span> W_in[ci, ]    <span class="co"># "center word" vector</span></span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>      u_p <span class="ot">&lt;-</span> W_out[pI, ]   <span class="co"># "context word" vector</span></span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>      <span class="co"># --- Positive pair ---</span></span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>      score_pos <span class="ot">&lt;-</span> <span class="fu">sigmoid_</span>(<span class="fu">dot_</span>(v_c, u_p))   <span class="co"># How "similar"?</span></span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>      grad_pos <span class="ot">&lt;-</span> score_pos <span class="sc">-</span> <span class="fl">1.0</span>              <span class="co"># How much to tweak? (want closer to 1)</span></span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Move context vector closer to center if they appeared together</span></span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>      W_out[pI, ] <span class="ot">&lt;&lt;-</span> W_out[pI, ] <span class="sc">-</span> lr <span class="sc">*</span> grad_pos <span class="sc">*</span> v_c</span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Accumulate change for center vector (to update after negatives too)</span></span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>      grad_center <span class="ot">&lt;-</span> grad_pos <span class="sc">*</span> u_p</span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>      <span class="co"># --- Negative pairs ---</span></span>
+<span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (neg_idx <span class="cf">in</span> neg_indices) {</span>
+<span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a>        ni <span class="ot">&lt;-</span> neg_idx <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb7-54"><a href="#cb7-54" aria-hidden="true" tabindex="-1"></a>        u_n <span class="ot">&lt;-</span> W_out[ni, ]                       <span class="co"># a not-actually-nearby word</span></span>
+<span id="cb7-55"><a href="#cb7-55" aria-hidden="true" tabindex="-1"></a>        score_neg <span class="ot">&lt;-</span> <span class="fu">sigmoid_</span>(<span class="fu">dot_</span>(v_c, u_n))    <span class="co"># similarity (want it LOW)</span></span>
+<span id="cb7-56"><a href="#cb7-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Move negative word's context vector AWAY from center</span></span>
+<span id="cb7-57"><a href="#cb7-57" aria-hidden="true" tabindex="-1"></a>        W_out[ni, ] <span class="ot">&lt;&lt;-</span> W_out[ni, ] <span class="sc">-</span> lr <span class="sc">*</span> score_neg <span class="sc">*</span> v_c</span>
+<span id="cb7-58"><a href="#cb7-58" aria-hidden="true" tabindex="-1"></a>        grad_center <span class="ot">&lt;-</span> grad_center <span class="sc">+</span> score_neg <span class="sc">*</span> u_n</span>
+<span id="cb7-59"><a href="#cb7-59" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb7-60"><a href="#cb7-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-61"><a href="#cb7-61" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Update center word's vector using all the gradients from above</span></span>
+<span id="cb7-62"><a href="#cb7-62" aria-hidden="true" tabindex="-1"></a>      W_in[ci, ] <span class="ot">&lt;&lt;-</span> W_in[ci, ] <span class="sc">-</span> lr <span class="sc">*</span> grad_center</span>
+<span id="cb7-63"><a href="#cb7-63" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-64"><a href="#cb7-64" aria-hidden="true" tabindex="-1"></a>    <span class="at">get_embedding =</span> <span class="cf">function</span>(word_idx) W_in[word_idx <span class="sc">+</span> <span class="dv">1</span>, ],  <span class="co"># numbers for word #word_idx</span></span>
+<span id="cb7-65"><a href="#cb7-65" aria-hidden="true" tabindex="-1"></a>    <span class="at">most_similar =</span> <span class="cf">function</span>(word_idx, idx2word, <span class="at">top_k =</span> <span class="dv">3</span>) {</span>
+<span id="cb7-66"><a href="#cb7-66" aria-hidden="true" tabindex="-1"></a>      <span class="co"># For the given word, look for other words whose embeddings are most "similar"</span></span>
+<span id="cb7-67"><a href="#cb7-67" aria-hidden="true" tabindex="-1"></a>      <span class="co"># (highest cosine similarity)</span></span>
+<span id="cb7-68"><a href="#cb7-68" aria-hidden="true" tabindex="-1"></a>      target <span class="ot">&lt;-</span> W_in[word_idx <span class="sc">+</span> <span class="dv">1</span>, ]</span>
+<span id="cb7-69"><a href="#cb7-69" aria-hidden="true" tabindex="-1"></a>      idxs <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="dv">0</span><span class="sc">:</span>(Vn <span class="sc">-</span> <span class="dv">1</span>), word_idx)  <span class="co"># skip self</span></span>
+<span id="cb7-70"><a href="#cb7-70" aria-hidden="true" tabindex="-1"></a>      scores <span class="ot">&lt;-</span> <span class="fu">sapply</span>(idxs, <span class="cf">function</span>(i) {</span>
+<span id="cb7-71"><a href="#cb7-71" aria-hidden="true" tabindex="-1"></a>        vi <span class="ot">&lt;-</span> W_in[i <span class="sc">+</span> <span class="dv">1</span>, ]</span>
+<span id="cb7-72"><a href="#cb7-72" aria-hidden="true" tabindex="-1"></a>        dot <span class="ot">&lt;-</span> <span class="fu">dot_</span>(target, vi)</span>
+<span id="cb7-73"><a href="#cb7-73" aria-hidden="true" tabindex="-1"></a>        norm_t <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">dot_</span>(target, target)) <span class="sc">+</span> <span class="fl">1e-9</span></span>
+<span id="cb7-74"><a href="#cb7-74" aria-hidden="true" tabindex="-1"></a>        norm_i <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">dot_</span>(vi, vi)) <span class="sc">+</span> <span class="fl">1e-9</span></span>
+<span id="cb7-75"><a href="#cb7-75" aria-hidden="true" tabindex="-1"></a>        dot <span class="sc">/</span> (norm_t <span class="sc">*</span> norm_i)</span>
+<span id="cb7-76"><a href="#cb7-76" aria-hidden="true" tabindex="-1"></a>      })</span>
+<span id="cb7-77"><a href="#cb7-77" aria-hidden="true" tabindex="-1"></a>      ord <span class="ot">&lt;-</span> <span class="fu">order</span>(scores, <span class="at">decreasing =</span> <span class="cn">TRUE</span>)[<span class="dv">1</span><span class="sc">:</span>top_k]</span>
+<span id="cb7-78"><a href="#cb7-78" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Return top_k similar words and similarity scores</span></span>
+<span id="cb7-79"><a href="#cb7-79" aria-hidden="true" tabindex="-1"></a>      <span class="fu">Map</span>(<span class="cf">function</span>(i, s) <span class="fu">list</span>(<span class="at">word =</span> idx2word[idxs[i] <span class="sc">+</span> <span class="dv">1</span>], <span class="at">score =</span> s), ord, scores[ord])</span>
+<span id="cb7-80"><a href="#cb7-80" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb7-81"><a href="#cb7-81" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-82"><a href="#cb7-82" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-83"><a href="#cb7-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-84"><a href="#cb7-84" aria-hidden="true" tabindex="-1"></a><span class="co"># This function makes pairs for training:</span></span>
+<span id="cb7-85"><a href="#cb7-85" aria-hidden="true" tabindex="-1"></a><span class="co"># For every word (the center), grab some neighbor words (context) and also sample some</span></span>
+<span id="cb7-86"><a href="#cb7-86" aria-hidden="true" tabindex="-1"></a><span class="co"># negative (random) words.</span></span>
+<span id="cb7-87"><a href="#cb7-87" aria-hidden="true" tabindex="-1"></a>generate_skipgram_pairs <span class="ot">&lt;-</span> <span class="cf">function</span>(corpus, word2idx, <span class="at">window =</span> <span class="dv">2</span>, <span class="at">neg_k =</span> <span class="dv">5</span>, <span class="at">seed =</span> <span class="dv">42</span>) {</span>
+<span id="cb7-88"><a href="#cb7-88" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(seed)</span>
+<span id="cb7-89"><a href="#cb7-89" aria-hidden="true" tabindex="-1"></a>  pairs <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb7-90"><a href="#cb7-90" aria-hidden="true" tabindex="-1"></a>  V <span class="ot">&lt;-</span> <span class="fu">length</span>(word2idx)</span>
+<span id="cb7-91"><a href="#cb7-91" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (sentence <span class="cf">in</span> corpus) {</span>
+<span id="cb7-92"><a href="#cb7-92" aria-hidden="true" tabindex="-1"></a>    ids <span class="ot">&lt;-</span> <span class="fu">sapply</span>(sentence, get_idx, <span class="at">word2idx =</span> word2idx)  <span class="co"># convert each word to its integer</span></span>
+<span id="cb7-93"><a href="#cb7-93" aria-hidden="true" tabindex="-1"></a>    n <span class="ot">&lt;-</span> <span class="fu">length</span>(ids)</span>
+<span id="cb7-94"><a href="#cb7-94" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(ids)) {</span>
+<span id="cb7-95"><a href="#cb7-95" aria-hidden="true" tabindex="-1"></a>      center <span class="ot">&lt;-</span> ids[i]</span>
+<span id="cb7-96"><a href="#cb7-96" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Grab window-size words to the left and right for positives</span></span>
+<span id="cb7-97"><a href="#cb7-97" aria-hidden="true" tabindex="-1"></a>      window_idx <span class="ot">&lt;-</span> <span class="fu">max</span>(<span class="dv">1</span>, i <span class="sc">-</span> window)<span class="sc">:</span><span class="fu">min</span>(n, i <span class="sc">+</span> window)</span>
+<span id="cb7-98"><a href="#cb7-98" aria-hidden="true" tabindex="-1"></a>      context <span class="ot">&lt;-</span> ids[<span class="fu">setdiff</span>(window_idx, i)]</span>
+<span id="cb7-99"><a href="#cb7-99" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (pos <span class="cf">in</span> context) {</span>
+<span id="cb7-100"><a href="#cb7-100" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Random negatives, not the special tokens (0-indexed range [4, V-1])</span></span>
+<span id="cb7-101"><a href="#cb7-101" aria-hidden="true" tabindex="-1"></a>        negs <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="dv">4</span><span class="sc">:</span>(V <span class="sc">-</span> <span class="dv">1</span>), neg_k, <span class="at">replace =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-102"><a href="#cb7-102" aria-hidden="true" tabindex="-1"></a>        pairs[[<span class="fu">length</span>(pairs) <span class="sc">+</span> <span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">center =</span> center, <span class="at">pos =</span> pos, <span class="at">negs =</span> negs)</span>
+<span id="cb7-103"><a href="#cb7-103" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb7-104"><a href="#cb7-104" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb7-105"><a href="#cb7-105" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-106"><a href="#cb7-106" aria-hidden="true" tabindex="-1"></a>  pairs</span>
+<span id="cb7-107"><a href="#cb7-107" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-108"><a href="#cb7-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-109"><a href="#cb7-109" aria-hidden="true" tabindex="-1"></a><span class="co"># === Now let's train the embeddings! (for dummies) ===</span></span>
+<span id="cb7-110"><a href="#cb7-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-111"><a href="#cb7-111" aria-hidden="true" tabindex="-1"></a><span class="co"># Repeat our tiny toy text many times so we have enough data</span></span>
+<span id="cb7-112"><a href="#cb7-112" aria-hidden="true" tabindex="-1"></a>bigger_corpus <span class="ot">&lt;-</span> <span class="fu">rep</span>(corpus, <span class="dv">50</span>)  <span class="co"># repeat for more signal</span></span>
+<span id="cb7-113"><a href="#cb7-113" aria-hidden="true" tabindex="-1"></a>pairs <span class="ot">&lt;-</span> <span class="fu">generate_skipgram_pairs</span>(bigger_corpus, word2idx, <span class="at">window =</span> <span class="dv">2</span>, <span class="at">neg_k =</span> <span class="dv">5</span>)</span>
+<span id="cb7-114"><a href="#cb7-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-115"><a href="#cb7-115" aria-hidden="true" tabindex="-1"></a><span class="co"># Make a Word2Vec model (choose how big the number-list for each word is, here 8)</span></span>
+<span id="cb7-116"><a href="#cb7-116" aria-hidden="true" tabindex="-1"></a>model_w2v <span class="ot">&lt;-</span> Word2Vec<span class="sc">$</span><span class="fu">new</span>(<span class="at">vocab_size =</span> <span class="fu">length</span>(word2idx), <span class="at">embed_dim =</span> <span class="dv">8</span>, <span class="at">seed =</span> <span class="dv">0</span>)</span>
+<span id="cb7-117"><a href="#cb7-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-118"><a href="#cb7-118" aria-hidden="true" tabindex="-1"></a><span class="co"># Shuffle the training pairs (normal in machine learning)</span></span>
+<span id="cb7-119"><a href="#cb7-119" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb7-120"><a href="#cb7-120" aria-hidden="true" tabindex="-1"></a>pairs <span class="ot">&lt;-</span> pairs[<span class="fu">sample</span>(<span class="fu">length</span>(pairs))]</span>
+<span id="cb7-121"><a href="#cb7-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-122"><a href="#cb7-122" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== Word2Vec Skip-gram ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb7-123"><a href="#cb7-123" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Training on %d (center, context, negatives) pairs...</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(pairs)))</span>
+<span id="cb7-124"><a href="#cb7-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-125"><a href="#cb7-125" aria-hidden="true" tabindex="-1"></a><span class="co"># Main training loop: for each pair, do a learning step!</span></span>
+<span id="cb7-126"><a href="#cb7-126" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (p <span class="cf">in</span> pairs) model_w2v<span class="sc">$</span><span class="fu">train_pair</span>(p<span class="sc">$</span>center, p<span class="sc">$</span>pos, p<span class="sc">$</span>negs, <span class="at">lr =</span> <span class="fl">0.05</span>)</span>
+<span id="cb7-127"><a href="#cb7-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-128"><a href="#cb7-128" aria-hidden="true" tabindex="-1"></a><span class="co"># Let's see which words are most similar to "cat" (according to the learned word numbers!)</span></span>
+<span id="cb7-129"><a href="#cb7-129" aria-hidden="true" tabindex="-1"></a>target <span class="ot">&lt;-</span> <span class="st">"cat"</span></span>
+<span id="cb7-130"><a href="#cb7-130" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (target <span class="sc">%in%</span> <span class="fu">names</span>(word2idx)) {</span>
+<span id="cb7-131"><a href="#cb7-131" aria-hidden="true" tabindex="-1"></a>  similar <span class="ot">&lt;-</span> model_w2v<span class="sc">$</span><span class="fu">most_similar</span>(word2idx[[target]], idx2word, <span class="at">top_k =</span> <span class="dv">3</span>)</span>
+<span id="cb7-132"><a href="#cb7-132" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Words most similar to '%s': "</span>, target))</span>
+<span id="cb7-133"><a href="#cb7-133" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">paste</span>(<span class="fu">sprintf</span>(<span class="st">"(%s, %.3f)"</span>, <span class="fu">sapply</span>(similar, <span class="st">`</span><span class="at">[[</span><span class="st">`</span>, <span class="st">"word"</span>), <span class="fu">sapply</span>(similar, <span class="st">`</span><span class="at">[[</span><span class="st">`</span>, <span class="st">"score"</span>)), <span class="at">collapse =</span> <span class="st">", "</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb7-134"><a href="#cb7-134" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="attention-mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="attention-mechanism">17.5 Attention Mechanism</h2>
+<p>Imagine you are reading a sentence and, for each word, you want to “pay attention” to other words that might help you understand it.</p>
+<p><strong>Attention</strong> is a special calculator that helps a neural network decide how much each word should look at every other word.</p>
+<section id="scaled-dot-product-attention-simple-math-version" class="level3">
+<h3 class="anchored" data-anchor-id="scaled-dot-product-attention-simple-math-version">Scaled Dot-Product Attention (Simple Math Version)</h3>
+<p>Think of the attention calculation in 3 simple steps:</p>
+<ol type="1">
+<li><strong>Find out who’s important:</strong>
+<ul>
+<li>For each word, make three “versions” of it — called <strong>Q</strong> (query), <strong>K</strong> (key), and <strong>V</strong> (value).</li>
+<li>Q: “What am I looking for?”</li>
+<li>K: “What do I have to offer?”</li>
+<li>V: “What information do I give you if you pick me?”</li>
+</ul></li>
+<li><strong>Score how well they match:</strong>
+<ul>
+<li>For every position, match its <strong>Q</strong> with every other position’s <strong>K</strong> (using dot product, which is just multiplying and adding up each part).</li>
+<li>This says how much the model thinks they go together.</li>
+<li>The formula is: <span class="math display">\[
+\text{score}_{ij} = Q_i \cdot K_j = \sum_{k=1}^{d_k} Q_{i,k} \times K_{j,k}
+\]</span></li>
+<li>Divide everything by <span class="math inline">\(\sqrt{d_k}\)</span> (the square root of the vector size). This keeps numbers nicely balanced so nothing explodes or shrinks too much.</li>
+</ul></li>
+<li><strong>Turn scores into attention weights:</strong>
+<ul>
+<li>Big scores mean you “pay more attention” there!</li>
+<li>But scores can be anything—so use <code>softmax</code>, which turns numbers into probabilities that add up to 1: <span class="math display">\[
+\text{AttentionWeights}_{ij} = \frac{\exp\left(\text{score}_{ij} / \sqrt{d_k}\right)}{\sum_{j}\exp\left(\text{score}_{ij} / \sqrt{d_k}\right)}
+\]</span></li>
+</ul></li>
+<li><strong>Mix the information:</strong>
+<ul>
+<li>For each word, take a <em>weighted sum</em> of all the <strong>V</strong> vectors (using the attention weights from above).</li>
+<li>This gives us a new “output” for each word that blends together information from all the other words.</li>
+</ul></li>
+<li><strong>Full formula:</strong> <span class="math display">\[
+\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{Q K^\top}{\sqrt{d_k}}\right) V
+\]</span></li>
+</ol>
+<p>So: - For each word, we ask “who should I pay attention to?” - We use math (dot products and softmax) to decide how much attention to pay! - We blend together the information from every word’s <strong>V</strong>.</p>
+<hr>
+</section>
+</section>
+<section id="the-transformer" class="level2">
+<h2 class="anchored" data-anchor-id="the-transformer">17.6 The Transformer</h2>
+<p>The Transformer (Vaswani et al., 2017) is a groundbreaking neural network architecture for NLP tasks (like translation or summarisation). Unlike RNNs (which read inputs one step at a time), Transformers process the entire input at once, using a mechanism called <strong>multi-head self-attention</strong>.</p>
+<p>Let’s break down the core ideas (for dummies!) with simple math:</p>
+<section id="multi-head-attention-what-is-it-why-do-we-use-it" class="level3">
+<h3 class="anchored" data-anchor-id="multi-head-attention-what-is-it-why-do-we-use-it">Multi-Head Attention (What is it? Why do we use it?)</h3>
+<ul>
+<li>Suppose your sentence is a row of tokens (e.g.&nbsp;“the cat sat”).</li>
+<li>For each token, the model asks: “To predict the next word, which other words should I pay attention to?”.</li>
+<li>But instead of doing this once, <strong>multi-head attention</strong> repeats it several times (h times): each “head” learns to focus on different patterns! (E.g. one head might focus on subject-verb, another on nearby words, etc.)</li>
+</ul>
+<section id="the-math-recipe-for-multi-head-attention" class="level4">
+<h4 class="anchored" data-anchor-id="the-math-recipe-for-multi-head-attention">The math “recipe” for Multi-Head Attention:</h4>
+<ol type="1">
+<li><p>Project queries (Q), keys (K), and values (V) using learned matrices for each head:</p>
+<ul>
+<li>For head i:
+<ul>
+<li><span class="math inline">\(\mathbf{Q}_i = \mathbf{Q} \mathbf{W}_i^Q\)</span></li>
+<li><span class="math inline">\(\mathbf{K}_i = \mathbf{K} \mathbf{W}_i^K\)</span></li>
+<li><span class="math inline">\(\mathbf{V}_i = \mathbf{V} \mathbf{W}_i^V\)</span></li>
+</ul></li>
+<li>Here, <span class="math inline">\(\mathbf{W}_i^Q\)</span>, <span class="math inline">\(\mathbf{W}_i^K\)</span>, and <span class="math inline">\(\mathbf{W}_i^V\)</span> are learned (trainable) matrices.</li>
+</ul></li>
+<li><p>Compute attention for each head using Scaled Dot-Product Attention:</p>
+<ul>
+<li><span class="math inline">\(\text{Attention}(\mathbf{Q}_i, \mathbf{K}_i, \mathbf{V}_i)\)</span></li>
+<li>(See earlier section for what this does: it lets each word “look” at every other word and take a weighted average of their value vectors.)</li>
+</ul></li>
+<li><p>Concatenate the outputs of all heads (e.g.&nbsp;just stick all their outputs together in a big vector).</p></li>
+<li><p>Pass the concatenated result through one more learned matrix, <span class="math inline">\(\mathbf{W}_O\)</span>, to mix everything together.</p>
+<p><span class="math display">\[
+\text{MultiHead}(\mathbf{Q},\mathbf{K},\mathbf{V}) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)\, \mathbf{W}_O
+\]</span></p>
+<p>where <span class="math display">\[
+\text{head}_i = \text{Attention}(\mathbf{Q}\mathbf{W}^Q_i,\; \mathbf{K}\mathbf{W}^K_i,\; \mathbf{V}\mathbf{W}^V_i)
+\]</span></p></li>
+</ol>
+<ul>
+<li>Why use multiple heads? It helps the model capture many different kinds of relationships—some heads might look for grammar, others for meaning!</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../Images/transformer.png" class="img-fluid figure-img"></p>
+<figcaption>Transformer</figcaption>
+</figure>
+</div>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>scaled_dot_product_attention <span class="ot">&lt;-</span> <span class="cf">function</span>(Q, K, V, <span class="at">mask =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Scaled Dot-Product Attention explained for beginners:</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - Q: "Queries" = What each word is currently looking for.</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - K: "Keys"    = What each word has to offer.</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - V: "Values"  = The information each word wants to share.</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - mask: (optional) logical matrix; TRUE hides that position (like ignoring padding or</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   future words).</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Step-by-step:</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 1. For every query position, see how much it "matches" every key (dot product).</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 2. Scale these scores down (to keep numbers manageable).</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 3. If there is a mask, set scores we want to ignore to a very negative number (so softmax</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#    makes their "attention" almost zero).</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 4. Use "softmax" to turn the scores for each word into probabilities that add up to 1.</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 5. For each word, take a "weighted sum" of the value vectors, using the attention weights.</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 6. Return the blended information (output), and the attention weights.</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Q: (num_queries, d_k); K: (num_keys, d_k); V: (num_keys, d_v)</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Output: (num_queries, d_v), attention weights (num_queries, num_keys)</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  d_k <span class="ot">&lt;-</span> <span class="fu">ncol</span>(Q)             <span class="co"># Size of each Q/K vector</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  scale <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(d_k)         <span class="co"># Divide scores by sqrt(d_k) to keep things stable</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 1. Calculate attention "scores" (how much each query likes each key)</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>  scores <span class="ot">&lt;-</span> (Q <span class="sc">%*%</span> base<span class="sc">::</span><span class="fu">t</span>(K)) <span class="sc">/</span> scale</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 2. (Optional) Use mask to ignore certain positions</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(mask)) scores[mask] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="fl">1e9</span>  <span class="co"># Very low score means "no attention"</span></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 3. Softmax: turn scores for each query into probabilities over the keys</span></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>  softmax_row <span class="ot">&lt;-</span> <span class="cf">function</span>(row) {</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>    m <span class="ot">&lt;-</span> <span class="fu">max</span>(row); e <span class="ot">&lt;-</span> <span class="fu">exp</span>(row <span class="sc">-</span> m); e <span class="sc">/</span> <span class="fu">sum</span>(e)  <span class="co"># subtract max for numerical stability</span></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>  weights <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">apply</span>(scores, <span class="dv">1</span>, softmax_row))  <span class="co"># each row of 'scores' becomes attention weights</span></span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 4. Use attention weights to blend the value vectors (weighted sum)</span></span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>  output <span class="ot">&lt;-</span> weights <span class="sc">%*%</span> V</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Return the final output and the attention weights (so we can see what was attended to)</span></span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">output =</span> output, <span class="at">weights =</span> weights)</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a><span class="co"># DEMO FOR DUMMIES: 3 "words", identity attention</span></span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a><span class="co"># - Each word is a 4-element vector: [1,0,0,0], [0,1,0,0], [0,0,1,0]</span></span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>Q <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">c</span>(<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>),</span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>           <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>),</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>           <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>, <span class="fl">0.0</span>))</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>K <span class="ot">&lt;-</span> Q  <span class="co"># In self-attention, Q = K = V (words attend to each other)</span></span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>V <span class="ot">&lt;-</span> Q</span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>attn <span class="ot">&lt;-</span> <span class="fu">scaled_dot_product_attention</span>(Q, K, V)</span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== Scaled Dot-Product Attention ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Attention weights (each row sums to 1):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(attn<span class="sc">$</span>weights)) {</span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  Token %d: %s</span><span class="sc">\n</span><span class="st">"</span>, i <span class="sc">-</span> <span class="dv">1</span>, <span class="fu">paste</span>(<span class="fu">round</span>(attn<span class="sc">$</span>weights[i, ], <span class="dv">3</span>), <span class="at">collapse =</span> <span class="st">", "</span>)))</span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+</section>
+<section id="positional-encoding-because-transformers-cant-count-by-themselves" class="level3">
+<h3 class="anchored" data-anchor-id="positional-encoding-because-transformers-cant-count-by-themselves">Positional Encoding (Because Transformers can’t “count” by themselves)</h3>
+<p>Positional Encoding is a technique used in Transformers to give the model information about the order of tokens in a sequence. Since Transformers process all positions in parallel and do not have built-in sense of position (unlike RNNs), positional encoding adds unique patterns (created using sine and cosine functions) to each input position. This helps the model distinguish between, for example, the first word and the third word in a sentence, allowing it to understand word order and sequence structure.</p>
+<ul>
+<li>Transformers have <strong>no recurrence</strong> (they process all words at once), so they don’t know the order of the words.</li>
+<li>To give the model a clue about <em>where</em> each word is in the sequence, we add “positional encodings” to the input vectors.</li>
+</ul>
+<p>For a word at position <code>pos</code> and dimension <code>i</code> of its vector:</p>
+<ul>
+<li><p>If <code>i</code> is even (0, 2, 4, …): <span class="math inline">\(\text{PE}(\text{pos}, 2i) = \sin\left(\frac{\text{pos}}{10000^{2i/d_{\text{model}}}}\right)\)</span></p></li>
+<li><p>If <code>i</code> is odd (1, 3, 5, …): <span class="math inline">\(\text{PE}(\text{pos}, 2i+1) = \cos\left(\frac{\text{pos}}{10000^{2i/d_{\text{model}}}}\right)\)</span></p></li>
+<li><p>This creates a unique vector for every position, and lets the model “know” the order of the words.</p></li>
+<li><p>The code for this is just applying sine/cosine functions at different frequencies (see next code cell).</p></li>
+</ul>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>positional_encoding <span class="ot">&lt;-</span> <span class="cf">function</span>(seq_len, d_model) {</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Make a matrix called 'PE' that tells the model where each word is in a sentence.</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># It fills each position with unique numbers using math 'waves' (sine and cosine).</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># This way, the model can tell the order of words!</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># How it works:</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - For every position (like the 1st, 2nd... word), we make a row of numbers.</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - For every slot in that row, we use either sin or cos (depending if it's an even or</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   odd slot) to create a wavy number.</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - The frequency of the wave changes for each slot, so each position ends up being unique.</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># In simple words: Turns position (like '3rd word') into a smart, wiggly set of numbers so</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the model knows where a word is.</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Arguments:</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - seq_len: How many positions (words) in the sentence</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># - d_model: How big you want each position's set of numbers to be</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns: a matrix (seq_len x d_model) of position encodings</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  PE <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> seq_len, <span class="at">ncol =</span> d_model)</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (pos <span class="cf">in</span> <span class="dv">0</span><span class="sc">:</span>(seq_len <span class="sc">-</span> <span class="dv">1</span>)) {         <span class="co"># For each word position</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">0</span><span class="sc">:</span>(d_model <span class="sc">-</span> <span class="dv">1</span>)) {         <span class="co"># For each number slot in the position</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Make a different frequency for each slot so every row is special</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>      angle <span class="ot">&lt;-</span> pos <span class="sc">/</span> (<span class="dv">10000</span> <span class="sc">^</span> (<span class="dv">2</span> <span class="sc">*</span> (i <span class="sc">%/%</span> <span class="dv">2</span>) <span class="sc">/</span> d_model))</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>      PE[pos <span class="sc">+</span> <span class="dv">1</span>, i <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="cf">if</span> (i <span class="sc">%%</span> <span class="dv">2</span> <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">sin</span>(angle) <span class="cf">else</span> <span class="fu">cos</span>(angle)  <span class="co"># even: sine, odd: cosine</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  PE</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Let's see what it looks like for 5 positions, each with 8 numbers:</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>pe <span class="ot">&lt;-</span> <span class="fu">positional_encoding</span>(<span class="dv">5</span>, <span class="dv">8</span>)</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== Positional Encoding (5 positions, 8-dim) ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (pos <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>) <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  pos %d: %s</span><span class="sc">\n</span><span class="st">"</span>, pos <span class="sc">-</span> <span class="dv">1</span>, <span class="fu">paste</span>(<span class="fu">round</span>(pe[pos, ], <span class="dv">3</span>), <span class="at">collapse =</span> <span class="st">", "</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="transformer-encoder-block" class="level3">
+<h3 class="anchored" data-anchor-id="transformer-encoder-block">Transformer Encoder Block</h3>
+<p>The Transformer Encoder Block is a core building block of the Transformer model. It processes a sequence of input vectors (such as word embeddings), enabling the model to understand relationships and context between all positions in the sequence.</p>
+<p>Key steps in an Encoder Block: 1. <strong>Self-Attention</strong>: Every word “looks at” every other word in the sequence (including itself) to gather context. 2. <strong>Add &amp; Normalize</strong>: The attention output is added back to the input (residual connection) and then normalized (LayerNorm) to stabilize learning. 3. <strong>Feed-Forward Network</strong>: Each position is independently passed through a small neural network (usually two linear layers with a ReLU activation in between). 4. <strong>Add &amp; Normalize Again</strong>: The feed-forward output is added back to the previous result and normalized again.</p>
+<p>Each of these steps helps the model build a rich representation of the sequence, capturing both meaning and positional information.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># === LAYER NORM (makes numbers more "normal" so the model learns better) ===</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>layer_norm <span class="ot">&lt;-</span> <span class="cf">function</span>(x, <span class="at">eps =</span> <span class="fl">1e-6</span>) {</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># This function squashes numbers so they have mean=0 and variance=1.</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Why do this? Helps neural networks be stable and learn better.</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Very simply: subtract the average, then divide by how much numbers differ from the average.</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># x: a vector of numbers; eps: a tiny number to avoid dividing by zero</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  mean_x <span class="ot">&lt;-</span> <span class="fu">mean</span>(x)                        <span class="co"># Compute the average of all numbers</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  var_x <span class="ot">&lt;-</span> <span class="fu">mean</span>((x <span class="sc">-</span> mean_x)<span class="sc">^</span><span class="dv">2</span>)            <span class="co"># Variance = how much numbers wiggle around mean</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  (x <span class="sc">-</span> mean_x) <span class="sc">/</span> <span class="fu">sqrt</span>(var_x <span class="sc">+</span> eps)         <span class="co"># Make them all have same scale</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="co"># === FEED-FORWARD NETWORK (tiny brain: squish/expand vector, with a "kick" in the middle) ===</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>feed_forward <span class="ot">&lt;-</span> <span class="cf">function</span>(x, W1, b1, W2, b2) {</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Tiny two-layer neural network.</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># First layer: squishes input vector into 'hidden' vector, using weights W1 and bias b1.</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Uses ReLU (if number &lt; 0, set to 0) to keep only positive stuff.</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Second layer: squishes hidden vector back to output size, using W2 and b2.</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>  hidden <span class="ot">&lt;-</span> <span class="fu">pmax</span>(<span class="fl">0.0</span>, <span class="fu">as.numeric</span>(W1 <span class="sc">%*%</span> x) <span class="sc">+</span> b1)  <span class="co"># squish (input -&gt; hidden), then ReLU</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(W2 <span class="sc">%*%</span> hidden) <span class="sc">+</span> b2                   <span class="co"># squish (hidden -&gt; output)</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="co"># === TRANSFORMER ENCODER LAYER (the heart of the Transformer) ===</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="co"># This class is ONE block of a Transformer.</span></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a><span class="co"># It takes a matrix of vectors ("tokens" = words or pieces of sentence),</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a><span class="co"># and lets them "talk to each other" (attention),</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a><span class="co"># then cleans up the result (layer norm and feed-forward).</span></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Major steps:</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a><span class="co">#   - Self-Attention: each word looks at every other word and grabs info</span></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="co">#   - Add &amp; Normalize: add original + new info together, clean up</span></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a><span class="co">#   - Feed-forward: a little neural net for each word, for more magic</span></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a><span class="co">#   - Add &amp; Normalize again: add more &amp; clean up again</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>TransformerEncoderLayer <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>  <span class="st">"TransformerEncoderLayer"</span>,</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">W_Q =</span> <span class="st">"matrix"</span>, <span class="at">W_K =</span> <span class="st">"matrix"</span>, <span class="at">W_V =</span> <span class="st">"matrix"</span>,</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>                <span class="at">W1 =</span> <span class="st">"matrix"</span>, <span class="at">b1 =</span> <span class="st">"numeric"</span>, <span class="at">W2 =</span> <span class="st">"matrix"</span>, <span class="at">b2 =</span> <span class="st">"numeric"</span>),</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">d_model =</span> <span class="dv">8</span>, <span class="at">d_ff =</span> <span class="dv">16</span>, <span class="at">seed =</span> <span class="dv">42</span>, ...) {</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>      <span class="co"># d_model: size of each token's vector ('width' of data at each step)</span></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>      <span class="co"># d_ff: size of intermediate hidden layer in feed-forward</span></span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>      <span class="co"># seed: makes the random numbers repeatable</span></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(seed)</span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>      scale <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fl">2.0</span> <span class="sc">/</span> (d_model <span class="sc">+</span> d_ff))</span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Self-attention weights for Query, Key, Value (just random numbers)</span></span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>      W_Q <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(d_model <span class="sc">*</span> d_model, <span class="dv">0</span>, scale), <span class="at">nrow =</span> d_model, <span class="at">ncol =</span> d_model)</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>      W_K <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(d_model <span class="sc">*</span> d_model, <span class="dv">0</span>, scale), <span class="at">nrow =</span> d_model, <span class="at">ncol =</span> d_model)</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>      W_V <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(d_model <span class="sc">*</span> d_model, <span class="dv">0</span>, scale), <span class="at">nrow =</span> d_model, <span class="at">ncol =</span> d_model)</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Feed-forward weights</span></span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>      W1 <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(d_ff <span class="sc">*</span> d_model, <span class="dv">0</span>, scale), <span class="at">nrow =</span> d_ff, <span class="at">ncol =</span> d_model)</span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>      b1 <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, d_ff)</span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>      W2 <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(d_model <span class="sc">*</span> d_ff, <span class="dv">0</span>, scale), <span class="at">nrow =</span> d_model, <span class="at">ncol =</span> d_ff)</span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>      b2 <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, d_model)</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">project_ =</span> <span class="cf">function</span>(H, W) {</span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Squish a whole batch of words (vectors) by multiplying with weights.</span></span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>      <span class="co"># H: matrix of token vectors (rows = tokens); W: weight matrix</span></span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>      H <span class="sc">%*%</span> base<span class="sc">::</span><span class="fu">t</span>(W)</span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>    <span class="at">forward =</span> <span class="cf">function</span>(H, <span class="at">mask =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Run one step of the encoder block.</span></span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>      <span class="co"># H: matrix of token vectors (rows = sentence length, cols = d_model)</span></span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>      <span class="co"># mask: (optional) tells you which words you should ignore</span></span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>      <span class="co">#</span></span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Steps:</span></span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>      <span class="co">#  1. Make queries, keys, values for self-attention</span></span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>      <span class="co">#  2. Compute attention (every word looks at every other word)</span></span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a>      <span class="co">#  3. Add the attention output back to original ("residual") and normalize it</span></span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>      <span class="co">#  4. Feed-forward network for each token</span></span>
+<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a>      <span class="co">#  5. Add result back in, and normalize again</span></span>
+<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Returns: new matrix of token vectors, all same size</span></span>
+<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Get queries, keys, values: help each token "ask" for info, "tell" about itself, "send" info</span></span>
+<span id="cb10-76"><a href="#cb10-76" aria-hidden="true" tabindex="-1"></a>      Q <span class="ot">&lt;-</span> <span class="fu">project_</span>(H, W_Q)</span>
+<span id="cb10-77"><a href="#cb10-77" aria-hidden="true" tabindex="-1"></a>      K <span class="ot">&lt;-</span> <span class="fu">project_</span>(H, W_K)</span>
+<span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a>      V <span class="ot">&lt;-</span> <span class="fu">project_</span>(H, W_V)</span>
+<span id="cb10-79"><a href="#cb10-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-80"><a href="#cb10-80" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Step 1: Self-attention!</span></span>
+<span id="cb10-81"><a href="#cb10-81" aria-hidden="true" tabindex="-1"></a>      attn <span class="ot">&lt;-</span> <span class="fu">scaled_dot_product_attention</span>(Q, K, V, mask)</span>
+<span id="cb10-82"><a href="#cb10-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-83"><a href="#cb10-83" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Step 2: Add attention output to input, then layer-normalize (row by row = per token)</span></span>
+<span id="cb10-84"><a href="#cb10-84" aria-hidden="true" tabindex="-1"></a>      H2 <span class="ot">&lt;-</span> H <span class="sc">+</span> attn<span class="sc">$</span>output</span>
+<span id="cb10-85"><a href="#cb10-85" aria-hidden="true" tabindex="-1"></a>      H2 <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">apply</span>(H2, <span class="dv">1</span>, layer_norm))</span>
+<span id="cb10-86"><a href="#cb10-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-87"><a href="#cb10-87" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Step 3: Feed-forward network (for each token): gives extra reasoning power</span></span>
+<span id="cb10-88"><a href="#cb10-88" aria-hidden="true" tabindex="-1"></a>      ffn_out <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">apply</span>(H2, <span class="dv">1</span>, <span class="cf">function</span>(h) <span class="fu">feed_forward</span>(h, W1, b1, W2, b2)))</span>
+<span id="cb10-89"><a href="#cb10-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-90"><a href="#cb10-90" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Step 4: Add FFN output to result, and normalize again</span></span>
+<span id="cb10-91"><a href="#cb10-91" aria-hidden="true" tabindex="-1"></a>      H3 <span class="ot">&lt;-</span> H2 <span class="sc">+</span> ffn_out</span>
+<span id="cb10-92"><a href="#cb10-92" aria-hidden="true" tabindex="-1"></a>      H3 <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">apply</span>(H3, <span class="dv">1</span>, layer_norm))</span>
+<span id="cb10-93"><a href="#cb10-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-94"><a href="#cb10-94" aria-hidden="true" tabindex="-1"></a>      H3  <span class="co"># Final result: a new set of vectors for each token</span></span>
+<span id="cb10-95"><a href="#cb10-95" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb10-96"><a href="#cb10-96" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb10-97"><a href="#cb10-97" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-98"><a href="#cb10-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-99"><a href="#cb10-99" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== DEMO TIME: Let's see it work ====</span></span>
+<span id="cb10-100"><a href="#cb10-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-101"><a href="#cb10-101" aria-hidden="true" tabindex="-1"></a>d_model <span class="ot">&lt;-</span> <span class="dv">8</span>; d_ff <span class="ot">&lt;-</span> <span class="dv">16</span>; seq_len <span class="ot">&lt;-</span> <span class="dv">4</span>  <span class="co"># Choose tiny numbers so it's fast</span></span>
+<span id="cb10-102"><a href="#cb10-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-103"><a href="#cb10-103" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">0</span>)</span>
+<span id="cb10-104"><a href="#cb10-104" aria-hidden="true" tabindex="-1"></a><span class="co"># Make up a tiny batch of token vectors (what would come from embeddings)</span></span>
+<span id="cb10-105"><a href="#cb10-105" aria-hidden="true" tabindex="-1"></a>tokens <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(seq_len <span class="sc">*</span> d_model), <span class="at">nrow =</span> seq_len, <span class="at">ncol =</span> d_model)</span>
+<span id="cb10-106"><a href="#cb10-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-107"><a href="#cb10-107" aria-hidden="true" tabindex="-1"></a><span class="co"># Add a bit of position info so the model knows word order</span></span>
+<span id="cb10-108"><a href="#cb10-108" aria-hidden="true" tabindex="-1"></a>pe2 <span class="ot">&lt;-</span> <span class="fu">positional_encoding</span>(seq_len, d_model)</span>
+<span id="cb10-109"><a href="#cb10-109" aria-hidden="true" tabindex="-1"></a>tokens <span class="ot">&lt;-</span> tokens <span class="sc">+</span> pe2</span>
+<span id="cb10-110"><a href="#cb10-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-111"><a href="#cb10-111" aria-hidden="true" tabindex="-1"></a><span class="co"># Create our transformer encoder layer!</span></span>
+<span id="cb10-112"><a href="#cb10-112" aria-hidden="true" tabindex="-1"></a>encoder <span class="ot">&lt;-</span> TransformerEncoderLayer<span class="sc">$</span><span class="fu">new</span>(<span class="at">d_model =</span> d_model, <span class="at">d_ff =</span> d_ff, <span class="at">seed =</span> <span class="dv">7</span>)</span>
+<span id="cb10-113"><a href="#cb10-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-114"><a href="#cb10-114" aria-hidden="true" tabindex="-1"></a><span class="co"># Pass the tokens through the encoder</span></span>
+<span id="cb10-115"><a href="#cb10-115" aria-hidden="true" tabindex="-1"></a>out <span class="ot">&lt;-</span> encoder<span class="sc">$</span><span class="fu">forward</span>(tokens)</span>
+<span id="cb10-116"><a href="#cb10-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-117"><a href="#cb10-117" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== Transformer Encoder Layer ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb10-118"><a href="#cb10-118" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Input shape:  %d x %d   # %d tokens, each with %d numbers</span><span class="sc">\n</span><span class="st">"</span>, seq_len, d_model, seq_len, d_model))</span>
+<span id="cb10-119"><a href="#cb10-119" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Output shape: %d x %d   # Should be the same size as input</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">nrow</span>(out), <span class="fu">ncol</span>(out)))</span>
+<span id="cb10-120"><a href="#cb10-120" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"First token output:"</span>, <span class="fu">round</span>(out[<span class="dv">1</span>, ], <span class="dv">3</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="classic-nlp-tasks" class="level2">
+<h2 class="anchored" data-anchor-id="classic-nlp-tasks">17.7 Classic NLP Tasks</h2>
+<section id="text-classification-naive-tf-idf" class="level3">
+<h3 class="anchored" data-anchor-id="text-classification-naive-tf-idf">Text Classification (Naive + TF-IDF)</h3>
+<p>This section demonstrates how to classify text documents using a simple method that combines the “naive” nearest-centroid approach with TF-IDF vectorization. Each document is converted into a TF-IDF vector. For each class, we compute a centroid vector (the average of all training documents’ vectors in that class). A new (test) document is converted to a TF-IDF vector as well, and classified to the class whose centroid is the most similar (by cosine similarity). This method is a classic, interpretable baseline for text classification tasks.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This function does super simple text classification with TF-IDF.</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Think of it like this: It finds which class (category) of text your document is most similar</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># to by averaging the "important words" for each category.</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>classify_tfidf <span class="ot">&lt;-</span> <span class="cf">function</span>(train_docs, train_labels, test_doc, word2idx) {</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># This is a dumb-friendly explanation of what's happening:</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 1. For each class (example: 'positive' or 'negative'),</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">#    - Collect all the documents labeled with that class.</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">#    - Turn each document into a TF-IDF vector (which words are important in it).</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#    - Average all the vectors for that class, so you get a "typical" vector for each class.</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 2. Turn the test document into a TF-IDF vector too.</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 3. Find out which class "centroid" (average vector) is closest to your test doc's vector</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#    (using cosine similarity).</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 4. Return that class as the answer.</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>  classes <span class="ot">&lt;-</span> <span class="fu">unique</span>(train_labels)  <span class="co"># Get unique classes (categories) in our dataset</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  centroids <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (cls <span class="cf">in</span> classes) {</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Grab all documents with this label</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    cls_docs <span class="ot">&lt;-</span> train_docs[train_labels <span class="sc">==</span> cls]</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Convert those documents to TF-IDF vectors</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>    mat <span class="ot">&lt;-</span> <span class="fu">tfidf</span>(<span class="fu">lapply</span>(cls_docs, tokenise), word2idx)<span class="sc">$</span>matrix</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Average all the vectors for this class to make the centroid</span></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>    centroids[[cls]] <span class="ot">&lt;-</span> <span class="fu">Reduce</span>(<span class="st">`</span><span class="at">+</span><span class="st">`</span>, mat) <span class="sc">/</span> <span class="fu">length</span>(mat)</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Turn the test doc into a TF-IDF vector</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>  test_vec <span class="ot">&lt;-</span> <span class="fu">tfidf</span>(<span class="fu">list</span>(<span class="fu">tokenise</span>(test_doc)), word2idx)<span class="sc">$</span>matrix[[<span class="dv">1</span>]]</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Check which class centroid is most like the test doc (cosine similarity = 1 is super similar)</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  sims <span class="ot">&lt;-</span> <span class="fu">sapply</span>(classes, <span class="cf">function</span>(c) <span class="fu">cosine_sim</span>(test_vec, centroids[[c]]))</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>  classes[<span class="fu">which.max</span>(sims)]</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a><span class="co"># Demo time, for dummies:</span></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a><span class="co"># Here's a tiny pretend dataset of movie reviews (positive and negative)</span></span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a>train_data <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">text =</span> <span class="st">"the film was amazing and wonderful"</span>, <span class="at">label =</span> <span class="st">"positive"</span>),</span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">text =</span> <span class="st">"great movie loved every minute"</span>, <span class="at">label =</span> <span class="st">"positive"</span>),</span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">text =</span> <span class="st">"terrible film waste of time"</span>, <span class="at">label =</span> <span class="st">"negative"</span>),</span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">text =</span> <span class="st">"boring and awful not recommended"</span>, <span class="at">label =</span> <span class="st">"negative"</span>)</span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a><span class="co"># Split data into texts and labels</span></span>
+<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a>train_docs <span class="ot">&lt;-</span> <span class="fu">sapply</span>(train_data, <span class="cf">function</span>(d) d<span class="sc">$</span>text)</span>
+<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>train_labels <span class="ot">&lt;-</span> <span class="fu">sapply</span>(train_data, <span class="cf">function</span>(d) d<span class="sc">$</span>label)</span>
+<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a><span class="co"># Build vocabulary - what words exist in the dataset</span></span>
+<span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a>all_corpus <span class="ot">&lt;-</span> <span class="fu">lapply</span>(train_docs, tokenise)</span>
+<span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a>vb2 <span class="ot">&lt;-</span> <span class="fu">build_vocab</span>(all_corpus, <span class="at">min_freq =</span> <span class="dv">1</span>)</span>
+<span id="cb11-48"><a href="#cb11-48" aria-hidden="true" tabindex="-1"></a>w2i <span class="ot">&lt;-</span> vb2<span class="sc">$</span>word2idx</span>
+<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-50"><a href="#cb11-50" aria-hidden="true" tabindex="-1"></a><span class="co"># Example review to classify</span></span>
+<span id="cb11-51"><a href="#cb11-51" aria-hidden="true" tabindex="-1"></a>test_doc <span class="ot">&lt;-</span> <span class="st">"loved it great film"</span></span>
+<span id="cb11-52"><a href="#cb11-52" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the classifier!</span></span>
+<span id="cb11-53"><a href="#cb11-53" aria-hidden="true" tabindex="-1"></a>pred <span class="ot">&lt;-</span> <span class="fu">classify_tfidf</span>(train_docs, train_labels, test_doc, w2i)</span>
+<span id="cb11-54"><a href="#cb11-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-55"><a href="#cb11-55" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== Text Classification ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb11-56"><a href="#cb11-56" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Test document: '%s'</span><span class="sc">\n</span><span class="st">"</span>, test_doc))</span>
+<span id="cb11-57"><a href="#cb11-57" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Predicted class: %s</span><span class="sc">\n</span><span class="st">"</span>, pred))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="exercises" class="level2">
+<h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
+<ol type="1">
+<li>Implement <strong>multi-head attention</strong> by splitting the d_model dimension into h heads, running attention in parallel, and concatenating outputs.</li>
+<li>Add a <strong>causal mask</strong> to the <code>scaled_dot_product_attention</code> function to prevent position i from attending to positions j &gt; i (needed for autoregressive generation).</li>
+<li>Implement <strong>byte-pair encoding</strong> decode (reverse the merges to reconstruct the original text).</li>
+<li>Train the Word2Vec model on a larger corpus (e.g., the first 1000 sentences from Project Gutenberg) and use PCA (Chapter 10) to visualise the embeddings in 2D.</li>
+<li>Build a character-level Transformer (encoder only) for text classification using the <code>TransformerEncoderLayer</code>.</li>
+</ol>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Key Idea</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tokenisation</td>
+<td>Split text; subword (BPE) handles OOV words</td>
+</tr>
+<tr class="even">
+<td>TF-IDF</td>
+<td>Frequency-weighted term importance</td>
+</tr>
+<tr class="odd">
+<td>Word2Vec</td>
+<td>Dense embeddings; semantic similarity = cosine distance</td>
+</tr>
+<tr class="even">
+<td>Attention</td>
+<td>Dynamic weighted sum of values based on query-key match</td>
+</tr>
+<tr class="odd">
+<td>Transformer</td>
+<td>Stack of attention + FFN blocks; no recurrence needed</td>
+</tr>
+<tr class="even">
+<td>Positional encoding</td>
+<td>Sinusoidal signals inject position info</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>← Previous:</strong> <a href="../Notebook/chapter-16-gnn.html">Chapter 16: Graph Neural Networks</a> <strong>→ Next:</strong> <a href="../Notebook/chapter-18-generative-models.html">Chapter 18: Generative Models</a></p>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/zia207\.github\.io\/ML-R");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../Notebook/chapter-16-gnn.html" class="pagination-link" aria-label="Ch 16 · Graph Neural Networks">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">Ch 16 · Graph Neural Networks</span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../Notebook/chapter-18-generative-models.html" class="pagination-link" aria-label="Ch 18 · Generative Models">
+        <span class="nav-page-text">Ch 18 · Generative Models</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© CC-By Zia Ahmed, Upatta Analytics, 2026</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-17-nlp.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>This page is built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

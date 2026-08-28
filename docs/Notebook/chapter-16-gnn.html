@@ -1,0 +1,1891 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Chapter 16: Graph Neural Networks (GNNs) – Machine Learning in R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../Notebook/chapter-17-nlp.html" rel="next">
+<link href="../Notebook/chapter-15-lstm.html" rel="prev">
+<link href="../Images/favicon.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-b13248f691110a3a988f32c964d6cd84.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-298d7a5bc0bdaa8e2d8fcf4df7d2d684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<style>
+  #quarto-document-content > header#title-block-header { display: none !important; }
+</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Machine Learning in R</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> <i class="bi bi-house" role="img" aria-label="Home">
+</i> 
+<span class="menu-text">Machine Learning in R</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/zia207/ML-R"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/zia-ahmed207"> <i class="bi bi-linkedin" role="img" aria-label="LinkedIn">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="mailto:zia207@gmail.com"> <i class="bi bi-mailbox" role="img" aria-label="Email">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-11-neural-networks.html"><strong>🔴 Advanced</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-16-gnn.html">Ch 16 · Graph Neural Networks</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-center sidebar-header">
+      <a href="../index.html" class="sidebar-logo-link">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo light-content py-0 d-lg-inline d-none">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo dark-content py-0 d-lg-inline d-none">
+      </a>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>Machine Learning in R</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟢 Beginner</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-00-prerequisites.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 00 · Prerequisites &amp; Setup</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-01-intro-to-ml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 01 · Introduction to ML</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-02-linear-regression.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 02 · Linear Regression</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-03-glm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 03 · Generalized Linear Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-04-knn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 04 · K-Nearest Neighbors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-05-naive-bayes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 05 · Naive Bayes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟡 Intermediate</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-06-decision-trees.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 06 · Decision Trees</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-07-svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 07 · Support Vector Machines</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-08-ensemble-methods.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 08 · Ensemble Methods</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-09-kmeans.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 09 · K-Means Clustering</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-10-pca.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 10 · PCA</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>🔴 Advanced</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-11-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 11 · Neural Networks (MLP)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-12-cnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 12 · Convolutional Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-13-cnn-advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 13 · CNNs — Advanced</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-14-rnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 14 · Recurrent Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-15-lstm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 15 · LSTM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-16-gnn.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Ch 16 · Graph Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-17-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 17 · NLP</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-18-generative-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 18 · Generative Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-19-reinforcement-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 19 · Reinforcement Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>📊 Best Practices</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-20-model-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 20 · Model Evaluation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#chapter-16-graph-neural-networks-gnns" id="toc-chapter-16-graph-neural-networks-gnns" class="nav-link active" data-scroll-target="#chapter-16-graph-neural-networks-gnns">Chapter 16: Graph Neural Networks (GNNs)</a>
+  <ul class="collapse">
+  <li><a href="#overview" id="toc-overview" class="nav-link" data-scroll-target="#overview">16.1 Overview</a>
+  <ul class="collapse">
+  <li><a href="#the-core-idea" id="toc-the-core-idea" class="nav-link" data-scroll-target="#the-core-idea">The core idea</a></li>
+  <li><a href="#the-one-trick-that-makes-it-work-you-are-who-your-neighbors-are" id="toc-the-one-trick-that-makes-it-work-you-are-who-your-neighbors-are" class="nav-link" data-scroll-target="#the-one-trick-that-makes-it-work-you-are-who-your-neighbors-are">The one trick that makes it work: “you are who your neighbors are”</a></li>
+  <li><a href="#a-real-world-example-catching-fraud-with-a-credit-card" id="toc-a-real-world-example-catching-fraud-with-a-credit-card" class="nav-link" data-scroll-target="#a-real-world-example-catching-fraud-with-a-credit-card">A real-world example: catching fraud with a credit card</a></li>
+  <li><a href="#where-else-this-shows-up" id="toc-where-else-this-shows-up" class="nav-link" data-scroll-target="#where-else-this-shows-up">Where else this shows up</a></li>
+  </ul></li>
+  <li><a href="#theory" id="toc-theory" class="nav-link" data-scroll-target="#theory">16.2 Theory</a>
+  <ul class="collapse">
+  <li><a href="#graph-basics" id="toc-graph-basics" class="nav-link" data-scroll-target="#graph-basics">16.2.1 Graph Basics</a></li>
+  <li><a href="#message-passing-framework" id="toc-message-passing-framework" class="nav-link" data-scroll-target="#message-passing-framework">16.2.2 Message Passing Framework</a></li>
+  <li><a href="#graph-convolutional-network-gcn" id="toc-graph-convolutional-network-gcn" class="nav-link" data-scroll-target="#graph-convolutional-network-gcn">16.2.3 Graph Convolutional Network (GCN)</a></li>
+  <li><a href="#graph-sage-sample-and-aggregate" id="toc-graph-sage-sample-and-aggregate" class="nav-link" data-scroll-target="#graph-sage-sample-and-aggregate">16.2.4 Graph SAGE (Sample and Aggregate)</a></li>
+  </ul></li>
+  <li><a href="#algorithm" id="toc-algorithm" class="nav-link" data-scroll-target="#algorithm">17.3 Algorithm</a></li>
+  <li><a href="#from-scratch-r" id="toc-from-scratch-r" class="nav-link" data-scroll-target="#from-scratch-r">17.4 From-Scratch R</a></li>
+  <li><a href="#link-prediction" id="toc-link-prediction" class="nav-link" data-scroll-target="#link-prediction">17.5 Link Prediction</a></li>
+  <li><a href="#graph-pooling" id="toc-graph-pooling" class="nav-link" data-scroll-target="#graph-pooling">17.6 Graph Pooling</a></li>
+  <li><a href="#part-b-fit-and-validate-a-from-scratch-gnn-on-real-soil-data" id="toc-part-b-fit-and-validate-a-from-scratch-gnn-on-real-soil-data" class="nav-link" data-scroll-target="#part-b-fit-and-validate-a-from-scratch-gnn-on-real-soil-data">Part B: Fit and validate a from-scratch GNN on real soil data</a>
+  <ul class="collapse">
+  <li><a href="#features-split-and-a-spatial-k-nn-graph" id="toc-features-split-and-a-spatial-k-nn-graph" class="nav-link" data-scroll-target="#features-split-and-a-spatial-k-nn-graph">Features, split, and a spatial <span class="math inline">\(k\)</span>-NN graph</a></li>
+  <li><a href="#from-scratch-gcn-regressor" id="toc-from-scratch-gcn-regressor" class="nav-link" data-scroll-target="#from-scratch-gcn-regressor">From-scratch GCN regressor</a></li>
+  <li><a href="#what-part-b-teaches" id="toc-what-part-b-teaches" class="nav-link" data-scroll-target="#what-part-b-teaches">What Part B teaches</a></li>
+  </ul></li>
+  <li><a href="#gnn-variants" id="toc-gnn-variants" class="nav-link" data-scroll-target="#gnn-variants">17.8 GNN Variants</a></li>
+  <li><a href="#applications" id="toc-applications" class="nav-link" data-scroll-target="#applications">17.9 Applications</a></li>
+  <li><a href="#exercises" id="toc-exercises" class="nav-link" data-scroll-target="#exercises">17.10 Exercises</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-16-gnn.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-11-neural-networks.html"><strong>🔴 Advanced</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-16-gnn.html">Ch 16 · Graph Neural Networks</a></li></ol></nav><h1 class="title display-7">Chapter 16: Graph Neural Networks (GNNs)</h1></header>
+
+<header id="title-block-header">
+
+<p class="subtitle lead">From-scratch GCN and GraphSAGE layers, link prediction, graph pooling, and a real spatial k-NN GCN regressor for soil organic carbon</p>
+
+</header>
+
+
+<div class="page-banner">
+<p><img src="../Images/banner_ml_r.png" class="img-fluid" alt="Machine Learning in R — From Scratch without Tears"></p>
+</div>
+<section id="chapter-16-graph-neural-networks-gnns" class="level1">
+<h1>Chapter 16: Graph Neural Networks (GNNs)</h1>
+<blockquote class="blockquote">
+<p><strong>Level</strong>: Advanced | <strong>Estimated Time</strong>: 6–8 hours | <strong>Prerequisites</strong>: Chapter 11 (Neural Networks), Chapter 13 (PCA)</p>
+</blockquote>
+<hr>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">16.1 Overview</h2>
+<p>CNNs exploit the <strong>grid structure</strong> of images; RNNs exploit <strong>sequential structure</strong>. But many real-world datasets are <strong>graphs</strong>:</p>
+<ul>
+<li>Social networks (nodes = users, edges = friendships)</li>
+<li>Molecular graphs (nodes = atoms, edges = bonds)</li>
+<li>Citation networks (nodes = papers, edges = citations)</li>
+<li>Knowledge graphs (entities connected by relations)</li>
+</ul>
+<p>Standard neural networks can’t handle graphs directly because: - Graphs have <strong>variable size</strong> — different numbers of nodes and edges - There is <strong>no canonical ordering</strong> of neighbours - Relationships between nodes carry information</p>
+<p><strong>GNNs</strong> learn by <strong>message passing</strong>: each node iteratively aggregates information from its neighbourhood, building up richer representations over multiple rounds.</p>
+<hr>
+<section id="the-core-idea" class="level3">
+<h3 class="anchored" data-anchor-id="the-core-idea">The core idea</h3>
+<p>Most machine learning works on data shaped like a table (rows and columns) or a grid (like the pixels of an image). But a lot of the world isn’t shaped that way — it’s shaped like a <strong>network</strong>: things connected to other things. Friends connected to friends. Roads connecting cities. Atoms bonded into molecules.</p>
+<p>A <strong>Graph Neural Network</strong> is a type of neural network built specifically to learn from this connected, network-shaped data.</p>
+<p>The vocabulary is just two words: - <strong>Nodes</strong> — the “things” (a person, a city, an atom) - <strong>Edges</strong> — the “connections” between them (a friendship, a road, a chemical bond)</p>
+</section>
+<section id="the-one-trick-that-makes-it-work-you-are-who-your-neighbors-are" class="level3">
+<h3 class="anchored" data-anchor-id="the-one-trick-that-makes-it-work-you-are-who-your-neighbors-are">The one trick that makes it work: “you are who your neighbors are”</h3>
+<p>Here’s the whole secret of a GNN in one sentence: <strong>each node updates what it knows by gathering information from its neighbors, and it does this over several rounds.</strong></p>
+<p>This is called <strong>message passing</strong>. Picture a rumor spreading through a group of friends. In round one, you only know what your direct friends tell you. In round two, your friends have now heard from <em>their</em> friends, so when they update you, you’re indirectly learning about people two steps away. After a few rounds, information has rippled across the whole network — but each node still pays most attention to its own local neighborhood.</p>
+<p>That’s it. Stack a few rounds of “gather from neighbors and update,” and the network learns rich patterns about both each node <em>and</em> its position in the larger structure.</p>
+<p>Let me show the message-passing idea visually:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../Images/GNN.png" class="img-fluid figure-img"></p>
+<figcaption>A node gathers messages from its neighbors</figcaption>
+</figure>
+</div>
+<p>Each round, “You” pulls in a little signal from every friend you’re connected to. Do this once and you know your immediate circle; do it a few times and information from friends-of-friends reaches you too.</p>
+</section>
+<section id="a-real-world-example-catching-fraud-with-a-credit-card" class="level3">
+<h3 class="anchored" data-anchor-id="a-real-world-example-catching-fraud-with-a-credit-card">A real-world example: catching fraud with a credit card</h3>
+<p>Imagine a bank trying to spot fraudulent transactions. The old approach looks at each transaction in isolation — amount, time, location — and asks “does this one look suspicious?” A fraudster who knows the rules can make each individual transaction look perfectly normal.</p>
+<p>Now model it as a <strong>graph</strong> instead: - <strong>Nodes</strong> = credit cards, merchants, devices, and bank accounts - <strong>Edges</strong> = “this card paid at this merchant,” “this device was used by this account”</p>
+<p>A GNN learns each card’s profile not just from its own transactions, but from the company it keeps. A brand-new card might look innocent on its own — but the GNN sees it’s connected to a device that’s <em>also</em> linked to five other cards that were all recently flagged. That guilt-by-association pattern is invisible when you look at transactions one at a time, but it lights up clearly in the network. The suspicious node inherits a warning signal from its shady neighborhood. This is exactly how companies like PayPal and many banks now catch fraud rings.</p>
+</section>
+<section id="where-else-this-shows-up" class="level3">
+<h3 class="anchored" data-anchor-id="where-else-this-shows-up">Where else this shows up</h3>
+<p>The same “learn from your neighbors” trick powers a lot of things you use: - <strong>Recommendations</strong> — Pinterest and Amazon model users and items as a giant graph; if people similar to you liked something, that signal flows to you. - <strong>Drug discovery</strong> — a molecule <em>is</em> a graph (atoms = nodes, bonds = edges), so GNNs predict whether a new compound might be toxic or effective. - <strong>Maps</strong> — Google Maps uses GNNs on the road network (intersections = nodes, roads = edges) to improve arrival-time estimates.</p>
+<p>A Graph Neural Network is a neural network that learns about connected things by letting each thing repeatedly absorb information from its neighbors — which makes it the natural tool whenever the <em>relationships</em> between your data points matter as much as the data points themselves.</p>
+</section>
+</section>
+<section id="theory" class="level2">
+<h2 class="anchored" data-anchor-id="theory">16.2 Theory</h2>
+<section id="graph-basics" class="level3">
+<h3 class="anchored" data-anchor-id="graph-basics">16.2.1 Graph Basics</h3>
+<p>A graph <span class="math inline">\(G = (V, E)\)</span> consists of: - <span class="math inline">\(V\)</span> — set of <span class="math inline">\(N\)</span> nodes, each with feature vector <span class="math inline">\(\mathbf{x}_v \in \mathbb{R}^d\)</span> - <span class="math inline">\(E\)</span> — set of edges; represented as adjacency matrix <span class="math inline">\(\mathbf{A} \in \{0,1\}^{N \times N}\)</span> - <span class="math inline">\(\mathcal{N}(v)\)</span> — neighbourhood of node <span class="math inline">\(v\)</span> (nodes connected by an edge)</p>
+</section>
+<section id="message-passing-framework" class="level3">
+<h3 class="anchored" data-anchor-id="message-passing-framework">16.2.2 Message Passing Framework</h3>
+<p>Each GNN layer updates node embeddings via three steps:</p>
+<p><span class="math display">\[\text{MESSAGE:} \quad \mathbf{m}_{uv} = \phi(\mathbf{h}_v, \mathbf{h}_u) \quad \text{for each neighbour } u \text{ of } v\]</span></p>
+<p><span class="math display">\[\text{AGGREGATE:} \quad \mathbf{a}_v = \rho\!\left(\{\mathbf{m}_{uv} : u \in \mathcal{N}(v)\}\right) \quad \leftarrow \text{permutation-invariant (sum/mean/max)}\]</span></p>
+<p><span class="math display">\[\text{UPDATE:} \quad \mathbf{h}'_v = \psi(\mathbf{h}_v, \mathbf{a}_v)\]</span></p>
+<p>Where <span class="math inline">\(\phi, \rho, \psi\)</span> are learnable functions. After <span class="math inline">\(K\)</span> layers, each node has a representation informed by its <span class="math inline">\(K\)</span>-hop neighbourhood.</p>
+</section>
+<section id="graph-convolutional-network-gcn" class="level3">
+<h3 class="anchored" data-anchor-id="graph-convolutional-network-gcn">16.2.3 Graph Convolutional Network (GCN)</h3>
+<p>The GCN layer (Kipf &amp; Welling, 2017) simplifies to:</p>
+<p><span class="math display">\[\mathbf{H}' = \sigma\!\left(\tilde{\mathbf{D}}^{-1/2} \tilde{\mathbf{A}} \tilde{\mathbf{D}}^{-1/2} \mathbf{H} \mathbf{W}\right)\]</span></p>
+<p>Where: - <span class="math inline">\(\tilde{\mathbf{A}} = \mathbf{A} + \mathbf{I}\)</span> — adjacency with self-loops added - <span class="math inline">\(\tilde{\mathbf{D}}\)</span> — degree matrix of <span class="math inline">\(\tilde{\mathbf{A}}\)</span> (diagonal) - <span class="math inline">\(\mathbf{H}\)</span> — node feature matrix (<span class="math inline">\(N \times d\)</span>) - <span class="math inline">\(\mathbf{W}\)</span> — learnable weight matrix (<span class="math inline">\(d \times d'\)</span>) - <span class="math inline">\(\sigma\)</span> — activation (ReLU)</p>
+<p>The normalisation <span class="math inline">\(\tilde{\mathbf{D}}^{-1/2} \tilde{\mathbf{A}} \tilde{\mathbf{D}}^{-1/2}\)</span> prevents exploding/vanishing from high-degree nodes.</p>
+<p>For a single node <span class="math inline">\(v\)</span>, the update simplifies to:</p>
+<p><span class="math display">\[\mathbf{h}'_v = \sigma\!\left( \mathbf{W}^\top \cdot \frac{1}{\sqrt{\deg(v)}} \sum_{u \in \mathcal{N}(v) \cup \{v\}} \frac{1}{\sqrt{\deg(u)}} \mathbf{h}_u \right)\]</span></p>
+</section>
+<section id="graph-sage-sample-and-aggregate" class="level3">
+<h3 class="anchored" data-anchor-id="graph-sage-sample-and-aggregate">16.2.4 Graph SAGE (Sample and Aggregate)</h3>
+<p>Instead of using the full neighbourhood, GraphSAGE samples a fixed number of neighbours and concatenates the aggregated neighbourhood with the node’s own embedding:</p>
+<p><span class="math display">\[\mathbf{a}_v = \text{AGGREGATE}\!\left(\{\mathbf{h}_u : u \in \text{sample}(\mathcal{N}(v))\}\right)\]</span></p>
+<p><span class="math display">\[\mathbf{h}'_v = \sigma(\mathbf{W} \cdot \text{concat}(\mathbf{h}_v, \mathbf{a}_v))\]</span></p>
+<p>Allows inductive learning (generalise to unseen nodes).</p>
+<hr>
+</section>
+</section>
+<section id="algorithm" class="level2">
+<h2 class="anchored" data-anchor-id="algorithm">17.3 Algorithm</h2>
+<pre><code>GCN Forward Pass:
+─────────────────
+Input: node features X (N×d), adjacency A (N×N), weights W (d×d')
+
+1. A_tilde = A + I_N          (add self-loops)
+2. Compute D_tilde_vv = sum_j A_tilde_vj  (degree of each node in A_tilde)
+3. For each node v:
+     h'_v = sigma( sum_u A_tilde[v,u] / sqrt(D_tilde[v,v] * D_tilde[u,u]) * h_u * W )
+
+Stack L layers for L-hop neighbourhood aggregation.
+Final node embeddings → node classification / link prediction / graph pooling</code></pre>
+<hr>
+</section>
+<section id="from-scratch-r" class="level2">
+<h2 class="anchored" data-anchor-id="from-scratch-r">17.4 From-Scratch R</h2>
+<p>Steps (From-Scratch GCN/GraphSAGE R Demo)</p>
+<ol type="1">
+<li>Define utility math functions: ReLU/sigmoid/softmax, matrix/vector multiplication, Xavier weight initialization.</li>
+<li>Build a simple <code>Graph</code> reference class to hold node features and adjacency data.</li>
+<li>Implement the GCN layer:
+<ul>
+<li>Add self-loops to adjacency.</li>
+<li>Compute the normalized neighbor aggregation for each node.</li>
+<li>Apply a linear transformation (weights + bias), then activation.</li>
+</ul></li>
+<li>Implement the GraphSAGE (sample &amp; aggregate) layer:
+<ul>
+<li>For each node, sample neighbors (or use all), aggregate their features (mean).</li>
+<li>Concatenate node’s features with its neighbors’ aggregate.</li>
+<li>Apply linear transformation and nonlinearity, normalize the output.</li>
+</ul></li>
+<li>Create a toy “Karate Club” graph, set up basic features and labels.</li>
+<li>Instantiate and run GCN and GraphSAGE layers on the graph to demonstrate:
+<ul>
+<li>Print prediction/classification from GCN (accuracy untrained).</li>
+<li>Print GraphSAGE node embeddings for inspection.</li>
+</ul></li>
+</ol>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== Simple Math Functions for Neural Networks ====</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>relu_v <span class="ot">&lt;-</span> <span class="cf">function</span>(v) {</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Apply ReLU to each element of a vector (or matrix): returns v if positive, else 0.</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pmax</span>(v, <span class="fl">0.0</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>sigmoid <span class="ot">&lt;-</span> <span class="cf">function</span>(x) {</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Squashes any number into the range (0, 1). Used for probabilities.</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The clip to [-500, 500] avoids overflow errors.</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="fl">1.0</span> <span class="sc">/</span> (<span class="fl">1.0</span> <span class="sc">+</span> <span class="fu">exp</span>(<span class="sc">-</span><span class="fu">pmax</span>(<span class="fu">pmin</span>(x, <span class="dv">500</span>), <span class="sc">-</span><span class="dv">500</span>)))</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>xavier <span class="ot">&lt;-</span> <span class="cf">function</span>(rows, cols, <span class="at">seed =</span> <span class="dv">0</span>) {</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Randomly makes a matrix for the network's starting weights.</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Keeps things 'not too big, not too small' to help learning.</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(seed)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  limit <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fl">6.0</span> <span class="sc">/</span> (rows <span class="sc">+</span> cols))</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">matrix</span>(<span class="fu">runif</span>(rows <span class="sc">*</span> cols, <span class="sc">-</span>limit, limit), <span class="at">nrow =</span> rows, <span class="at">ncol =</span> cols)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>softmax <span class="ot">&lt;-</span> <span class="cf">function</span>(v) {</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Makes a vector of numbers "behave like probabilities" (all positive, add to 1)</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> <span class="fu">max</span>(v)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>  e <span class="ot">&lt;-</span> <span class="fu">exp</span>(v <span class="sc">-</span> m)  <span class="co"># Subtract max(v) for stability</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>  e <span class="sc">/</span> <span class="fu">sum</span>(e)</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== Graph Data Structure ====</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Think of a graph as a group of dots (nodes) and lines (edges).</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co"># Each node can have some numbers as its 'features'.</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>Graph <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Graph"</span>,</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">N =</span> <span class="st">"numeric"</span>, <span class="at">D =</span> <span class="st">"numeric"</span>, <span class="at">adj =</span> <span class="st">"matrix"</span>, <span class="at">features =</span> <span class="st">"matrix"</span>),</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">num_nodes =</span> <span class="dv">1</span>, <span class="at">feature_dim =</span> <span class="dv">1</span>, ...) {</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>      N <span class="ot">&lt;&lt;-</span> num_nodes       <span class="co"># How many dots</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>      D <span class="ot">&lt;&lt;-</span> feature_dim     <span class="co"># How many features per dot</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>      adj <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> num_nodes, <span class="at">ncol =</span> num_nodes)          <span class="co"># Who's connected to who</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>      features <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, <span class="at">nrow =</span> num_nodes, <span class="at">ncol =</span> feature_dim) <span class="co"># The dot features</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>    <span class="at">add_edge =</span> <span class="cf">function</span>(u, v) {</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Draw a line between dot u and dot v. u, v are 0-indexed (Python-style node ids).</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>      adj[u <span class="sc">+</span> <span class="dv">1</span>, v <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;&lt;-</span> <span class="dv">1</span></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>      adj[v <span class="sc">+</span> <span class="dv">1</span>, u <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;&lt;-</span> <span class="dv">1</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">degree =</span> <span class="cf">function</span>(v) {</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>      <span class="co"># How many lines come out of dot v? (v is 0-indexed)</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>      <span class="fu">sum</span>(adj[v <span class="sc">+</span> <span class="dv">1</span>, ])</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== GCN (Graph Convolutional Network) Layer ====</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="co"># This is the building block for GCN. It updates every node's features</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="co"># based on its neighbors and itself, making use of a little math magic.</span></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>GCNLayer <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GCNLayer"</span>,</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">W =</span> <span class="st">"matrix"</span>, <span class="at">b =</span> <span class="st">"numeric"</span>),</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">in_dim =</span> <span class="dv">1</span>, <span class="at">out_dim =</span> <span class="dv">1</span>, <span class="at">seed =</span> <span class="dv">42</span>, ...) {</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Matrix of learnable 'weights' to decide how to mix inputs.</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>      W <span class="ot">&lt;&lt;-</span> <span class="fu">xavier</span>(out_dim, in_dim, seed)   <span class="co"># Each output feature gets its own weights</span></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>      b <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, out_dim)               <span class="co"># Bias: just shifts things a bit</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>    <span class="at">forward =</span> <span class="cf">function</span>(H, adj, <span class="at">activate =</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>      <span class="co"># H: matrix of node features (one row per node)</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>      <span class="co"># adj: who's connected to who (the adjacency matrix)</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Returns: new node features (per node)</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>      N <span class="ot">&lt;-</span> <span class="fu">nrow</span>(H)  <span class="co"># How many nodes</span></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Add self-loops: every node is 'friends with itself' now</span></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>      A_tilde <span class="ot">&lt;-</span> adj <span class="sc">+</span> <span class="fu">diag</span>(N)</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Degree of each node (for normalizing, so things don't blow up)</span></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>      D_tilde <span class="ot">&lt;-</span> <span class="fu">rowSums</span>(A_tilde)</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>      <span class="co"># For each node: Add up the features of its neighbors (including itself),</span></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>      <span class="co"># but divide (normalize) smartly so each neighbor doesn't count "too much"</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>      H_agg <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, <span class="at">nrow =</span> N, <span class="at">ncol =</span> <span class="fu">ncol</span>(H))</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (v <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>N) {</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        agg <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, <span class="fu">ncol</span>(H))</span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> (u <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>N) {</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> (A_tilde[v, u] <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Normalization trick</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>            norm <span class="ot">&lt;-</span> <span class="fl">1.0</span> <span class="sc">/</span> <span class="fu">sqrt</span>(D_tilde[v] <span class="sc">*</span> D_tilde[u])</span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>            agg <span class="ot">&lt;-</span> agg <span class="sc">+</span> norm <span class="sc">*</span> H[u, ]</span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>          }</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>        H_agg[v, ] <span class="ot">&lt;-</span> agg</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Linear transformation: Mix the features together and add bias</span></span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>      H_out <span class="ot">&lt;-</span> <span class="fu">sweep</span>(H_agg <span class="sc">%*%</span> base<span class="sc">::</span><span class="fu">t</span>(W), <span class="dv">2</span>, b, <span class="st">"+"</span>)</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (activate) H_out <span class="ot">&lt;-</span> <span class="fu">relu_v</span>(H_out)  <span class="co"># Squash negative numbers to 0</span></span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>      H_out</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== A Two-Layer GCN for Node Classification ====</span></span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a><span class="co"># Stacks two GCN layers.</span></span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a><span class="co"># First layer makes "hidden" features, second layer predicts categories for each node.</span></span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>GCN <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GCN"</span>,</span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">layer1 =</span> <span class="st">"ANY"</span>, <span class="at">layer2 =</span> <span class="st">"ANY"</span>),</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">in_dim =</span> <span class="dv">1</span>, <span class="at">hidden_dim =</span> <span class="dv">1</span>, <span class="at">num_classes =</span> <span class="dv">1</span>, <span class="at">seed =</span> <span class="dv">42</span>, ...) {</span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>      layer1 <span class="ot">&lt;&lt;-</span> GCNLayer<span class="sc">$</span><span class="fu">new</span>(in_dim, hidden_dim, seed)          <span class="co"># First 'thinking' layer</span></span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>      layer2 <span class="ot">&lt;&lt;-</span> GCNLayer<span class="sc">$</span><span class="fu">new</span>(hidden_dim, num_classes, seed <span class="sc">+</span> <span class="dv">1</span>) <span class="co"># Second: output categories</span></span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>    <span class="at">forward =</span> <span class="cf">function</span>(H, adj) {</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Layer 1: Actually learns "new features"</span></span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>      H1 <span class="ot">&lt;-</span> layer1<span class="sc">$</span><span class="fu">forward</span>(H, adj, <span class="at">activate =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Layer 2: Gives raw scores for each node's possible category (called logits)</span></span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>      H2 <span class="ot">&lt;-</span> layer2<span class="sc">$</span><span class="fu">forward</span>(H1, adj, <span class="at">activate =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Softmax turns them into probabilities (like "80% this node is blue")</span></span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>      base<span class="sc">::</span><span class="fu">t</span>(<span class="fu">apply</span>(H2, <span class="dv">1</span>, softmax))</span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>    <span class="at">predict =</span> <span class="cf">function</span>(H, adj) {</span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Run full forward pass, then pick the most likely class for each node (0-indexed)</span></span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>      probs <span class="ot">&lt;-</span> <span class="fu">forward</span>(H, adj)</span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>      <span class="fu">apply</span>(probs, <span class="dv">1</span>, which.max) <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== GraphSAGE Layer (Aggregation by Sampling Neighbors) ====</span></span>
+<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a><span class="co"># This is another way to update each node: by looking at a random sample</span></span>
+<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a><span class="co"># of the neighbors so we don't need the whole giant graph at once.</span></span>
+<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a><span class="co"># Also, stacks the node's own features with its neighbors before mixing.</span></span>
+<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>GraphSAGELayer <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GraphSAGELayer"</span>,</span>
+<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">W =</span> <span class="st">"matrix"</span>, <span class="at">b =</span> <span class="st">"numeric"</span>),</span>
+<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">in_dim =</span> <span class="dv">1</span>, <span class="at">out_dim =</span> <span class="dv">1</span>, <span class="at">seed =</span> <span class="dv">42</span>, ...) {</span>
+<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Twice as many weights, since we'll combine self and neighbors.</span></span>
+<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>      W <span class="ot">&lt;&lt;-</span> <span class="fu">xavier</span>(out_dim, <span class="dv">2</span> <span class="sc">*</span> in_dim, seed)</span>
+<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>      b <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, out_dim)</span>
+<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>    <span class="at">forward =</span> <span class="cf">function</span>(H, adj, <span class="at">sample_size =</span> <span class="cn">NULL</span>, <span class="at">activate =</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a>      N <span class="ot">&lt;-</span> <span class="fu">nrow</span>(H)          <span class="co"># How many nodes?</span></span>
+<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>      in_dim <span class="ot">&lt;-</span> <span class="fu">ncol</span>(H)     <span class="co"># Number of features per node</span></span>
+<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a>      H_out <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, <span class="at">nrow =</span> N, <span class="at">ncol =</span> <span class="fu">length</span>(b))</span>
+<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (v <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>N) {</span>
+<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Who's connected to v?</span></span>
+<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a>        neighbours <span class="ot">&lt;-</span> <span class="fu">which</span>(adj[v, ] <span class="sc">==</span> <span class="dv">1</span>)</span>
+<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a>        <span class="co"># If too many neighbors, pick a random sample (save time, GraphSAGE idea)</span></span>
+<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(sample_size) <span class="sc">&amp;&amp;</span> <span class="fu">length</span>(neighbours) <span class="sc">&gt;</span> sample_size) {</span>
+<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a>          neighbours <span class="ot">&lt;-</span> <span class="fu">sample</span>(neighbours, sample_size)</span>
+<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> (<span class="fu">length</span>(neighbours) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a>          <span class="co"># For each feature, compute the mean of the neighbors' features</span></span>
+<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a>          agg <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(H[neighbours, , <span class="at">drop =</span> <span class="cn">FALSE</span>])</span>
+<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a>        } <span class="cf">else</span> {</span>
+<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a>          agg <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, in_dim)  <span class="co"># No neighbors? Zero vector.</span></span>
+<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Stick together our own features with the aggregated neighbors</span></span>
+<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a>        combined <span class="ot">&lt;-</span> <span class="fu">c</span>(H[v, ], agg)  <span class="co"># Just a long vector, e.g. [a,b,c,...,x]</span></span>
+<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Mix with weights and add bias, just like before</span></span>
+<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a>        out <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(W <span class="sc">%*%</span> combined) <span class="sc">+</span> b</span>
+<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> (activate) out <span class="ot">&lt;-</span> <span class="fu">relu_v</span>(out)  <span class="co"># Remove negatives</span></span>
+<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Make the output vector length = 1 (keeps scale in check)</span></span>
+<span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a>        norm <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(out<span class="sc">^</span><span class="dv">2</span>)) <span class="sc">+</span> <span class="fl">1e-9</span></span>
+<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a>        H_out[v, ] <span class="ot">&lt;-</span> out <span class="sc">/</span> norm</span>
+<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a>      H_out</span>
+<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-186"><a href="#cb2-186" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-187"><a href="#cb2-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-188"><a href="#cb2-188" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== Build a Tiny Karate Club Graph for Demo ====</span></span>
+<span id="cb2-189"><a href="#cb2-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-190"><a href="#cb2-190" aria-hidden="true" tabindex="-1"></a><span class="co"># Builds a toy version of the famous Karate Club graph.</span></span>
+<span id="cb2-191"><a href="#cb2-191" aria-hidden="true" tabindex="-1"></a><span class="co"># 8 nodes, 2 groups (like "red" team and "blue" team), with a bridge between them.</span></span>
+<span id="cb2-192"><a href="#cb2-192" aria-hidden="true" tabindex="-1"></a><span class="co"># Each node gets features indicating which group it's in, plus a little noise.</span></span>
+<span id="cb2-193"><a href="#cb2-193" aria-hidden="true" tabindex="-1"></a>build_karate_mini <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb2-194"><a href="#cb2-194" aria-hidden="true" tabindex="-1"></a>  g <span class="ot">&lt;-</span> Graph<span class="sc">$</span><span class="fu">new</span>(<span class="at">num_nodes =</span> <span class="dv">8</span>, <span class="at">feature_dim =</span> <span class="dv">4</span>)   <span class="co"># 8 nodes, 4 features each</span></span>
+<span id="cb2-195"><a href="#cb2-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-196"><a href="#cb2-196" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Edges for group 0 (the first four)</span></span>
+<span id="cb2-197"><a href="#cb2-197" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (e <span class="cf">in</span> <span class="fu">list</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>), <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">2</span>), <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">3</span>), <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>), <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>))) g<span class="sc">$</span><span class="fu">add_edge</span>(e[<span class="dv">1</span>], e[<span class="dv">2</span>])</span>
+<span id="cb2-198"><a href="#cb2-198" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-199"><a href="#cb2-199" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Edges for group 1 (last four)</span></span>
+<span id="cb2-200"><a href="#cb2-200" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (e <span class="cf">in</span> <span class="fu">list</span>(<span class="fu">c</span>(<span class="dv">4</span>, <span class="dv">5</span>), <span class="fu">c</span>(<span class="dv">4</span>, <span class="dv">6</span>), <span class="fu">c</span>(<span class="dv">4</span>, <span class="dv">7</span>), <span class="fu">c</span>(<span class="dv">5</span>, <span class="dv">6</span>), <span class="fu">c</span>(<span class="dv">6</span>, <span class="dv">7</span>))) g<span class="sc">$</span><span class="fu">add_edge</span>(e[<span class="dv">1</span>], e[<span class="dv">2</span>])</span>
+<span id="cb2-201"><a href="#cb2-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-202"><a href="#cb2-202" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Connect groups (make the bridge)</span></span>
+<span id="cb2-203"><a href="#cb2-203" aria-hidden="true" tabindex="-1"></a>  g<span class="sc">$</span><span class="fu">add_edge</span>(<span class="dv">3</span>, <span class="dv">4</span>)</span>
+<span id="cb2-204"><a href="#cb2-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-205"><a href="#cb2-205" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Give first group [1, 0, random noise, random noise]</span></span>
+<span id="cb2-206"><a href="#cb2-206" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb2-207"><a href="#cb2-207" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>) g<span class="sc">$</span>features[i, ] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fu">rnorm</span>(<span class="dv">1</span>, <span class="dv">0</span>, <span class="fl">0.1</span>), <span class="fu">rnorm</span>(<span class="dv">1</span>, <span class="dv">0</span>, <span class="fl">0.1</span>))</span>
+<span id="cb2-208"><a href="#cb2-208" aria-hidden="true" tabindex="-1"></a>  <span class="co"># And second group [0, 1, random noise, random noise]</span></span>
+<span id="cb2-209"><a href="#cb2-209" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">5</span><span class="sc">:</span><span class="dv">8</span>) g<span class="sc">$</span>features[i, ] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">1.0</span>, <span class="fu">rnorm</span>(<span class="dv">1</span>, <span class="dv">0</span>, <span class="fl">0.1</span>), <span class="fu">rnorm</span>(<span class="dv">1</span>, <span class="dv">0</span>, <span class="fl">0.1</span>))</span>
+<span id="cb2-210"><a href="#cb2-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-211"><a href="#cb2-211" aria-hidden="true" tabindex="-1"></a>  labels <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="dv">0</span>, <span class="dv">4</span>), <span class="fu">rep</span>(<span class="dv">1</span>, <span class="dv">4</span>))  <span class="co"># 0 for group 0, 1 for group 1</span></span>
+<span id="cb2-212"><a href="#cb2-212" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">g =</span> g, <span class="at">labels =</span> labels)</span>
+<span id="cb2-213"><a href="#cb2-213" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-214"><a href="#cb2-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-215"><a href="#cb2-215" aria-hidden="true" tabindex="-1"></a><span class="co"># ==== Run the Demo ====</span></span>
+<span id="cb2-216"><a href="#cb2-216" aria-hidden="true" tabindex="-1"></a>km <span class="ot">&lt;-</span> <span class="fu">build_karate_mini</span>()</span>
+<span id="cb2-217"><a href="#cb2-217" aria-hidden="true" tabindex="-1"></a>g <span class="ot">&lt;-</span> km<span class="sc">$</span>g; labels <span class="ot">&lt;-</span> km<span class="sc">$</span>labels</span>
+<span id="cb2-218"><a href="#cb2-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-219"><a href="#cb2-219" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"=== GCN Node Classification Demo ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-220"><a href="#cb2-220" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Graph: %d nodes, %d edges</span><span class="sc">\n</span><span class="st">"</span>, g<span class="sc">$</span>N, <span class="fu">sum</span>(g<span class="sc">$</span>adj) <span class="sc">/</span> <span class="dv">2</span>))</span>
+<span id="cb2-221"><a href="#cb2-221" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-222"><a href="#cb2-222" aria-hidden="true" tabindex="-1"></a><span class="co"># Make a 2-layer GCN, first making 8 hidden features per node, then 2 classes</span></span>
+<span id="cb2-223"><a href="#cb2-223" aria-hidden="true" tabindex="-1"></a>gcn <span class="ot">&lt;-</span> GCN<span class="sc">$</span><span class="fu">new</span>(<span class="at">in_dim =</span> <span class="dv">4</span>, <span class="at">hidden_dim =</span> <span class="dv">8</span>, <span class="at">num_classes =</span> <span class="dv">2</span>, <span class="at">seed =</span> <span class="dv">7</span>)</span>
+<span id="cb2-224"><a href="#cb2-224" aria-hidden="true" tabindex="-1"></a>preds <span class="ot">&lt;-</span> gcn<span class="sc">$</span><span class="fu">predict</span>(g<span class="sc">$</span>features, g<span class="sc">$</span>adj)</span>
+<span id="cb2-225"><a href="#cb2-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-226"><a href="#cb2-226" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Node labels (ground truth):"</span>, labels, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-227"><a href="#cb2-227" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"GCN predictions (untrained):"</span>, preds, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-228"><a href="#cb2-228" aria-hidden="true" tabindex="-1"></a>acc <span class="ot">&lt;-</span> <span class="fu">mean</span>(preds <span class="sc">==</span> labels)</span>
+<span id="cb2-229"><a href="#cb2-229" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Accuracy (random init, no training): %.2f</span><span class="sc">\n</span><span class="st">"</span>, acc))</span>
+<span id="cb2-230"><a href="#cb2-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-231"><a href="#cb2-231" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">=== GraphSAGE Demo ===</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-232"><a href="#cb2-232" aria-hidden="true" tabindex="-1"></a>sage <span class="ot">&lt;-</span> GraphSAGELayer<span class="sc">$</span><span class="fu">new</span>(<span class="dv">4</span>, <span class="dv">8</span>, <span class="at">seed =</span> <span class="dv">99</span>)</span>
+<span id="cb2-233"><a href="#cb2-233" aria-hidden="true" tabindex="-1"></a>H_out <span class="ot">&lt;-</span> sage<span class="sc">$</span><span class="fu">forward</span>(g<span class="sc">$</span>features, g<span class="sc">$</span>adj)</span>
+<span id="cb2-234"><a href="#cb2-234" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"GraphSAGE embeddings (8-dim, first 2 nodes):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-235"><a href="#cb2-235" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"  Node 0:"</span>, <span class="fu">round</span>(H_out[<span class="dv">1</span>, ], <span class="dv">3</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb2-236"><a href="#cb2-236" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"  Node 4:"</span>, <span class="fu">round</span>(H_out[<span class="dv">5</span>, ], <span class="dv">3</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+<section id="link-prediction" class="level2">
+<h2 class="anchored" data-anchor-id="link-prediction">17.5 Link Prediction</h2>
+<p>A common task for Graph Neural Networks (GNNs) is link prediction: given a pair of nodes <span class="math inline">\((u, v)\)</span>, predict whether an edge exists between them.</p>
+<p>The general approach is to first use a GNN to compute node embeddings <span class="math inline">\(\mathbf{h}_u\)</span> and <span class="math inline">\(\mathbf{h}_v\)</span> for each node in the graph.</p>
+<p>To predict the existence or likelihood of an edge, these embeddings are combined to produce an edge “score”. The combination can be as follows:</p>
+<p><strong>(1) Dot Product:</strong> Take the dot product of the two embeddings and pass it through a sigmoid function to map the result to a probability between 0 and 1:</p>
+<p><span class="math display">\[\text{score}(u, v) = \sigma(\mathbf{h}_u \cdot \mathbf{h}_v)\]</span></p>
+<p>where <span class="math inline">\(\sigma(\cdot)\)</span> is the sigmoid activation.</p>
+<p>This approach assumes that similar embeddings (i.e., those with a large dot product) are more likely to be connected.</p>
+<p><strong>(2) Concatenation + MLP:</strong> A more flexible approach is to concatenate the two embeddings and feed them into a multilayer perceptron (MLP), followed by a sigmoid function:</p>
+<p><span class="math display">\[\text{score}(u, v) = \sigma(\text{MLP}(\text{concat}(\mathbf{h}_u, \mathbf{h}_v)))\]</span></p>
+<p>This allows the model to learn more complex relationships between node pairs.</p>
+<p>In practice, the choice between dot product and MLP-based scoring depends on the problem’s complexity and the amount of training data available.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This function computes the link prediction score between two node embeddings.</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>link_prediction_score <span class="ot">&lt;-</span> <span class="cf">function</span>(h_u, h_v) {</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Computes a dot-product based link prediction score between node embeddings h_u and h_v,</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># followed by a sigmoid activation to map the score to [0, 1].</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  dot <span class="ot">&lt;-</span> <span class="fu">sum</span>(h_u <span class="sc">*</span> h_v)   <span class="co"># Compute the dot product of embeddings</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sigmoid</span>(dot)            <span class="co"># Sigmoid maps result to probability</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Example usage: use GraphSAGE node embeddings to compute link prediction scores</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare two cases: nodes from the same community, and nodes from different communities</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>score_same <span class="ot">&lt;-</span> <span class="fu">link_prediction_score</span>(H_out[<span class="dv">1</span>, ], H_out[<span class="dv">2</span>, ])  <span class="co"># same community (nodes 0-1)</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>score_diff <span class="ot">&lt;-</span> <span class="fu">link_prediction_score</span>(H_out[<span class="dv">1</span>, ], H_out[<span class="dv">6</span>, ])  <span class="co"># diff community (nodes 0-5)</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Link Prediction Scores:</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  Nodes 0-1 (same community):  %.3f</span><span class="sc">\n</span><span class="st">"</span>, score_same))</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  Nodes 0-5 (diff community):  %.3f</span><span class="sc">\n</span><span class="st">"</span>, score_diff))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+<section id="graph-pooling" class="level2">
+<h2 class="anchored" data-anchor-id="graph-pooling">17.6 Graph Pooling</h2>
+<p>For <strong>graph-level</strong> tasks—such as predicting the properties of an entire molecule or classifying the category of a social network—Graph Neural Networks (GNNs) must produce a single embedding vector that summarizes the entire graph.</p>
+<p>This is achieved by applying a <strong>pooling</strong> operation to the individual node embeddings, which aggregates information from all nodes into one vector. The most common pooling methods are:</p>
+<ol type="1">
+<li><p><strong>Global Mean Pooling:</strong> This method computes the average of all node embeddings. Suppose there are <span class="math inline">\(N\)</span> nodes in a graph and each node <span class="math inline">\(v\)</span> has an embedding vector <span class="math inline">\(\mathbf{h}_v\)</span>. The global mean pooling combines them as:</p>
+<p><span class="math display">\[
+\text{Global mean pooling:} \quad \mathbf{h}_G = \frac{1}{N} \sum_{v=1}^N \mathbf{h}_v
+\]</span></p>
+<p>Here, <span class="math inline">\(\mathbf{h}_G\)</span> is the graph-level embedding. This approach treats all nodes equally and works well when each node contributes similarly to the graph property.</p></li>
+<li><p><strong>Global Max Pooling:</strong> Instead of averaging, global max pooling takes the largest value (across all nodes) for each dimension of the embedding. For embedding dimension <span class="math inline">\(k\)</span>, it is:</p>
+<p><span class="math display">\[
+\text{Global max pooling:} \quad h_{G,k} = \max_{v} h_{v,k}
+\]</span></p>
+<p>This pooling method helps to capture the most salient or strongest features from any node in the graph. It can highlight rare but important node features.</p></li>
+<li><p><strong>Hierarchical Pooling:</strong> More complex pooling methods, such as those used in <strong>DiffPool</strong> and similar frameworks, perform hierarchical pooling. Rather than aggregating all node embeddings at once, they cluster the nodes iteratively into “supernodes” and aggregate embeddings at each level. This creates a hierarchy of coarser graphs, capturing both local and global structure, and can produce a more informative graph embedding, especially for large or complex graphs.</p></li>
+</ol>
+<p>In summary, graph pooling transforms a variable-size set of node embeddings into a single fixed-size vector, enabling GNNs to handle tasks where a prediction is required for a whole graph rather than individual nodes.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Computes the global mean pooling of node embeddings.</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Aggregates all node embeddings by averaging each embedding dimension across all nodes.</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>global_mean_pool <span class="ot">&lt;-</span> <span class="cf">function</span>(node_embeddings) {</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># node_embeddings: matrix (num_nodes x embedding_dim)</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns: a single graph-level embedding vector (length embedding_dim)</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">colMeans</span>(node_embeddings)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute a graph embedding by averaging all node embeddings (global mean pooling)</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>graph_embedding <span class="ot">&lt;-</span> <span class="fu">global_mean_pool</span>(H_out)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Display the resulting graph embedding, rounding values for readability</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Graph embedding (mean pool, 8-dim):"</span>, <span class="fu">round</span>(graph_embedding, <span class="dv">3</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+<section id="part-b-fit-and-validate-a-from-scratch-gnn-on-real-soil-data" class="level2">
+<h2 class="anchored" data-anchor-id="part-b-fit-and-validate-a-from-scratch-gnn-on-real-soil-data">Part B: Fit and validate a from-scratch GNN on real soil data</h2>
+<p>Part A showed GCN and GraphSAGE on a toy karate-club graph. Now we do the real thing: <strong>predict soil organic carbon (SOC)</strong> at Great Plains sample locations with a <strong>spatial k-nearest-neighbour graph</strong> and a GCN written in base R (no PyTorch, TensorFlow, or scikit-learn).</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 40%">
+<col style="width: 60%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Role</th>
+<th>Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Target</strong></td>
+<td><code>SOC</code></td>
+</tr>
+<tr class="even">
+<td><strong>Predictors</strong></td>
+<td><code>DEM</code> (elevation), <code>MAP</code> (mean annual precipitation), <code>MAT</code> (mean annual temperature), <code>NDVI</code> (greenness), <code>NLCD</code> (land cover class)</td>
+</tr>
+<tr class="odd">
+<td><strong>Coordinates</strong></td>
+<td><code>Latitude</code>, <code>Longitude</code> — used only to <strong>draw edges</strong>, not as model features</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why a graph?</strong> Nearby soils tend to be similar (Tobler’s first law of geography). Connecting each sample to its <span class="math inline">\(k\)</span> nearest neighbours lets the GCN mix a site’s own environment with what its neighbours see.</p>
+<p><strong>Protocol (transductive node regression).</strong> We build <strong>one</strong> graph over all 467 sites. Every node’s features are visible, but <strong>SOC labels are used only on the training nodes</strong>. Validation chooses the epoch; the test set is the honest final score.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Load Great Plains soil samples ──</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>PATH <span class="ot">&lt;-</span> <span class="st">"../Data/gp_soil_data.csv"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">file.exists</span>(PATH)) PATH <span class="ot">&lt;-</span> <span class="st">"Data/gp_soil_data.csv"</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(PATH, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Loaded %s</span><span class="sc">\n</span><span class="st">"</span>, PATH))</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%d sites  |  %d states  |  SOC %.2f-%.2f</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>            <span class="fu">nrow</span>(df), <span class="fu">length</span>(<span class="fu">unique</span>(df<span class="sc">$</span>STATE)), <span class="fu">min</span>(df<span class="sc">$</span>SOC), <span class="fu">max</span>(df<span class="sc">$</span>SOC)))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Numeric predictors + target:</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">round</span>(<span class="fu">t</span>(<span class="fu">sapply</span>(df[, <span class="fu">c</span>(<span class="st">"DEM"</span>, <span class="st">"MAP"</span>, <span class="st">"MAT"</span>, <span class="st">"NDVI"</span>, <span class="st">"SOC"</span>)], summary)), <span class="dv">3</span>))</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">NLCD land-cover counts:</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">table</span>(df<span class="sc">$</span>NLCD))</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(df)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<section id="features-split-and-a-spatial-k-nn-graph" class="level3">
+<h3 class="anchored" data-anchor-id="features-split-and-a-spatial-k-nn-graph">Features, split, and a spatial <span class="math inline">\(k\)</span>-NN graph</h3>
+<ol type="1">
+<li><strong>Numeric covariates</strong> <code>DEM</code>, <code>MAP</code>, <code>MAT</code>, <code>NDVI</code> are standardised with <strong>training-set</strong> mean and standard deviation (no leakage from val/test).</li>
+<li><strong>NLCD</strong> is categorical (Forest, Herbaceous, Planted/Cultivated, Shrubland), so we one-hot encode it.</li>
+<li><strong>Edges</strong> come from geography: haversine distance on lat/lon, then each site is linked to its <span class="math inline">\(k=8\)</span> nearest neighbours and the graph is made undirected.</li>
+<li><strong>GCN normalisation</strong> (Kipf &amp; Welling): <span class="math inline">\(\hat{A} = \tilde{D}^{-1/2}(\,A+I\,)\tilde{D}^{-1/2}\)</span> so high-degree nodes do not dominate.</li>
+</ol>
+<p>A linear model on the same features is the baseline. If the GNN is doing its job, neighbour mixing should beat (or at least match) that baseline on validation/test.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This code prepares the data for a graph-based neural network.</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># It covers 4 main steps:</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Splitting the samples into train/val/test</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Encoding site features as numbers for the model</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Building a graph by linking each site to its nearest neighbours (using latitude/longitude)</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Plotting the resulting graph for visualization</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Define which columns to use and set random seed</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>NUM_COLS <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"DEM"</span>, <span class="st">"MAP"</span>, <span class="st">"MAT"</span>, <span class="st">"NDVI"</span>)   <span class="co"># numeric input features: elevation, precipitation, temperature, greenness</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>TARGET <span class="ot">&lt;-</span> <span class="st">"SOC"</span>                              <span class="co"># what we want to predict: Soil Organic Carbon (SOC)</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>K_NEIGHBORS <span class="ot">&lt;-</span> <span class="dv">8</span>                             <span class="co"># each node will connect to its 8 nearest neighbors</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>SEED <span class="ot">&lt;-</span> <span class="dv">42</span>                                   <span class="co"># random seed so the results are reproducible</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Split samples into train, val, and test sets</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(SEED)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>N <span class="ot">&lt;-</span> <span class="fu">nrow</span>(df)                                <span class="co"># Total number of sites</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>perm <span class="ot">&lt;-</span> <span class="fu">sample</span>(N)                            <span class="co"># Random order of sites</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>n_tr <span class="ot">&lt;-</span> <span class="fu">floor</span>(<span class="fl">0.70</span> <span class="sc">*</span> N)                      <span class="co"># 70% for training</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>n_va <span class="ot">&lt;-</span> <span class="fu">floor</span>(<span class="fl">0.15</span> <span class="sc">*</span> N)                      <span class="co"># 15% validation</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>tr <span class="ot">&lt;-</span> perm[<span class="dv">1</span><span class="sc">:</span>n_tr]; va <span class="ot">&lt;-</span> perm[(n_tr <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(n_tr <span class="sc">+</span> n_va)]; te <span class="ot">&lt;-</span> perm[(n_tr <span class="sc">+</span> n_va <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>N]</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Split  train=%d  val=%d  test=%d</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(tr), <span class="fu">length</span>(va), <span class="fu">length</span>(te)))</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: One-hot encode the NLCD land-cover class (turn category into dummy variables)</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>nlcd_classes <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(df<span class="sc">$</span>NLCD))                         <span class="co"># unique land cover classes</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>nlcd_index <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">seq_along</span>(nlcd_classes) <span class="sc">-</span> <span class="dv">1</span>, nlcd_classes)</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>nlcd_oh <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> N, <span class="at">ncol =</span> <span class="fu">length</span>(nlcd_classes))</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>N) nlcd_oh[i, nlcd_index[[df<span class="sc">$</span>NLCD[i]]] <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">1</span>  <span class="co"># one-hot encode</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 4: Standardize (normalize) numeric features, but using only train set stats!</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>X_num <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(df[, NUM_COLS]); <span class="fu">storage.mode</span>(X_num) <span class="ot">&lt;-</span> <span class="st">"double"</span>  <span class="co"># numeric feature values</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>mu <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(X_num[tr, , <span class="at">drop =</span> <span class="cn">FALSE</span>])                      <span class="co"># mean per feature (train only)</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>pop_sd <span class="ot">&lt;-</span> <span class="cf">function</span>(x) <span class="fu">sqrt</span>(<span class="fu">mean</span>((x <span class="sc">-</span> <span class="fu">mean</span>(x))<span class="sc">^</span><span class="dv">2</span>))              <span class="co"># population std (matches numpy default)</span></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>sd_ <span class="ot">&lt;-</span> <span class="fu">apply</span>(X_num[tr, , <span class="at">drop =</span> <span class="cn">FALSE</span>], <span class="dv">2</span>, pop_sd)             <span class="co"># std per feature (train only)</span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>sd_[sd_ <span class="sc">&lt;</span> <span class="fl">1e-12</span>] <span class="ot">&lt;-</span> <span class="fl">1.0</span>                                        <span class="co"># prevent division by zero</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">sweep</span>(<span class="fu">sweep</span>(X_num, <span class="dv">2</span>, mu, <span class="st">"-"</span>), <span class="dv">2</span>, sd_, <span class="st">"/"</span>), nlcd_oh)  <span class="co"># scaled numeric + dummies</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 5: Standardize target variable (y = SOC), using only train set</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> df[[TARGET]]</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>y_mu <span class="ot">&lt;-</span> <span class="fu">mean</span>(y[tr]); y_sd <span class="ot">&lt;-</span> <span class="fu">pop_sd</span>(y[tr])</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (y_sd <span class="sc">&lt;=</span> <span class="fl">1e-12</span>) y_sd <span class="ot">&lt;-</span> <span class="fl">1.0</span></span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>y_z <span class="ot">&lt;-</span> (y <span class="sc">-</span> y_mu) <span class="sc">/</span> y_sd                                       <span class="co"># standardized SOC</span></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 6: Take site coordinates for the graph</span></span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>lat <span class="ot">&lt;-</span> df<span class="sc">$</span>Latitude</span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>lon <span class="ot">&lt;-</span> df<span class="sc">$</span>Longitude</span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 7: Define "haversine" distance for all pairs of sites (distance on a sphere, in km)</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>haversine_km <span class="ot">&lt;-</span> <span class="cf">function</span>(lat, lon) {</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Compute all-pairs great-circle distance (km) based on latitude/longitude.</span></span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>  R <span class="ot">&lt;-</span> <span class="fl">6371.0</span></span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>  latr <span class="ot">&lt;-</span> lat <span class="sc">*</span> pi <span class="sc">/</span> <span class="dv">180</span>; lonr <span class="ot">&lt;-</span> lon <span class="sc">*</span> pi <span class="sc">/</span> <span class="dv">180</span></span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>  dlat <span class="ot">&lt;-</span> <span class="fu">outer</span>(latr, latr, <span class="st">"-"</span>)</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>  dlon <span class="ot">&lt;-</span> <span class="fu">outer</span>(lonr, lonr, <span class="st">"-"</span>)</span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a>  a <span class="ot">&lt;-</span> <span class="fu">sin</span>(dlat <span class="sc">/</span> <span class="dv">2</span>)<span class="sc">^</span><span class="dv">2</span> <span class="sc">+</span> <span class="fu">outer</span>(<span class="fu">cos</span>(latr), <span class="fu">cos</span>(latr)) <span class="sc">*</span> <span class="fu">sin</span>(dlon <span class="sc">/</span> <span class="dv">2</span>)<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a>  <span class="dv">2</span> <span class="sc">*</span> R <span class="sc">*</span> <span class="fu">asin</span>(<span class="fu">sqrt</span>(<span class="fu">pmin</span>(<span class="fu">pmax</span>(a, <span class="dv">0</span>), <span class="dv">1</span>)))</span>
+<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 8: Build a k-nearest neighbors adjacency matrix using haversine distances</span></span>
+<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a>knn_adj <span class="ot">&lt;-</span> <span class="cf">function</span>(lat, lon, k) {</span>
+<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a>  dist <span class="ot">&lt;-</span> <span class="fu">haversine_km</span>(lat, lon)          <span class="co"># all pairwise distances</span></span>
+<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a>  <span class="fu">diag</span>(dist) <span class="ot">&lt;-</span> <span class="cn">Inf</span>                       <span class="co"># don't count each site as its own neighbor!</span></span>
+<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a>  n <span class="ot">&lt;-</span> <span class="fu">length</span>(lat)</span>
+<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a>  A <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, n, n)</span>
+<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n) A[i, <span class="fu">order</span>(dist[i, ])[<span class="dv">1</span><span class="sc">:</span>k]] <span class="ot">&lt;-</span> <span class="fl">1.0</span>   <span class="co"># k nearest neighbors</span></span>
+<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a>  A <span class="ot">&lt;-</span> <span class="fu">pmax</span>(A, base<span class="sc">::</span><span class="fu">t</span>(A))                <span class="co"># make the graph undirected</span></span>
+<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a>  <span class="fu">diag</span>(A) <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb6-67"><a href="#cb6-67" aria-hidden="true" tabindex="-1"></a>  A</span>
+<span id="cb6-68"><a href="#cb6-68" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-69"><a href="#cb6-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-70"><a href="#cb6-70" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 9: Normalize the adjacency matrix suitable for a Graph Neural Network</span></span>
+<span id="cb6-71"><a href="#cb6-71" aria-hidden="true" tabindex="-1"></a>normalize_adj <span class="ot">&lt;-</span> <span class="cf">function</span>(A) {</span>
+<span id="cb6-72"><a href="#cb6-72" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Normalized adjacency matrix: D^(-1/2) (A + I) D^(-1/2) following Kipf &amp; Welling.</span></span>
+<span id="cb6-73"><a href="#cb6-73" aria-hidden="true" tabindex="-1"></a>  A_tilde <span class="ot">&lt;-</span> A <span class="sc">+</span> <span class="fu">diag</span>(<span class="fu">nrow</span>(A))            <span class="co"># add self-connections (the +I)</span></span>
+<span id="cb6-74"><a href="#cb6-74" aria-hidden="true" tabindex="-1"></a>  deg <span class="ot">&lt;-</span> <span class="fu">rowSums</span>(A_tilde)                 <span class="co"># degree of each node (site)</span></span>
+<span id="cb6-75"><a href="#cb6-75" aria-hidden="true" tabindex="-1"></a>  dinv <span class="ot">&lt;-</span> <span class="fl">1.0</span> <span class="sc">/</span> <span class="fu">sqrt</span>(deg)                 <span class="co"># inverse sqrt degree</span></span>
+<span id="cb6-76"><a href="#cb6-76" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sweep</span>(<span class="fu">sweep</span>(A_tilde, <span class="dv">1</span>, dinv, <span class="st">"*"</span>), <span class="dv">2</span>, dinv, <span class="st">"*"</span>)  <span class="co"># normalize</span></span>
+<span id="cb6-77"><a href="#cb6-77" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-78"><a href="#cb6-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-79"><a href="#cb6-79" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 10: Actually construct the adjacency matrix (A) and its normalized version (Ahat)</span></span>
+<span id="cb6-80"><a href="#cb6-80" aria-hidden="true" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">knn_adj</span>(lat, lon, K_NEIGHBORS)</span>
+<span id="cb6-81"><a href="#cb6-81" aria-hidden="true" tabindex="-1"></a>Ahat <span class="ot">&lt;-</span> <span class="fu">normalize_adj</span>(A)</span>
+<span id="cb6-82"><a href="#cb6-82" aria-hidden="true" tabindex="-1"></a>n_edges <span class="ot">&lt;-</span> <span class="fu">sum</span>(A) <span class="sc">%/%</span> <span class="dv">2</span>                                <span class="co"># number of undirected edges</span></span>
+<span id="cb6-83"><a href="#cb6-83" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Graph: %d nodes, %d undirected edges, k=%d</span><span class="sc">\n</span><span class="st">"</span>, N, n_edges, K_NEIGHBORS))</span>
+<span id="cb6-84"><a href="#cb6-84" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Feature matrix X: %d x %d  (4 numeric + %d NLCD dummies)</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb6-85"><a href="#cb6-85" aria-hidden="true" tabindex="-1"></a>            <span class="fu">nrow</span>(X), <span class="fu">ncol</span>(X), <span class="fu">length</span>(nlcd_classes)))</span>
+<span id="cb6-86"><a href="#cb6-86" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"NLCD columns:"</span>, nlcd_classes, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb6-87"><a href="#cb6-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-88"><a href="#cb6-88" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 11: Plot the sites and their connection skeleton on a map for visualization</span></span>
+<span id="cb6-89"><a href="#cb6-89" aria-hidden="true" tabindex="-1"></a>edges_idx <span class="ot">&lt;-</span> <span class="fu">which</span>(<span class="fu">upper.tri</span>(A) <span class="sc">&amp;</span> A <span class="sc">==</span> <span class="dv">1</span>, <span class="at">arr.ind =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb6-90"><a href="#cb6-90" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(lon, lat, <span class="at">type =</span> <span class="st">"n"</span>, <span class="at">xlab =</span> <span class="st">"Longitude"</span>, <span class="at">ylab =</span> <span class="st">"Latitude"</span>,</span>
+<span id="cb6-91"><a href="#cb6-91" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"Great Plains soil sites — k-NN graph (colour = SOC)"</span>, <span class="at">asp =</span> <span class="dv">1</span>)</span>
+<span id="cb6-92"><a href="#cb6-92" aria-hidden="true" tabindex="-1"></a><span class="fu">segments</span>(lon[edges_idx[, <span class="dv">1</span>]], lat[edges_idx[, <span class="dv">1</span>]], lon[edges_idx[, <span class="dv">2</span>]], lat[edges_idx[, <span class="dv">2</span>]],</span>
+<span id="cb6-93"><a href="#cb6-93" aria-hidden="true" tabindex="-1"></a>         <span class="at">col =</span> <span class="st">"grey75"</span>, <span class="at">lwd =</span> <span class="fl">0.4</span>)                    <span class="co"># thin gray lines for each edge</span></span>
+<span id="cb6-94"><a href="#cb6-94" aria-hidden="true" tabindex="-1"></a>soc_pal <span class="ot">&lt;-</span> <span class="fu">colorRampPalette</span>(<span class="fu">c</span>(<span class="st">"#FFFFD4"</span>, <span class="st">"#FE9929"</span>, <span class="st">"#993404"</span>))(<span class="dv">100</span>)</span>
+<span id="cb6-95"><a href="#cb6-95" aria-hidden="true" tabindex="-1"></a>soc_bin <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(<span class="fu">cut</span>(y, <span class="at">breaks =</span> <span class="dv">100</span>, <span class="at">include.lowest =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb6-96"><a href="#cb6-96" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(lon, lat, <span class="at">pch =</span> <span class="dv">21</span>, <span class="at">bg =</span> soc_pal[soc_bin], <span class="at">col =</span> <span class="st">"black"</span>, <span class="at">cex =</span> <span class="fl">1.0</span>, <span class="at">lwd =</span> <span class="fl">0.3</span>)  <span class="co"># colour = SOC</span></span>
+<span id="cb6-97"><a href="#cb6-97" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topright"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="fu">sprintf</span>(<span class="st">"SOC %.0f"</span>, <span class="fu">min</span>(y)), <span class="fu">sprintf</span>(<span class="st">"SOC %.0f"</span>, <span class="fu">max</span>(y))),</span>
+<span id="cb6-98"><a href="#cb6-98" aria-hidden="true" tabindex="-1"></a>       <span class="at">pt.bg =</span> soc_pal[<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">100</span>)], <span class="at">pch =</span> <span class="dv">21</span>, <span class="at">bty =</span> <span class="st">"n"</span>, <span class="at">cex =</span> <span class="fl">0.8</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="from-scratch-gcn-regressor" class="level3">
+<h3 class="anchored" data-anchor-id="from-scratch-gcn-regressor">From-scratch GCN regressor</h3>
+<p>Two GCN layers in a row tend to <strong>oversmooth</strong> a small spatial graph (every node starts looking like the regional average). We therefore use:</p>
+<ol type="1">
+<li><strong>One GCN layer</strong> — the same normalised neighbourhood mix as §16.2.3, then ReLU: <span class="math display">\[\mathbf{H} = \mathrm{ReLU}\!\left(\hat{A}\, \mathbf{X}\, \mathbf{W}_1 + \mathbf{b}_1\right)\]</span></li>
+<li><strong>Skip-concat</strong> — keep the original node features so the model can still fall back to a linear map of DEM/MAP/MAT/NDVI/NLCD: <span class="math display">\[\hat{y} = \big[\,\mathbf{H}\,\|\,\mathbf{X}\,\big]\,\mathbf{W}_2 + \mathbf{b}_2\]</span></li>
+</ol>
+<p>Loss is mean squared error on <strong>training nodes only</strong> (in standardised SOC units). We report RMSE / MAE / <span class="math inline">\(R^2\)</span> after converting predictions back to the original SOC scale.</p>
+<p>Adam and a closed-form <strong>OLS baseline</strong> (same features, no graph) are also written by hand. We reuse the same <code>field()</code>-reflection Adam step introduced in Chapter 15 (<code>adam_step()</code>), rather than a separate generic optimiser class keyed by arbitrary parameter objects — R’s reference-class fields already give us the “look up a parameter by name, update it in place” behaviour the Python <code>Adam</code> class builds from a plain dict.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Base-R GCN regressor, Adam, metrics, OLS baseline ──</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Adam optimiser step (same pattern as Chapter 15's from-scratch LSTM/GRU) ---</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>adam_step <span class="ot">&lt;-</span> <span class="cf">function</span>(obj, grads, <span class="at">lr =</span> <span class="fl">0.01</span>, <span class="at">b1 =</span> <span class="fl">0.9</span>, <span class="at">b2 =</span> <span class="fl">0.999</span>, <span class="at">eps =</span> <span class="fl">1e-8</span>) {</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  obj<span class="sc">$</span>t <span class="ot">&lt;-</span> obj<span class="sc">$</span>t <span class="sc">+</span> <span class="dv">1</span>  <span class="co"># Counts the number of optimization steps</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (p <span class="cf">in</span> obj<span class="sc">$</span>params) {</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    g <span class="ot">&lt;-</span> grads[[p]]</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    obj<span class="sc">$</span>m[[p]] <span class="ot">&lt;-</span> b1 <span class="sc">*</span> obj<span class="sc">$</span>m[[p]] <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">-</span> b1) <span class="sc">*</span> g          <span class="co"># First moment</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    obj<span class="sc">$</span>v[[p]] <span class="ot">&lt;-</span> b2 <span class="sc">*</span> obj<span class="sc">$</span>v[[p]] <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">-</span> b2) <span class="sc">*</span> (g <span class="sc">*</span> g)    <span class="co"># Second moment</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    mh <span class="ot">&lt;-</span> obj<span class="sc">$</span>m[[p]] <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">-</span> b1<span class="sc">^</span>obj<span class="sc">$</span>t)                     <span class="co"># Bias correction</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    vh <span class="ot">&lt;-</span> obj<span class="sc">$</span>v[[p]] <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">-</span> b2<span class="sc">^</span>obj<span class="sc">$</span>t)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    obj<span class="sc">$</span><span class="fu">field</span>(p, obj<span class="sc">$</span><span class="fu">field</span>(p) <span class="sc">-</span> lr <span class="sc">*</span> mh <span class="sc">/</span> (<span class="fu">sqrt</span>(vh) <span class="sc">+</span> eps))  <span class="co"># Parameter update</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- GCN Regressor ---</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Implements a simple GCN regressor from scratch:</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="co"># - 1 GCN layer (mixing neighbors using normalized adjacency)</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="co"># - ReLU activation</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="co"># - Skip-connection (concatenate original features)</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="co"># - Linear layer to 1 output per node (SOC value)</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>GCNRegressor <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GCNRegressor"</span>,</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">W1 =</span> <span class="st">"matrix"</span>, <span class="at">b1 =</span> <span class="st">"numeric"</span>, <span class="at">W2 =</span> <span class="st">"matrix"</span>, <span class="at">b2 =</span> <span class="st">"numeric"</span>,</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>                <span class="at">hidden =</span> <span class="st">"numeric"</span>, <span class="at">X =</span> <span class="st">"matrix"</span>, <span class="at">Ahat =</span> <span class="st">"matrix"</span>,</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>                <span class="at">Z1 =</span> <span class="st">"matrix"</span>, <span class="at">H =</span> <span class="st">"matrix"</span>, <span class="at">cat_ =</span> <span class="st">"matrix"</span>,</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>                <span class="at">dW1 =</span> <span class="st">"matrix"</span>, <span class="at">db1 =</span> <span class="st">"numeric"</span>, <span class="at">dW2 =</span> <span class="st">"matrix"</span>, <span class="at">db2 =</span> <span class="st">"numeric"</span>,</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>                <span class="at">params =</span> <span class="st">"character"</span>, <span class="at">m =</span> <span class="st">"list"</span>, <span class="at">v =</span> <span class="st">"list"</span>, <span class="at">t =</span> <span class="st">"numeric"</span>),</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">in_dim =</span> <span class="dv">1</span>, <span class="at">hidden =</span> <span class="dv">32</span>, <span class="at">seed =</span> <span class="dv">0</span>, ...) {</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Random initialization for reproducibility</span></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(seed)</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>      W1 <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(in_dim <span class="sc">*</span> hidden, <span class="fl">0.0</span>, <span class="fu">sqrt</span>(<span class="fl">2.0</span> <span class="sc">/</span> in_dim)), <span class="at">nrow =</span> in_dim, <span class="at">ncol =</span> hidden)</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>      b1 <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, hidden)</span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>      W2 <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>((hidden <span class="sc">+</span> in_dim) <span class="sc">*</span> <span class="dv">1</span>, <span class="fl">0.0</span>, <span class="fu">sqrt</span>(<span class="fl">2.0</span> <span class="sc">/</span> (hidden <span class="sc">+</span> in_dim))),</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>                     <span class="at">nrow =</span> hidden <span class="sc">+</span> in_dim, <span class="at">ncol =</span> <span class="dv">1</span>)</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>      b2 <span class="ot">&lt;&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>      hidden <span class="ot">&lt;&lt;-</span> hidden</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>      params <span class="ot">&lt;&lt;-</span> <span class="fu">c</span>(<span class="st">"W1"</span>, <span class="st">"b1"</span>, <span class="st">"W2"</span>, <span class="st">"b2"</span>)</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>      m <span class="ot">&lt;&lt;-</span> <span class="fu">setNames</span>(<span class="fu">lapply</span>(params, <span class="cf">function</span>(p) { z <span class="ot">&lt;-</span> <span class="fu">field</span>(p); z[] <span class="ot">&lt;-</span> <span class="dv">0</span>; z }), params)</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>      v <span class="ot">&lt;&lt;-</span> <span class="fu">setNames</span>(<span class="fu">lapply</span>(params, <span class="cf">function</span>(p) { z <span class="ot">&lt;-</span> <span class="fu">field</span>(p); z[] <span class="ot">&lt;-</span> <span class="dv">0</span>; z }), params)</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>      t <span class="ot">&lt;&lt;-</span> <span class="dv">0</span></span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>    <span class="at">forward =</span> <span class="cf">function</span>(Xin, Ahat_in) {</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Store these for backward pass</span></span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a>      X <span class="ot">&lt;&lt;-</span> Xin; Ahat <span class="ot">&lt;&lt;-</span> Ahat_in</span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>      <span class="co"># GCN layer: propagate neighbor information via normalized adjacency matrix</span></span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>      Z1 <span class="ot">&lt;&lt;-</span> <span class="fu">sweep</span>((Ahat <span class="sc">%*%</span> X) <span class="sc">%*%</span> W1, <span class="dv">2</span>, b1, <span class="st">"+"</span>)   <span class="co"># Pre-nonlinearity</span></span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a>      H <span class="ot">&lt;&lt;-</span> <span class="fu">pmax</span>(Z1, <span class="fl">0.0</span>)                              <span class="co"># ReLU activation</span></span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Concatenate the GCN and the original features</span></span>
+<span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a>      cat_ <span class="ot">&lt;&lt;-</span> <span class="fu">cbind</span>(H, X)                             <span class="co"># skip connection</span></span>
+<span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a>      <span class="fu">as.numeric</span>(cat_ <span class="sc">%*%</span> W2 <span class="sc">+</span> b2)                      <span class="co"># Final outputs for all nodes</span></span>
+<span id="cb7-54"><a href="#cb7-54" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-55"><a href="#cb7-55" aria-hidden="true" tabindex="-1"></a>    <span class="at">backward =</span> <span class="cf">function</span>(dY, <span class="at">wd =</span> <span class="fl">1e-4</span>) {</span>
+<span id="cb7-56"><a href="#cb7-56" aria-hidden="true" tabindex="-1"></a>      <span class="co"># dY: gradient on outputs (length N)</span></span>
+<span id="cb7-57"><a href="#cb7-57" aria-hidden="true" tabindex="-1"></a>      gy <span class="ot">&lt;-</span> <span class="fu">matrix</span>(dY, <span class="at">ncol =</span> <span class="dv">1</span>)</span>
+<span id="cb7-58"><a href="#cb7-58" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Backprop into second (linear) layer</span></span>
+<span id="cb7-59"><a href="#cb7-59" aria-hidden="true" tabindex="-1"></a>      dW2 <span class="ot">&lt;&lt;-</span> base<span class="sc">::</span><span class="fu">t</span>(cat_) <span class="sc">%*%</span> gy <span class="sc">+</span> wd <span class="sc">*</span> W2      <span class="co"># gradient + weight decay</span></span>
+<span id="cb7-60"><a href="#cb7-60" aria-hidden="true" tabindex="-1"></a>      db2 <span class="ot">&lt;&lt;-</span> <span class="fu">sum</span>(gy)</span>
+<span id="cb7-61"><a href="#cb7-61" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Backprop through ReLU, only for hidden nodes</span></span>
+<span id="cb7-62"><a href="#cb7-62" aria-hidden="true" tabindex="-1"></a>      dH <span class="ot">&lt;-</span> (gy <span class="sc">%*%</span> base<span class="sc">::</span><span class="fu">t</span>(W2))[, <span class="dv">1</span><span class="sc">:</span>hidden, drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb7-63"><a href="#cb7-63" aria-hidden="true" tabindex="-1"></a>      dZ <span class="ot">&lt;-</span> dH <span class="sc">*</span> (Z1 <span class="sc">&gt;</span> <span class="dv">0</span>)                          <span class="co"># gradient through ReLU</span></span>
+<span id="cb7-64"><a href="#cb7-64" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Backprop through first (GCN) layer</span></span>
+<span id="cb7-65"><a href="#cb7-65" aria-hidden="true" tabindex="-1"></a>      dW1 <span class="ot">&lt;&lt;-</span> base<span class="sc">::</span><span class="fu">t</span>(Ahat <span class="sc">%*%</span> X) <span class="sc">%*%</span> dZ <span class="sc">+</span> wd <span class="sc">*</span> W1  <span class="co"># includes weight decay</span></span>
+<span id="cb7-66"><a href="#cb7-66" aria-hidden="true" tabindex="-1"></a>      db1 <span class="ot">&lt;&lt;-</span> <span class="fu">colSums</span>(dZ)</span>
+<span id="cb7-67"><a href="#cb7-67" aria-hidden="true" tabindex="-1"></a>      <span class="co"># No return, grads stored as fields</span></span>
+<span id="cb7-68"><a href="#cb7-68" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-69"><a href="#cb7-69" aria-hidden="true" tabindex="-1"></a>    <span class="at">step =</span> <span class="cf">function</span>(<span class="at">lr =</span> <span class="fl">1e-3</span>, <span class="at">beta1 =</span> <span class="fl">0.9</span>, <span class="at">beta2 =</span> <span class="fl">0.999</span>, <span class="at">eps =</span> <span class="fl">1e-8</span>) {</span>
+<span id="cb7-70"><a href="#cb7-70" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Get all parameters and their associated gradients, update via Adam</span></span>
+<span id="cb7-71"><a href="#cb7-71" aria-hidden="true" tabindex="-1"></a>      <span class="fu">adam_step</span>(.self, <span class="fu">list</span>(<span class="at">W1 =</span> dW1, <span class="at">b1 =</span> db1, <span class="at">W2 =</span> dW2, <span class="at">b2 =</span> db2), lr, beta1, beta2, eps)</span>
+<span id="cb7-72"><a href="#cb7-72" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-73"><a href="#cb7-73" aria-hidden="true" tabindex="-1"></a>    <span class="at">snapshot =</span> <span class="cf">function</span>() {</span>
+<span id="cb7-74"><a href="#cb7-74" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Returns a copy of all parameters so we can later restore them</span></span>
+<span id="cb7-75"><a href="#cb7-75" aria-hidden="true" tabindex="-1"></a>      <span class="fu">setNames</span>(<span class="fu">lapply</span>(params, <span class="cf">function</span>(p) <span class="fu">field</span>(p)), params)</span>
+<span id="cb7-76"><a href="#cb7-76" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb7-77"><a href="#cb7-77" aria-hidden="true" tabindex="-1"></a>    <span class="at">restore =</span> <span class="cf">function</span>(snap) {</span>
+<span id="cb7-78"><a href="#cb7-78" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Restore parameters from a 'snapshot' (copy all params)</span></span>
+<span id="cb7-79"><a href="#cb7-79" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (p <span class="cf">in</span> <span class="fu">names</span>(snap)) <span class="fu">field</span>(p, snap[[p]])</span>
+<span id="cb7-80"><a href="#cb7-80" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb7-81"><a href="#cb7-81" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-82"><a href="#cb7-82" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-83"><a href="#cb7-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-84"><a href="#cb7-84" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Metrics and Baselines ---</span></span>
+<span id="cb7-85"><a href="#cb7-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-86"><a href="#cb7-86" aria-hidden="true" tabindex="-1"></a><span class="co"># Computes regression metrics (RMSE, MAE, R2)</span></span>
+<span id="cb7-87"><a href="#cb7-87" aria-hidden="true" tabindex="-1"></a><span class="co"># pred: predictions for all nodes; y: ground truth for all nodes</span></span>
+<span id="cb7-88"><a href="#cb7-88" aria-hidden="true" tabindex="-1"></a><span class="co"># mask: index vector selecting which nodes to score (e.g. train or test split)</span></span>
+<span id="cb7-89"><a href="#cb7-89" aria-hidden="true" tabindex="-1"></a>regression_metrics <span class="ot">&lt;-</span> <span class="cf">function</span>(pred, y, mask) {</span>
+<span id="cb7-90"><a href="#cb7-90" aria-hidden="true" tabindex="-1"></a>  e <span class="ot">&lt;-</span> pred[mask] <span class="sc">-</span> y[mask]</span>
+<span id="cb7-91"><a href="#cb7-91" aria-hidden="true" tabindex="-1"></a>  rmse <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>(e<span class="sc">^</span><span class="dv">2</span>))</span>
+<span id="cb7-92"><a href="#cb7-92" aria-hidden="true" tabindex="-1"></a>  mae <span class="ot">&lt;-</span> <span class="fu">mean</span>(<span class="fu">abs</span>(e))</span>
+<span id="cb7-93"><a href="#cb7-93" aria-hidden="true" tabindex="-1"></a>  ss_res <span class="ot">&lt;-</span> <span class="fu">sum</span>(e<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb7-94"><a href="#cb7-94" aria-hidden="true" tabindex="-1"></a>  ss_tot <span class="ot">&lt;-</span> <span class="fu">sum</span>((y[mask] <span class="sc">-</span> <span class="fu">mean</span>(y[mask]))<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb7-95"><a href="#cb7-95" aria-hidden="true" tabindex="-1"></a>  r2 <span class="ot">&lt;-</span> <span class="cf">if</span> (ss_tot <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="fl">1.0</span> <span class="sc">-</span> ss_res <span class="sc">/</span> ss_tot <span class="cf">else</span> <span class="fl">0.0</span></span>
+<span id="cb7-96"><a href="#cb7-96" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">RMSE =</span> rmse, <span class="at">MAE =</span> mae, <span class="at">R2 =</span> r2)</span>
+<span id="cb7-97"><a href="#cb7-97" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-98"><a href="#cb7-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-99"><a href="#cb7-99" aria-hidden="true" tabindex="-1"></a><span class="co"># Closed-form Ordinary Least Squares predictor for baseline.</span></span>
+<span id="cb7-100"><a href="#cb7-100" aria-hidden="true" tabindex="-1"></a><span class="co"># Trains on X_tr, y_tr, predicts on X_all. Adds intercept column to features automatically.</span></span>
+<span id="cb7-101"><a href="#cb7-101" aria-hidden="true" tabindex="-1"></a><span class="co"># The design matrix here is rank-deficient (an intercept column PLUS all NLCD one-hot dummies</span></span>
+<span id="cb7-102"><a href="#cb7-102" aria-hidden="true" tabindex="-1"></a><span class="co"># sum to the same constant column) -- exactly the classic "dummy variable trap". NumPy's</span></span>
+<span id="cb7-103"><a href="#cb7-103" aria-hidden="true" tabindex="-1"></a><span class="co"># np.linalg.lstsq copes via an SVD-based pseudo-inverse (minimum-norm solution); R's qr.solve()</span></span>
+<span id="cb7-104"><a href="#cb7-104" aria-hidden="true" tabindex="-1"></a><span class="co"># instead errors out on a singular matrix, so we reproduce lstsq's SVD approach by hand.</span></span>
+<span id="cb7-105"><a href="#cb7-105" aria-hidden="true" tabindex="-1"></a>ols_predict <span class="ot">&lt;-</span> <span class="cf">function</span>(X_tr, y_tr, X_all) {</span>
+<span id="cb7-106"><a href="#cb7-106" aria-hidden="true" tabindex="-1"></a>  Xb <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="dv">1</span>, X_tr)                     <span class="co"># prepend ones for intercept</span></span>
+<span id="cb7-107"><a href="#cb7-107" aria-hidden="true" tabindex="-1"></a>  s <span class="ot">&lt;-</span> <span class="fu">svd</span>(Xb)</span>
+<span id="cb7-108"><a href="#cb7-108" aria-hidden="true" tabindex="-1"></a>  tol <span class="ot">&lt;-</span> <span class="fu">max</span>(<span class="fu">dim</span>(Xb)) <span class="sc">*</span> s<span class="sc">$</span>d[<span class="dv">1</span>] <span class="sc">*</span> .Machine<span class="sc">$</span>double.eps</span>
+<span id="cb7-109"><a href="#cb7-109" aria-hidden="true" tabindex="-1"></a>  d_inv <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(s<span class="sc">$</span>d <span class="sc">&gt;</span> tol, <span class="dv">1</span> <span class="sc">/</span> s<span class="sc">$</span>d, <span class="dv">0</span>)   <span class="co"># pseudo-inverse: zero out near-zero singular values</span></span>
+<span id="cb7-110"><a href="#cb7-110" aria-hidden="true" tabindex="-1"></a>  beta <span class="ot">&lt;-</span> s<span class="sc">$</span>v <span class="sc">%*%</span> (d_inv <span class="sc">*</span> (base<span class="sc">::</span><span class="fu">t</span>(s<span class="sc">$</span>u) <span class="sc">%*%</span> y_tr))  <span class="co"># minimum-norm least-squares solution</span></span>
+<span id="cb7-111"><a href="#cb7-111" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(<span class="fu">cbind</span>(<span class="dv">1</span>, X_all) <span class="sc">%*%</span> beta)     <span class="co"># predict for all</span></span>
+<span id="cb7-112"><a href="#cb7-112" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-113"><a href="#cb7-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-114"><a href="#cb7-114" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Model Training Loop ---</span></span>
+<span id="cb7-115"><a href="#cb7-115" aria-hidden="true" tabindex="-1"></a><span class="co"># Settings: hidden units, epochs, learning rate, weight decay</span></span>
+<span id="cb7-116"><a href="#cb7-116" aria-hidden="true" tabindex="-1"></a>HIDDEN <span class="ot">&lt;-</span> <span class="dv">32</span>; EPOCHS <span class="ot">&lt;-</span> <span class="dv">250</span>; LR <span class="ot">&lt;-</span> <span class="fl">5e-3</span>; WD <span class="ot">&lt;-</span> <span class="fl">1e-4</span></span>
+<span id="cb7-117"><a href="#cb7-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-118"><a href="#cb7-118" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize GCN model</span></span>
+<span id="cb7-119"><a href="#cb7-119" aria-hidden="true" tabindex="-1"></a>model <span class="ot">&lt;-</span> GCNRegressor<span class="sc">$</span><span class="fu">new</span>(<span class="at">in_dim =</span> <span class="fu">ncol</span>(X), <span class="at">hidden =</span> HIDDEN, <span class="at">seed =</span> <span class="dv">0</span>)</span>
+<span id="cb7-120"><a href="#cb7-120" aria-hidden="true" tabindex="-1"></a>history <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">train_rmse =</span> <span class="fu">c</span>(), <span class="at">val_rmse =</span> <span class="fu">c</span>())</span>
+<span id="cb7-121"><a href="#cb7-121" aria-hidden="true" tabindex="-1"></a>best_val <span class="ot">&lt;-</span> <span class="cn">Inf</span>; best_ep <span class="ot">&lt;-</span> <span class="dv">0</span>; best_snap <span class="ot">&lt;-</span> <span class="cn">NULL</span>  <span class="co"># track best validation so we can restore later</span></span>
+<span id="cb7-122"><a href="#cb7-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-123"><a href="#cb7-123" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (ep <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>EPOCHS) {</span>
+<span id="cb7-124"><a href="#cb7-124" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Forward pass: predict standardized SOC for ALL samples (train/val/test)</span></span>
+<span id="cb7-125"><a href="#cb7-125" aria-hidden="true" tabindex="-1"></a>  yhat_z <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">forward</span>(X, Ahat)</span>
+<span id="cb7-126"><a href="#cb7-126" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Loss: MSE over only training nodes — this is transductive semi-supervised!</span></span>
+<span id="cb7-127"><a href="#cb7-127" aria-hidden="true" tabindex="-1"></a>  err <span class="ot">&lt;-</span> yhat_z[tr] <span class="sc">-</span> y_z[tr]</span>
+<span id="cb7-128"><a href="#cb7-128" aria-hidden="true" tabindex="-1"></a>  loss <span class="ot">&lt;-</span> <span class="fu">mean</span>(err<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb7-129"><a href="#cb7-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-130"><a href="#cb7-130" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Backward pass: gradient is zero except for training split (mask)</span></span>
+<span id="cb7-131"><a href="#cb7-131" aria-hidden="true" tabindex="-1"></a>  dY <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, <span class="fu">length</span>(yhat_z))</span>
+<span id="cb7-132"><a href="#cb7-132" aria-hidden="true" tabindex="-1"></a>  dY[tr] <span class="ot">&lt;-</span> <span class="fl">2.0</span> <span class="sc">*</span> err <span class="sc">/</span> <span class="fu">length</span>(tr)   <span class="co"># d(MSE)/d yhat, train only!</span></span>
+<span id="cb7-133"><a href="#cb7-133" aria-hidden="true" tabindex="-1"></a>  model<span class="sc">$</span><span class="fu">backward</span>(dY, <span class="at">wd =</span> WD)</span>
+<span id="cb7-134"><a href="#cb7-134" aria-hidden="true" tabindex="-1"></a>  model<span class="sc">$</span><span class="fu">step</span>(<span class="at">lr =</span> LR)                <span class="co"># Adam step</span></span>
+<span id="cb7-135"><a href="#cb7-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-136"><a href="#cb7-136" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Metrics: convert back to 'real' SOC units before tracking</span></span>
+<span id="cb7-137"><a href="#cb7-137" aria-hidden="true" tabindex="-1"></a>  pred <span class="ot">&lt;-</span> yhat_z <span class="sc">*</span> y_sd <span class="sc">+</span> y_mu</span>
+<span id="cb7-138"><a href="#cb7-138" aria-hidden="true" tabindex="-1"></a>  tr_m <span class="ot">&lt;-</span> <span class="fu">regression_metrics</span>(pred, y, tr)</span>
+<span id="cb7-139"><a href="#cb7-139" aria-hidden="true" tabindex="-1"></a>  va_m <span class="ot">&lt;-</span> <span class="fu">regression_metrics</span>(pred, y, va)</span>
+<span id="cb7-140"><a href="#cb7-140" aria-hidden="true" tabindex="-1"></a>  history<span class="sc">$</span>train_rmse <span class="ot">&lt;-</span> <span class="fu">c</span>(history<span class="sc">$</span>train_rmse, tr_m<span class="sc">$</span>RMSE)</span>
+<span id="cb7-141"><a href="#cb7-141" aria-hidden="true" tabindex="-1"></a>  history<span class="sc">$</span>val_rmse <span class="ot">&lt;-</span> <span class="fu">c</span>(history<span class="sc">$</span>val_rmse, va_m<span class="sc">$</span>RMSE)</span>
+<span id="cb7-142"><a href="#cb7-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-143"><a href="#cb7-143" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Save best validation model so far (early stopping)</span></span>
+<span id="cb7-144"><a href="#cb7-144" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (va_m<span class="sc">$</span>RMSE <span class="sc">&lt;</span> best_val) {</span>
+<span id="cb7-145"><a href="#cb7-145" aria-hidden="true" tabindex="-1"></a>    best_val <span class="ot">&lt;-</span> va_m<span class="sc">$</span>RMSE; best_ep <span class="ot">&lt;-</span> ep; best_snap <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">snapshot</span>()</span>
+<span id="cb7-146"><a href="#cb7-146" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-147"><a href="#cb7-147" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Occasionally print progress</span></span>
+<span id="cb7-148"><a href="#cb7-148" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (ep <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">25</span>, <span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">175</span>, <span class="dv">250</span>)) {</span>
+<span id="cb7-149"><a href="#cb7-149" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"epoch %3d  loss=%.4f  train RMSE=%.3f  val RMSE=%.3f  val R2=%.3f</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb7-150"><a href="#cb7-150" aria-hidden="true" tabindex="-1"></a>                ep, loss, tr_m<span class="sc">$</span>RMSE, va_m<span class="sc">$</span>RMSE, va_m<span class="sc">$</span>R2))</span>
+<span id="cb7-151"><a href="#cb7-151" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-152"><a href="#cb7-152" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-153"><a href="#cb7-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-154"><a href="#cb7-154" aria-hidden="true" tabindex="-1"></a><span class="co"># Restore best model based on validation RMSE</span></span>
+<span id="cb7-155"><a href="#cb7-155" aria-hidden="true" tabindex="-1"></a>model<span class="sc">$</span><span class="fu">restore</span>(best_snap)</span>
+<span id="cb7-156"><a href="#cb7-156" aria-hidden="true" tabindex="-1"></a>pred <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">forward</span>(X, Ahat) <span class="sc">*</span> y_sd <span class="sc">+</span> y_mu   <span class="co"># final predictions</span></span>
+<span id="cb7-157"><a href="#cb7-157" aria-hidden="true" tabindex="-1"></a><span class="co"># Ordinary Least Squares baseline and mean baseline</span></span>
+<span id="cb7-158"><a href="#cb7-158" aria-hidden="true" tabindex="-1"></a>ols_pred <span class="ot">&lt;-</span> <span class="fu">ols_predict</span>(X[tr, , <span class="at">drop =</span> <span class="cn">FALSE</span>], y[tr], X)</span>
+<span id="cb7-159"><a href="#cb7-159" aria-hidden="true" tabindex="-1"></a>mean_pred <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fu">mean</span>(y[tr]), <span class="fu">length</span>(y))</span>
+<span id="cb7-160"><a href="#cb7-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-161"><a href="#cb7-161" aria-hidden="true" tabindex="-1"></a><span class="co"># Print a table comparing final performance on train/val/test</span></span>
+<span id="cb7-162"><a href="#cb7-162" aria-hidden="true" tabindex="-1"></a>n_params_g <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">sapply</span>(model<span class="sc">$</span>params, <span class="cf">function</span>(p) <span class="fu">length</span>(model<span class="sc">$</span><span class="fu">field</span>(p))))</span>
+<span id="cb7-163"><a href="#cb7-163" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Best validation RMSE at epoch %d  (%d GCN parameters)</span><span class="sc">\n</span><span class="st">"</span>, best_ep, n_params_g))</span>
+<span id="cb7-164"><a href="#cb7-164" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%-20s%-8s%8s%8s%8s</span><span class="sc">\n</span><span class="st">"</span>, <span class="st">"Model"</span>, <span class="st">"Split"</span>, <span class="st">"RMSE"</span>, <span class="st">"MAE"</span>, <span class="st">"R2"</span>))</span>
+<span id="cb7-165"><a href="#cb7-165" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">strrep</span>(<span class="st">"-"</span>, <span class="dv">52</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb7-166"><a href="#cb7-166" aria-hidden="true" tabindex="-1"></a>model_list <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="fu">list</span>(<span class="at">name =</span> <span class="st">"Mean baseline"</span>, <span class="at">phat =</span> mean_pred),</span>
+<span id="cb7-167"><a href="#cb7-167" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"OLS (no graph)"</span>, <span class="at">phat =</span> ols_pred),</span>
+<span id="cb7-168"><a href="#cb7-168" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"GCN (from scratch)"</span>, <span class="at">phat =</span> pred))</span>
+<span id="cb7-169"><a href="#cb7-169" aria-hidden="true" tabindex="-1"></a>split_list <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="fu">list</span>(<span class="at">name =</span> <span class="st">"train"</span>, <span class="at">mask =</span> tr), <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"val"</span>, <span class="at">mask =</span> va), <span class="fu">list</span>(<span class="at">name =</span> <span class="st">"test"</span>, <span class="at">mask =</span> te))</span>
+<span id="cb7-170"><a href="#cb7-170" aria-hidden="true" tabindex="-1"></a><span class="co"># Test GCN, OLS, and mean-baseline on all splits (train/val/test)</span></span>
+<span id="cb7-171"><a href="#cb7-171" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (ms <span class="cf">in</span> model_list) {</span>
+<span id="cb7-172"><a href="#cb7-172" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (sp <span class="cf">in</span> split_list) {</span>
+<span id="cb7-173"><a href="#cb7-173" aria-hidden="true" tabindex="-1"></a>    m <span class="ot">&lt;-</span> <span class="fu">regression_metrics</span>(ms<span class="sc">$</span>phat, y, sp<span class="sc">$</span>mask)</span>
+<span id="cb7-174"><a href="#cb7-174" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%-20s%-8s%8.3f%8.3f%8.3f</span><span class="sc">\n</span><span class="st">"</span>, ms<span class="sc">$</span>name, sp<span class="sc">$</span>name, m<span class="sc">$</span>RMSE, m<span class="sc">$</span>MAE, m<span class="sc">$</span>R2))</span>
+<span id="cb7-175"><a href="#cb7-175" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-176"><a href="#cb7-176" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Learning curve, predicted vs observed, residual map ──</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">3</span>), <span class="at">mar =</span> <span class="fu">c</span>(<span class="dv">4</span>, <span class="dv">4</span>, <span class="dv">3</span>, <span class="dv">4</span>))</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(history<span class="sc">$</span>train_rmse, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">col =</span> <span class="st">"steelblue"</span>, <span class="at">xlab =</span> <span class="st">"Epoch"</span>, <span class="at">ylab =</span> <span class="st">"RMSE (SOC units)"</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"GCN learning curve"</span>, <span class="at">ylim =</span> <span class="fu">range</span>(<span class="fu">c</span>(history<span class="sc">$</span>train_rmse, history<span class="sc">$</span>val_rmse)))</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(history<span class="sc">$</span>val_rmse, <span class="at">col =</span> <span class="st">"tomato"</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">v =</span> best_ep, <span class="at">col =</span> <span class="st">"grey40"</span>, <span class="at">lty =</span> <span class="dv">2</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topright"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"train"</span>, <span class="st">"val"</span>, <span class="fu">sprintf</span>(<span class="st">"best ep %d"</span>, best_ep)),</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"steelblue"</span>, <span class="st">"tomato"</span>, <span class="st">"grey40"</span>), <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">2</span>), <span class="at">cex =</span> <span class="fl">0.8</span>, <span class="at">bty =</span> <span class="st">"n"</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(y[va], pred[va], <span class="at">pch =</span> <span class="dv">1</span>, <span class="at">col =</span> <span class="st">"steelblue"</span>, <span class="at">xlab =</span> <span class="st">"Observed SOC"</span>, <span class="at">ylab =</span> <span class="st">"Predicted SOC"</span>,</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"GCN: predicted vs observed"</span>, <span class="at">asp =</span> <span class="dv">1</span>,</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlim =</span> <span class="fu">range</span>(y), <span class="at">ylim =</span> <span class="fu">range</span>(y))</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(y[te], pred[te], <span class="at">pch =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">"tomato"</span>)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">a =</span> <span class="dv">0</span>, <span class="at">b =</span> <span class="dv">1</span>, <span class="at">lty =</span> <span class="dv">2</span>)</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topleft"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"val"</span>, <span class="st">"test"</span>), <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">0</span>), <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"steelblue"</span>, <span class="st">"tomato"</span>), <span class="at">cex =</span> <span class="fl">0.8</span>, <span class="at">bty =</span> <span class="st">"n"</span>)</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>resid <span class="ot">&lt;-</span> pred <span class="sc">-</span> y</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>cap <span class="ot">&lt;-</span> <span class="fu">quantile</span>(<span class="fu">abs</span>(resid), <span class="fl">0.95</span>)</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>resid_col_pal <span class="ot">&lt;-</span> <span class="fu">colorRampPalette</span>(<span class="fu">c</span>(<span class="st">"#2166AC"</span>, <span class="st">"#F7F7F7"</span>, <span class="st">"#B2182B"</span>))(<span class="dv">100</span>)</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>resid_bin <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(<span class="fu">cut</span>(<span class="fu">pmin</span>(<span class="fu">pmax</span>(resid, <span class="sc">-</span>cap), cap), <span class="at">breaks =</span> <span class="fu">seq</span>(<span class="sc">-</span>cap, cap, <span class="at">length.out =</span> <span class="dv">101</span>),</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>                             <span class="at">include.lowest =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(lon, lat, <span class="at">pch =</span> <span class="dv">21</span>, <span class="at">bg =</span> resid_col_pal[resid_bin], <span class="at">col =</span> <span class="st">"black"</span>, <span class="at">cex =</span> <span class="fl">1.0</span>, <span class="at">lwd =</span> <span class="fl">0.3</span>,</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"Longitude"</span>, <span class="at">ylab =</span> <span class="st">"Latitude"</span>, <span class="at">main =</span> <span class="st">"GCN residuals (all nodes)"</span>, <span class="at">asp =</span> <span class="dv">1</span>)</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topright"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="fu">sprintf</span>(<span class="st">"%.1f"</span>, <span class="sc">-</span>cap), <span class="st">"0"</span>, <span class="fu">sprintf</span>(<span class="st">"+%.1f"</span>, cap)),</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>       <span class="at">pt.bg =</span> resid_col_pal[<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">50</span>, <span class="dv">100</span>)], <span class="at">pch =</span> <span class="dv">21</span>, <span class="at">bty =</span> <span class="st">"n"</span>, <span class="at">cex =</span> <span class="fl">0.7</span>, <span class="at">title =</span> <span class="st">"pred - obs"</span>)</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Takeaway: OLS already captures DEM/MAP/MAT/NDVI/NLCD. The GCN adds a"</span>,</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>    <span class="st">"spatial smoothness prior through A-hat, so it should match or beat OLS on"</span>,</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>    <span class="st">"val/test without using lat/lon as features.</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="what-part-b-teaches" class="level3">
+<h3 class="anchored" data-anchor-id="what-part-b-teaches">What Part B teaches</h3>
+<ul>
+<li>A <strong>soil map is a graph</strong>: sites are nodes, geographic nearness is the edge set, environmental covariates are node features, SOC is a node label.</li>
+<li><strong>Transductive GCN regression</strong> uses the full <span class="math inline">\(\hat{A}\)</span> at every step but the MSE is masked to training nodes — the same idea as semi-supervised GCN classification, just with a scalar output.</li>
+<li><strong>Skip-concat</strong> (<code>[H ‖ X]</code>) keeps the original covariates so one GCN layer can <em>add</em> neighbour context instead of washing it out (oversmoothing).</li>
+<li>Always compare against a <strong>linear baseline</strong> on the same features. On this 467-point Great Plains set the environmental signal (especially NDVI and MAP) is strong; the graph is a modest spatial regulariser, not magic.</li>
+</ul>
+<p><strong>Try it yourself.</strong> (1) Change <code>K_NEIGHBORS</code> to 4 and 16 — too few edges isolate sites, too many oversmooth. (2) Drop the skip-concat and train a two-layer GCN; watch validation RMSE. (3) Hold out a whole state as the test set (spatial block) instead of a random split.</p>
+<hr>
+</section>
+</section>
+<section id="gnn-variants" class="level2">
+<h2 class="anchored" data-anchor-id="gnn-variants">17.8 GNN Variants</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Year</th>
+<th>Key Innovation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GCN</td>
+<td>2017</td>
+<td>Spectral convolution simplified to neighbourhood avg</td>
+</tr>
+<tr class="even">
+<td>GraphSAGE</td>
+<td>2017</td>
+<td>Inductive, sample-based, concat self + nbr</td>
+</tr>
+<tr class="odd">
+<td>GAT</td>
+<td>2018</td>
+<td>Attention weights on each edge</td>
+</tr>
+<tr class="even">
+<td>GIN</td>
+<td>2019</td>
+<td>Maximally expressive (Weisfeiler-Lehman test)</td>
+</tr>
+<tr class="odd">
+<td>PNA</td>
+<td>2020</td>
+<td>Multiple aggregators + degree scalers</td>
+</tr>
+<tr class="even">
+<td>GraphTransformer</td>
+<td>2021</td>
+<td>Transformer attention over graphs</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="applications" class="level2">
+<h2 class="anchored" data-anchor-id="applications">17.9 Applications</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Domain</th>
+<th>Task</th>
+<th>GNN</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Drug discovery</td>
+<td>Molecular property prediction</td>
+<td>MPNN / GIN</td>
+</tr>
+<tr class="even">
+<td>Social network</td>
+<td>Fake news detection</td>
+<td>GAT</td>
+</tr>
+<tr class="odd">
+<td>Recommendation</td>
+<td>User-item interactions</td>
+<td>GraphSAGE</td>
+</tr>
+<tr class="even">
+<td>Traffic</td>
+<td>Speed prediction</td>
+<td>Spatio-temporal GNN</td>
+</tr>
+<tr class="odd">
+<td>Knowledge graph</td>
+<td>Link prediction</td>
+<td>TransE / RotatE</td>
+</tr>
+<tr class="even">
+<td>Protein folding</td>
+<td>Structure prediction</td>
+<td>Equivariant GNN</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="exercises" class="level2">
+<h2 class="anchored" data-anchor-id="exercises">17.10 Exercises</h2>
+<ol type="1">
+<li>Implement a Graph Attention (GAT) layer where each edge has a learned attention weight <span class="math inline">\(\alpha_{uv} = \text{softmax}(\text{LeakyReLU}(\mathbf{a}^\top [\mathbf{W}\mathbf{h}_v \| \mathbf{W}\mathbf{h}_u]))\)</span>.</li>
+<li>Add a simple training loop to the GCN with cross-entropy loss and gradient descent (finite differences or manual backprop).</li>
+<li>Implement the Weisfeiler-Lehman graph isomorphism test and relate it to GIN’s sum aggregation.</li>
+<li>Build a 3-layer GCN and visualise the node embeddings after each layer on the mini Karate Club graph.</li>
+<li>Implement global max pooling and concatenate it with mean pooling for a richer graph embedding.</li>
+</ol>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Key Idea</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Message passing</td>
+<td>Nodes aggregate info from neighbours iteratively</td>
+</tr>
+<tr class="even">
+<td>GCN</td>
+<td>Normalised neighbourhood average × learned weight</td>
+</tr>
+<tr class="odd">
+<td>GraphSAGE</td>
+<td>Sample neighbours, concat self + aggregated</td>
+</tr>
+<tr class="even">
+<td>GAT</td>
+<td>Attention weights per edge, focus on important neighbours</td>
+</tr>
+<tr class="odd">
+<td>Link prediction</td>
+<td>Dot product of node embeddings → edge probability</td>
+</tr>
+<tr class="even">
+<td>Graph pooling</td>
+<td>Aggregate all node embeddings → graph-level representation</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>← Previous:</strong> <a href="../Notebook/chapter-15-lstm.html">Chapter 15: LSTM</a> <strong>→ Next:</strong> <a href="../Notebook/chapter-17-nlp.html">Chapter 17: Natural Language Processing</a></p>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/zia207\.github\.io\/ML-R");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../Notebook/chapter-15-lstm.html" class="pagination-link" aria-label="Ch 15 · LSTM">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">Ch 15 · LSTM</span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../Notebook/chapter-17-nlp.html" class="pagination-link" aria-label="Ch 17 · NLP">
+        <span class="nav-page-text">Ch 17 · NLP</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© CC-By Zia Ahmed, Upatta Analytics, 2026</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-16-gnn.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>This page is built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

@@ -1,0 +1,427 @@
+---
+title: "Chapter 02: Linear Regression"
+subtitle: "Gradient descent, cost functions, and your first trainable model"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 02: Linear Regression
+
+> **Level**: Beginner | **Estimated Time**: 3–4 hours
+
+---
+
+## 2.1 Overview
+
+Linear regression answers: *"Given some input features, can we predict a continuous output?"*
+
+**Example**: Predict house price from size (sqft).
+
+The idea: fit a straight line through the data so predictions are as close to reality as possible.
+
+$$\text{Price} = w_1 \times \text{size} + w_0$$
+
+In higher dimensions, this becomes a **hyperplane** instead of a line.
+
+---
+
+## 2.2 Mathematical Formulation
+
+### The Model
+Let's break down how linear regression predicts an output from inputs:
+
+First, imagine you have a set of input features (variables) represented as a vector:
+$\mathbf{x} = [x_1, x_2, ..., x_p]$.
+
+To make predictions, we assign a weight to each input. These weights are:
+$\mathbf{w} = [w_0, w_1, ..., w_p]$, where $w_0$ is a special weight called the bias or intercept.
+
+The prediction ($\hat{y}$) for a single example is calculated as:
+
+$$\hat{y} = w_0 + w_1 x_1 + w_2 x_2 + \cdots + w_p x_p$$
+
+In other words, each input is multiplied by its corresponding weight, and the results are added together along with the bias.
+
+We can write this calculation more compactly using vectors:
+
+$$\hat{y} = \mathbf{w}^\top \mathbf{x}$$
+
+Here, we treat the bias as $w_0$ and include an extra input $x_0 = 1$ in the vector $\mathbf{x}$. This way, the bias is just another multiplication.
+
+### The Cost Function (Mean Squared Error) — Explained
+To figure out how well our model is doing, we need a way to measure how close its predictions ($\hat{y}$) are to the true results ($y$). That's where the **Mean Squared Error (MSE)** comes in.
+
+Here's how MSE works:
+- For each example, take the difference between the real value and what the model predicted.
+- Square that difference (so that big mistakes count extra, and negatives don't cancel positives).
+- Add up all those squared differences.
+- Divide by the number of examples to get the average.
+
+As a formula:
+
+$$J(\mathbf{w}) = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2 = \frac{1}{n} \sum_{i=1}^{n} (y_i - \mathbf{w}^\top \mathbf{x}_i)^2$$
+
+**Why do we square the errors?** Squaring makes sure all errors are positive (so they don't cancel out), exaggerates larger mistakes (a difference of 2 counts four times as much as 1), and is mathematically convenient — it gives us a nice, smooth curve we can optimize easily.
+
+Bottom line: The lower the MSE, the better our model is doing!
+
+---
+
+## 2.3 Gradient Descent
+
+Gradient descent is the "learning" part of the model below. Here is the dummy-proof version.
+
+### The Analogy: Walking Downhill in Fog
+
+Imagine you're standing on a hillside in thick fog and want to reach the bottom of the valley. You can't see the valley, but you *can* feel the slope under your feet. So you:
+
+1. Feel which direction is downhill,
+2. Take a small step that way,
+3. Repeat until the ground feels flat.
+
+In our model:
+
+| Analogy | In the model |
+|---------|-------------|
+| The hill | The error $J(\mathbf{w})$ (MSE) — how wrong the predictions are for a given choice of weights |
+| Your position | The current values of the weights $w_0, w_1$ |
+| The slope under your feet | The **gradient** — for each weight: "if I increase it slightly, does the error go up or down, and how steeply?" |
+| The step size | The **learning rate** $\alpha$ (`lr` in the code) |
+| The bottom of the valley | The best-fitting line |
+
+### What the Math Says
+
+The prediction is $\hat{y} = w_0 + w_1 x$ and the error is the MSE from Section 2.2. The gradient of the error with respect to each weight $w_j$ is:
+
+$$\frac{\partial J}{\partial w_j} = \frac{2}{n}\sum_{i=1}^{n} (\hat{y}_i - y_i)\, x_{ij}$$
+
+In words: **(how wrong we were on each sample) × (the input that weight was multiplying)**, averaged over all samples. If we're predicting too high on big houses, the gradient for $w_1$ is positive → we should lower $w_1$.
+
+The update rule is one line:
+
+$$w_j \leftarrow w_j - \alpha \cdot \frac{\partial J}{\partial w_j}$$
+
+The minus sign is the key: the gradient points *uphill* (direction of increasing error), so we step in the *opposite* direction.
+
+### How One Iteration of `fit()` Works
+
+1. **Start with a guess** — all weights are 0, so the first prediction for every house is \$0 (terrible, huge error — we're high on the hill).
+2. **Measure the error on every sample** — `error = y_pred - yi`. Positive means we predicted too high, negative too low.
+3. **Accumulate the gradient** — `gradients[j] += error * xi[j]`. Each sample "votes" on which way each weight should move, weighted by its own input value. (Remember `xi[0]` is always 1, the bias column, so `gradients[0]` collects the plain errors for $w_0$.)
+4. **Take the step** — `weights[j] -= lr * (2/n) * gradients[j]`. Move each weight a little bit against the average gradient.
+5. **Repeat** (2000 times in the demo). Each pass, the line tilts and shifts a little closer to the data. The `cost_history` shows the error dropping fast at first (steep hillside), then slowing as it approaches the valley floor.
+
+### Why the Learning Rate Matters
+
+- **Too small** (e.g., 0.0001): tiny steps — you'll get there, but it might take millions of iterations.
+- **Too large** (e.g., 1.0): you overshoot the valley and bounce to the other side, often getting *worse* each step until the numbers overflow to infinity.
+- **Just right** (0.05 in the demo): fast, steady descent. (Exercise 3 at the end of the chapter asks you to experiment with this.)
+
+This is also why the multi-feature demo (Section 2.5) normalizes features first: if "size" is in the thousands and "bedrooms" is 1–5, the hill is extremely stretched in one direction, and no single learning rate works well for both weights. Normalizing makes the valley round so the same step size works everywhere.
+
+> **Jargon note**: this chapter computes the gradient using **all** samples before each step ("batch" gradient descent). The SVM in Chapter 07 and the neural network in Chapter 11 instead update after *each individual sample* ("stochastic" gradient descent, SGD) — same downhill idea, just noisier, cheaper steps.
+
+---
+
+## 2.4 Simple Linear Regression
+
+The code below (`linear_regression.R`) creates a **Linear Regression model from scratch in R** using **Gradient Descent** to learn from data and make predictions.
+
+The goal is to find the best equation:
+
+$$
+y = w_0 + w_1x
+$$
+
+Where:
+
+* **(w_0)** = bias/intercept (starting value)
+* **(w_1)** = weight/slope (how much output changes)
+
+### Main Parts of the Code
+
+1. **`initialize()` → Initialize the model**
+
+   * Sets:
+
+     * `lr` → how big each learning step is
+     * `n_iterations` → how many times to improve the model
+     * `weights` → values the model learns
+     * `cost_history` → stores error values
+
+2. **`add_bias()` → Add a column of 1s**
+
+   * Converts:
+
+   ```r
+   matrix(c(2, 3), ncol = 1)
+   ```
+
+   into:
+
+   ```r
+   cbind(1, matrix(c(2, 3), ncol = 1))
+   ```
+
+   * This allows the model to learn the intercept ((w_0)).
+
+3. **`predict_one()` → Make one prediction**
+
+   * Uses current weights to calculate:
+     $\hat y = w^Tx$
+
+4. **`compute_cost()` → Measure error**
+
+   * Calculates **Mean Squared Error (MSE)**:
+     $$
+     J=\frac1n\sum(y-\hat y)^2
+     $$
+   * Lower error means better predictions.
+
+5. **`fit()` → Train the model**
+
+   * Adds bias
+   * Starts weights at zero
+   * Repeats many times:
+
+     * Predict values
+     * Calculate error
+     * Compute gradients
+     * Update weights using gradient descent
+   * Stores cost every 100 iterations
+
+6. **`predict()` → Predict new values**
+
+   * Uses learned weights to estimate outputs for new inputs.
+
+In short: **the model repeatedly makes predictions, measures errors, updates the weights, and gradually learns the best equation for prediction.**
+
+```{r}
+# linear_regression.R
+#
+# Linear Regression using Gradient Descent.
+# No ML libraries — pure base R. We use a Reference Class (setRefClass) to
+# mirror the Python class, with fields playing the role of `self.*` attributes.
+
+LinearRegression <- setRefClass(
+  "LinearRegression",
+  fields = list(
+    lr = "numeric",
+    n_iterations = "numeric",
+    weights = "numeric",       # c(w0 (bias), w1, w2, ..., wp)
+    cost_history = "numeric"
+  ),
+  methods = list(
+    initialize = function(learning_rate = 0.01, n_iterations = 1000, ...) {
+      # Initializes the linear regression model.
+      #   learning_rate: the step size for updating the weights during training
+      #   n_iterations: number of times to update the weights
+      lr <<- learning_rate
+      n_iterations <<- n_iterations
+      weights <<- numeric(0)
+      cost_history <<- numeric(0)
+      callSuper(...)
+    },
+
+    add_bias = function(X) {
+      # Adds a bias (intercept) column to the input data.
+      # X: matrix, each row is a sample.
+      # Returns: matrix with a column of 1s prepended for the bias term.
+      cbind(1, X)
+    },
+
+    predict_one = function(x_with_bias) {
+      # Predicts the output for a single sample using current weights.
+      #   y_hat = w^T x = sum(weight_i * x_i) for all i
+      sum(weights * x_with_bias)
+    },
+
+    compute_cost = function(X_b, y) {
+      # Computes the mean squared error (MSE) cost function.
+      #   J = (1/n) * sum( (y_i - y_hat_i)^2 )
+      # Lower cost means better predictions.
+      n <- length(y)
+      y_hat <- as.numeric(X_b %*% weights)
+      sum((y - y_hat)^2) / n
+    },
+
+    fit = function(X, y) {
+      # Train the linear regression model using gradient descent.
+      #
+      # How it works:
+      # 1. Adds a bias (intercept) term to each input sample.
+      # 2. Initializes the model's weights to zero.
+      # 3. For each iteration:
+      #    a. Computes the gradient of the cost function (MSE) with respect to each weight.
+      #       For every data point, calculates the prediction error and accumulates how much
+      #       each weight contributed to the error.
+      #    b. Updates each weight by moving it a small step in the direction that reduces error.
+      #       The amount moved depends on the learning rate (lr) and the average gradient.
+      #    c. Every 100 iterations, computes the current cost and stores it in cost_history.
+      # 4. Repeats these steps for the specified number of iterations.
+      X_b <- add_bias(X)                # Add bias (column of ones) to X
+      n <- nrow(X_b)                     # Number of samples
+      p <- ncol(X_b)                     # Number of weights (features + bias)
+
+      weights <<- rep(0.0, p)           # Initialize weights to zero
+
+      for (iteration in 0:(n_iterations - 1)) {
+        y_pred <- as.numeric(X_b %*% weights)  # Predicted values for all samples
+        error <- y_pred - y                    # Prediction error (vector)
+        gradients <- as.numeric(t(X_b) %*% error)  # Partial derivative wrt each weight
+
+        # Update each weight by the gradient descent rule
+        weights <<- weights - lr * (2 / n) * gradients
+
+        # Store cost for later plotting/diagnostics every 100 iterations
+        if (iteration %% 100 == 0) {
+          cost_history <<- c(cost_history, compute_cost(X_b, y))
+        }
+      }
+
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      # Predict output for a matrix of samples.
+      X_b <- add_bias(X)
+      as.numeric(X_b %*% weights)
+    }
+  )
+)
+
+# ── Metrics ────────────────────────────────────────────────────────────────
+
+mse <- function(y_true, y_pred) {
+  sum((y_true - y_pred)^2) / length(y_true)
+}
+
+rmse <- function(y_true, y_pred) {
+  sqrt(mse(y_true, y_pred))
+}
+
+r_squared <- function(y_true, y_pred) {
+  # Coefficient of determination R^2.
+  y_mean <- sum(y_true) / length(y_true)
+  ss_tot <- sum((y_true - y_mean)^2)
+  ss_res <- sum((y_true - y_pred)^2)
+  1 - (ss_res / ss_tot)
+}
+
+# ── Demo ───────────────────────────────────────────────────────────────────
+
+# Dataset: House size (sqft / 1000) -> Price ($1000s)
+X_train <- matrix(c(0.8, 1.2, 1.5, 2.0, 2.5, 1.0, 1.8), ncol = 1)
+y_train <- c(150, 200, 250, 320, 400, 175, 290)
+
+X_test <- matrix(c(1.1, 2.2, 0.9), ncol = 1)
+y_test <- c(190, 350, 160)
+
+# Train
+model <- LinearRegression$new(learning_rate = 0.05, n_iterations = 2000)
+model$fit(X_train, y_train)
+
+cat("Learned weights (w0=bias, w1=size coefficient):\n")
+cat(sprintf("  w0 = %.2f\n", model$weights[1]))
+cat(sprintf("  w1 = %.2f\n", model$weights[2]))
+cat(sprintf("  Equation: price = %.1f + %.1f x size\n", model$weights[1], model$weights[2]))
+
+# Evaluate
+y_pred <- model$predict(X_test)
+cat("\nTest Predictions vs Actuals:\n")
+for (i in seq_along(y_test)) {
+  cat(sprintf("  Size=%.0fsqft -> Predicted $%.1fk, Actual $%dk\n",
+              X_test[i, 1] * 1000, y_pred[i], y_test[i]))
+}
+
+cat(sprintf("\nRMSE : %.2f\n", rmse(y_test, y_pred)))
+cat(sprintf("MSE : %.2f\n", mse(y_test, y_pred)))
+cat(sprintf("R^2   : %.4f\n", r_squared(y_test, y_pred)))
+```
+
+---
+
+## 2.5 Multiple Linear Regression
+
+Extending to multiple features (e.g., size + bedrooms + age):
+
+```{r}
+# Multiple features — normalize first so gradient descent is stable
+# Normalize: subtract mean, divide by standard deviation
+# This function normalizes each feature (column) of a matrix X so that each feature has zero
+# mean and unit variance. It returns the normalized data (X_norm), the means, and the std devs.
+normalize_features <- function(X) {
+  # If X is empty, return empty results.
+  if (nrow(X) == 0) {
+    return(list(X_norm = X, means = numeric(0), stds = numeric(0)))
+  }
+  n_features <- ncol(X)  # Number of columns/features in X.
+  # Compute the mean for each feature (column).
+  means <- colMeans(X)
+  # Compute the standard deviation for each feature, with a small minimum value to avoid
+  # division by zero.
+  stds <- sapply(seq_len(n_features), function(j) {
+    max(sqrt(sum((X[, j] - means[j])^2) / nrow(X)), 1e-8)
+  })
+  # For each sample (row), normalize each feature by subtracting the mean and dividing by
+  # the standard deviation.
+  X_norm <- sweep(X, 2, means, "-")
+  X_norm <- sweep(X_norm, 2, stds, "/")
+  list(X_norm = X_norm, means = means, stds = stds)
+}
+
+X_train_multi <- rbind(
+  c(1.2, 3, 10),   # size (k sqft), bedrooms, age (years)
+  c(1.5, 3, 5),
+  c(2.0, 4, 8),
+  c(2.5, 4, 2),
+  c(0.8, 2, 20)
+)
+y_train_multi <- c(200, 250, 320, 400, 140)
+
+norm_out <- normalize_features(X_train_multi)
+X_train_norm <- norm_out$X_norm
+feat_means <- norm_out$means
+feat_stds <- norm_out$stds
+
+model_multi <- LinearRegression$new(learning_rate = 0.05, n_iterations = 2000)
+model_multi$fit(X_train_norm, y_train_multi)
+
+preds_multi <- model_multi$predict(X_train_norm)
+cat("Multi-feature predictions vs actuals:\n")
+for (i in seq_along(y_train_multi)) {
+  cat(sprintf("  Predicted: %.1f  Actual: %d\n", preds_multi[i], y_train_multi[i]))
+}
+```
+
+> **Important**: Always normalize features when they have very different scales — without normalization the gradient descent step size becomes wildly unequal across features and the update can overflow.
+
+---
+
+## Summary
+
+| Concept | Formula |
+|---------|---------|
+| Linear model | $\hat{y} = \mathbf{w}^\top \mathbf{x}$ |
+| Cost function | $J = \frac{1}{n} \sum (y - \hat{y})^2$ |
+| Gradient update | $\mathbf{w} \leftarrow \mathbf{w} - \alpha \cdot \frac{\partial J}{\partial \mathbf{w}}$ |
+| R² score | $1 - \frac{SS_{\text{res}}}{SS_{\text{tot}}}$ |
+
+---
+
+## Exercises
+
+1. **Analytical**: Derive the gradient $\frac{\partial J}{\partial w_j}$ for MSE from scratch.
+2. **Coding**: Add L2 (Ridge) regularization to the `fit()` method.
+3. **Experiment**: Try learning rates [0.001, 0.01, 0.1, 1.0]. What happens?
+4. **Extension**: Implement the Normal Equation $\mathbf{w} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{y}$ and compare results.
+
+---
+
+**← Previous:** [Chapter 01: Intro to ML](chapter-01-intro-to-ml.qmd)
+**→ Next:** [Chapter 03: Generalized Linear Models](chapter-03-glm.qmd)

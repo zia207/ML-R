@@ -1,0 +1,8 @@
+title-block-style: none
+title-block-banner: false
+code-tools: false
+include-in-header:
+  text: |
+    <style>
+      #quarto-document-content > header#title-block-header { display: none !important; }
+    </style>

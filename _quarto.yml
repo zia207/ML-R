@@ -1,0 +1,140 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+    - "index.qmd"
+    - "references.qmd"
+    - "Notebook/*.qmd"
+  resources:
+    - "Images/**"
+
+website:
+  title: "Machine Learning in R"
+  description: "From Scratch — without Tears"
+  favicon: Images/favicon.png
+  image: Images/chapter_logo_ml_r.png
+  site-url: https://zia207.github.io/ML-R
+  repo-url: https://github.com/zia207/ML-R
+  repo-actions: [source, issue]
+  page-navigation: true
+  back-to-top-navigation: true
+
+  page-footer:
+    left: "&copy; CC-By Zia Ahmed, Upatta Analytics, 2026"
+    right: "This page is built with [Quarto](https://quarto.org/)."
+
+  navbar:
+    background: primary
+    search: true
+    left:
+      - icon: house
+        href: index.qmd
+        aria-label: Home
+    right:
+      - icon: github
+        href: https://github.com/zia207/ML-R
+        aria-label: GitHub
+      - icon: linkedin
+        href: https://www.linkedin.com/in/zia-ahmed207
+        aria-label: LinkedIn
+      - icon: mailbox
+        href: mailto:zia207@gmail.com
+        aria-label: Email
+
+  sidebar:
+    logo: Images/chapter_logo_ml_r.png
+    logo-alt: "From Scratch — without Tears"
+    pinned: true
+    border: true
+    align: center
+    search: true
+    style: "docked"
+    collapse-level: 1
+    contents:
+      - section: "**Machine Learning in R**"
+        contents:
+          - href: index.qmd
+            text: Introduction
+          - href: references.qmd
+            text: References
+      - section: "**🟢 Beginner**"
+        contents:
+          - text: "Ch 00 · Prerequisites & Setup"
+            href: Notebook/chapter-00-prerequisites.qmd
+          - text: "Ch 01 · Introduction to ML"
+            href: Notebook/chapter-01-intro-to-ml.qmd
+          - text: "Ch 02 · Linear Regression"
+            href: Notebook/chapter-02-linear-regression.qmd
+          - text: "Ch 03 · Generalized Linear Models"
+            href: Notebook/chapter-03-glm.qmd
+          - text: "Ch 04 · K-Nearest Neighbors"
+            href: Notebook/chapter-04-knn.qmd
+          - text: "Ch 05 · Naive Bayes"
+            href: Notebook/chapter-05-naive-bayes.qmd
+      - section: "**🟡 Intermediate**"
+        contents:
+          - text: "Ch 06 · Decision Trees"
+            href: Notebook/chapter-06-decision-trees.qmd
+          - text: "Ch 07 · Support Vector Machines"
+            href: Notebook/chapter-07-svm.qmd
+          - text: "Ch 08 · Ensemble Methods"
+            href: Notebook/chapter-08-ensemble-methods.qmd
+          - text: "Ch 09 · K-Means Clustering"
+            href: Notebook/chapter-09-kmeans.qmd
+          - text: "Ch 10 · PCA"
+            href: Notebook/chapter-10-pca.qmd
+      - section: "**🔴 Advanced**"
+        contents:
+          - text: "Ch 11 · Neural Networks (MLP)"
+            href: Notebook/chapter-11-neural-networks.qmd
+          - text: "Ch 12 · Convolutional Neural Networks"
+            href: Notebook/chapter-12-cnn.qmd
+          - text: "Ch 13 · CNNs — Advanced"
+            href: Notebook/chapter-13-cnn-advanced.qmd
+          - text: "Ch 14 · Recurrent Neural Networks"
+            href: Notebook/chapter-14-rnn.qmd
+          - text: "Ch 15 · LSTM"
+            href: Notebook/chapter-15-lstm.qmd
+          - text: "Ch 16 · Graph Neural Networks"
+            href: Notebook/chapter-16-gnn.qmd
+          - text: "Ch 17 · NLP"
+            href: Notebook/chapter-17-nlp.qmd
+          - text: "Ch 18 · Generative Models"
+            href: Notebook/chapter-18-generative-models.qmd
+          - text: "Ch 19 · Reinforcement Learning"
+            href: Notebook/chapter-19-reinforcement-learning.qmd
+      - section: "**📊 Best Practices**"
+        contents:
+          - text: "Ch 20 · Model Evaluation"
+            href: Notebook/chapter-20-model-evaluation.qmd
+
+tbl-cap-location: top
+title-block-banner: true
+
+format:
+  html:
+    theme: [flatly, custom.scss]
+    fontsize: 1.25em
+    title-fontsize: 40
+    linestretch: 1.7
+    code-fold: show
+    code-tools: false
+    code-copy: true
+    toc: true
+    toc-font-size: 1.5em
+    toc-depth: 4
+    toc-title: Contents
+    number-sections: false
+    smooth-scroll: true
+    fig-align: center
+    grid:
+      sidebar-width: 350px
+      body-width: 1200px
+      margin-width: 250px
+      gutter-width: 1.5rem
+
+execute:
+  echo: true
+  warning: false
+  message: false
+  enabled: false

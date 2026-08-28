@@ -1,0 +1,1804 @@
+---
+title: "Chapter 04: Generalized Linear Models (GLMs)"
+subtitle: "Linear, logistic, multinomial, Poisson, ordinal regression, and regularization — all from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+format:
+  html:
+    fig-width: 9
+    fig-height: 4
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 04: Generalized Linear Models (GLMs)
+
+> **Level**: Beginner | **Estimated Time**: 5–6 hours
+
+---
+
+## What You Will Learn
+
+| Section | Topic |
+|---------|-------|
+| 4.1 | GLM Framework — the unifying theory |
+| 4.2 | Linear Regression as a GLM (Gaussian / identity) |
+| 4.3 | Logistic Regression — binary classification |
+| 4.4 | Multinomial Logistic Regression — multi-class |
+| 4.5 | Poisson Regression — count data |
+| 4.6 | Ordinal Regression — ordered categories |
+| 4.7 | Regularization — Ridge, Lasso, Elastic Net |
+
+Every section follows the same pattern:
+1. **Intuition** – plain-language motivation
+2. **Theory** – mathematical derivation
+3. **From-scratch code** – pure R, no modeling libraries
+4. **Demo** – simulated data with visualizations
+
+```{r}
+set.seed(42)
+
+# ── shared plot style ────────────────────────────────────────────────────────
+COLORS <- c("#2196F3", "#F44336", "#4CAF50", "#FF9800", "#9C27B0")
+cat("Libraries loaded.\n")
+```
+
+---
+
+## 4.1  The GLM Framework
+
+### 4.1.1  Why Do We Need GLMs?
+
+**Ordinary linear regression** assumes:
+- The response $y$ is continuous and unbounded
+- Errors are normally distributed with constant variance
+
+In reality, we often model:
+| Response | Example | Problem with OLS |
+|----------|---------|-----------------|
+| Binary (0/1) | Email spam | Predictions outside [0,1] |
+| Counts (0,1,2,…) | Accidents per year | Predictions can be negative |
+| Ordered (low/med/high) | Satisfaction rating | No natural numeric encoding |
+| Positive continuous | Time until failure | Skewed errors |
+
+**Generalized Linear Models** (GLMs, Nelder & Wedderburn, 1972) unify all of these under one framework.
+
+---
+
+### 4.1.2  Three Components of a GLM
+
+Every Generalized Linear Model (GLM) has three basic building blocks. Here's a simple way to understand them:
+
+**1. Random Component**: What kind of "thing" or outcome are we predicting?
+This just means: what kind of values do our outcomes (Y) take? Are they numbers, yes/no responses, counts, or other types?
+Each type of outcome generally follows a certain probability pattern: for example, normal (Gaussian) for regular numbers; Bernoulli for yes/no; Poisson for counts; Gamma for positive measurements.
+
+**2. Systematic Component**: How do we combine what we know (the inputs) to get a prediction?
+This is a formula that adds up our input variables ($\mathbf{x}$, like age, weight, etc.), each multiplied by a coefficient ($\boldsymbol{\beta}$) that shows how important that input is:
+
+$$\eta_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip}$$
+
+**3. Link Function**: How do we connect our prediction formula to what we expect to see on average?
+Sometimes our prediction formula gives results on a different scale from our outcome (for example, predicting the chance of "yes" as a number between 0 and 1).
+The link function is just a mathematical way of connecting the prediction formula ($\eta$) to the expected outcome ($\mu$):
+
+$$g(\mu_i) = \eta_i \quad \Longleftrightarrow \quad \mu_i = g^{-1}(\eta_i)$$
+
+where $\mu_i$ is what we expect Y to be, given the inputs for case $i$.
+
+---
+
+### 4.1.3  The Exponential Family
+
+The "exponential family" refers to a group of probability distributions that all follow a similar mathematical form involving the exponential function. This means that, despite representing different types of data (like counts, binary outcomes, or continuous values), their probability formulas all share a core structure that uses an exponent. Because of this shared structure, we can study and analyze them in a unified way, which is especially helpful in statistics for writing general methods that apply to many situations.
+
+The probability (or probability density) of seeing value $y$ for some variable can be written as:
+
+$$f(y; \theta, \phi) = \exp\!\left(\frac{y\theta - b(\theta)}{a(\phi)} + c(y, \phi)\right)$$
+
+What do all those symbols mean?
+- $\theta$: this is just a special way to write the important parameter for the distribution (called the "natural" or "canonical" parameter)
+- $\phi$: this is about how spread out or "wide" the distribution is (the "dispersion")
+- $b(\theta)$, $a(\phi)$, $c(y, \phi)$: these are just functions that depend on which specific distribution we're using (they don't have to make sense to you right now)
+
+Why do we care? Because many common distributions (like normal, binomial, Poisson, etc.) can all be written in this way, which means we can handle them with the same math tricks.
+
+If your distribution is written like this, then:
+- The mean (average) of $Y$ is $b'(\theta)$ (the derivative of $b$ with respect to $\theta$)
+- The variance (spread) of $Y$ is $b''(\theta)$ (second derivative) times $a(\phi)$
+
+In summary: "Exponential family = bunch of nice, common distributions that share the same formula building blocks, which makes them easy to analyze and use in GLMs."
+
+---
+
+### 4.1.4  Common GLMs at a Glance
+
+| Model | Response | Distribution | Canonical Link | Inverse Link |
+|-------|----------|-------------|----------------|--------------|
+| Linear Regression | Continuous | Gaussian | Identity: $\eta = \mu$ | $\mu = \eta$ |
+| Logistic Regression | Binary | Bernoulli | Logit: $\eta = \log\frac{\mu}{1-\mu}$ | $\mu = \frac{e^\eta}{1+e^\eta}$ |
+| Poisson Regression | Count | Poisson | Log: $\eta = \log \mu$ | $\mu = e^\eta$ |
+| Gamma Regression | Positive | Gamma | Inverse: $\eta = 1/\mu$ | $\mu = 1/\eta$ |
+
+---
+
+### 4.1.5  GLM Estimation
+
+All GLMs are trained by making the model's predictions match the data as closely as possible, using a process called "maximizing the log-likelihood" (which just means making the model say the data is as likely as possible, according to its formulas).
+
+One of the main methods for estimating coefficients in GLMs is called **IRLS** (**Iteratively Re-weighted Least Squares**). Here's how it works: at each step, the algorithm fits a weighted least squares regression, where the weights are based on how well the current model predicts each data point (so they get updated each iteration). You keep repeating this process, refitting with new weights each time, until things stop changing much. IRLS is especially powerful for GLMs because it properly accounts for the way different models treat variance, and it usually finds the answer quickly for standard problems.
+
+But you can also use **gradient descent**, which is easier to understand and program, and works well in most situations.
+
+Gradient descent just means: you start with a guess for the parameters (the $\beta$ coefficients), check how "wrong" you are (the gradient tells you which direction to move to get better), and adjust your guess a little in that direction—over and over, getting closer each time. This is written as:
+
+$$\boldsymbol{\beta}^{(t+1)} = \boldsymbol{\beta}^{(t)} - \alpha \nabla_{\boldsymbol{\beta}} \ell(\boldsymbol{\beta}^{(t)})$$
+
+Here's what this equation means:
+- $\boldsymbol{\beta}^{(t)}$: This is your current guess for the coefficients (at iteration $t$).
+- $\ell(\boldsymbol{\beta}^{(t)})$: This is the "loss" or "log-likelihood" (how well your current coefficients fit the data).
+- $\nabla_{\boldsymbol{\beta}} \ell(\boldsymbol{\beta}^{(t)})$: This is the gradient—a vector that points in the direction where the loss increases most rapidly. Moving in the opposite direction reduces the loss.
+- $\alpha$: This is the learning rate (step size)—how big a step you take toward improving the coefficients.
+- $\boldsymbol{\beta}^{(t+1)}$: This is your updated coefficients for the next iteration.
+
+In simple terms, this equation says: "To improve our model, take your current coefficients, and step a little bit in the direction that makes the model fit the data better."
+
+---
+
+## 4.2  Linear Regression as a GLM
+
+### Theory
+
+**Random component**: $Y \sim \mathcal{N}(\mu, \sigma^2)$
+
+**Link function**: Identity — $g(\mu) = \mu$, so $\eta = \mu$
+
+**Likelihood** for one observation:
+
+$$\ell_i = -\frac{1}{2\sigma^2}(y_i - \mathbf{x}_i^\top\boldsymbol{\beta})^2 - \text{const}$$
+
+Maximizing the total log-likelihood is equivalent to **minimizing MSE**:
+
+$$\text{MSE} = \frac{1}{n}\sum_{i=1}^n (y_i - \hat{y}_i)^2$$
+
+**Analytical OLS solution** (when $\mathbf{X}^\top\mathbf{X}$ is invertible):
+
+$$\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top\mathbf{X})^{-1}\mathbf{X}^\top\mathbf{y}$$
+
+**Gradient descent** (iterative):
+
+$$\frac{\partial \text{MSE}}{\partial \boldsymbol{\beta}} = \frac{2}{n}\mathbf{X}^\top(\mathbf{X}\boldsymbol{\beta} - \mathbf{y})$$
+
+### Linear Regression GLM  —  from scratch
+
+### Short Explanation of the `LinearRegressionGLM` Code
+
+This code builds a **Linear Regression model (Gaussian GLM with identity link)** to predict numeric values using:
+
+$$
+y=\beta_0+\beta_1x_1+\beta_2x_2+\cdots+\beta_px_p
+$$
+
+Where:
+
+* **$\beta_0$** = intercept (bias)
+* **$\beta$** = coefficients (weights)
+
+### Main Parts
+
+1. **`initialize()`**
+
+   * Initializes:
+
+     * `coef_` → stores model coefficients
+     * `loss_history_` → stores training error
+
+2. **`add_bias(X)`**
+
+   * Adds a column of **1s** to include the intercept term.
+
+3. **`fit_ols(X, y)`**
+
+   * Trains using **Ordinary Least Squares (OLS)**.
+   * Computes coefficients directly using matrix algebra:
+
+   $$
+   \beta=(X^TX)^{-1}X^Ty
+   $$
+
+4. **`fit_gd(X, y)`**
+
+   * Trains using **Gradient Descent**.
+   * Repeatedly:
+
+     * Predicts values
+     * Calculates error
+     * Updates coefficients
+     * Stores loss
+
+5. **`predict(X)`**
+
+   * Uses learned coefficients to predict new values.
+
+6. **`score_r2(X, y)`**
+
+   * Calculates **R² score** to measure model performance:
+   * **1 = perfect prediction**
+   * **0 = poor prediction**
+
+This class performs **linear regression** using either **OLS (direct solution)** or **Gradient Descent (iterative learning)**, then predicts values and evaluates accuracy using **R²**.
+
+```{r}
+# ═══════════════════════════════════════════════════════════════════════════
+#  Linear Regression GLM  —  from scratch
+# ═══════════════════════════════════════════════════════════════════════════
+
+LinearRegressionGLM <- setRefClass(
+  "LinearRegressionGLM",
+  fields = list(coef_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(...) {
+      # Stores the weight vector (including bias/intercept)
+      coef_ <<- numeric(0)
+      # Stores loss values (mean squared error) at each step of gradient descent
+      loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    add_bias = function(X) {
+      # Prepends a column of ones to the feature matrix for the intercept
+      cbind(1, X)
+    },
+
+    fit_ols = function(X, y) {
+      # Fit the model by solving the normal equations for OLS:
+      #   beta = (X^T X)^{-1} X^T y
+      # We use R's QR-based least-squares solver for numerical stability.
+      X_b <- add_bias(X)
+      coef_ <<- as.numeric(qr.solve(X_b, y))
+      invisible(.self)
+    },
+
+    fit_gd = function(X, y, lr = 0.01, n_iter = 2000) {
+      # Fit the model by performing batch gradient descent to minimize MSE.
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      coef_ <<- rep(0, p)     # Start with zero weights
+      loss_history_ <<- numeric(0)
+      for (i in seq_len(n_iter)) {
+        residuals <- as.numeric(X_b %*% coef_) - y     # prediction - truth
+        grad <- 2 * as.numeric(t(X_b) %*% residuals) / n
+        coef_ <<- coef_ - lr * grad
+        loss_history_ <<- c(loss_history_, mean(residuals^2))
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      # Compute predictions for input X using the learned coefficients.
+      as.numeric(add_bias(X) %*% coef_)
+    },
+
+    score_r2 = function(X, y) {
+      # R^2 = 1 - (residual sum of squares / total sum of squares)
+      y_hat <- predict(X)
+      ss_res <- sum((y - y_hat)^2)
+      ss_tot <- sum((y - mean(y))^2)
+      1 - ss_res / ss_tot
+    }
+  )
+)
+
+# ── Metrics ────────────────────────────────────────────────────────────────
+mse  <- function(y, y_hat) mean((y - y_hat)^2)
+rmse <- function(y, y_hat) sqrt(mse(y, y_hat))
+mae  <- function(y, y_hat) mean(abs(y - y_hat))
+
+cat("LinearRegressionGLM defined.\n")
+```
+
+```{r}
+# ── Demo: Linear Regression GLM ─────────────────────────────────────────────
+
+# --- Simulate data: house size -> price --
+set.seed(0)
+n <- 120
+X_raw <- runif(n, 500, 3500)                    # sq ft
+true_beta <- c(50000, 120)                      # intercept, slope
+noise <- rnorm(n, 0, 20000)
+y_raw <- true_beta[1] + true_beta[2] * X_raw + noise
+
+X_raw <- matrix(X_raw, ncol = 1)
+
+# Normalize (population mean/sd, matching typical from-scratch standardisation)
+X_mean <- mean(X_raw)
+X_std  <- sqrt(mean((X_raw - X_mean)^2))
+X <- (X_raw - X_mean) / X_std
+
+idx <- sample(n)
+X_train <- X[idx[1:90], , drop = FALSE];   y_train <- y_raw[idx[1:90]]
+X_test  <- X[idx[91:120], , drop = FALSE]; y_test  <- y_raw[idx[91:120]]
+
+# Fit both methods
+model_ols <- LinearRegressionGLM$new()$fit_ols(X_train, y_train)
+model_gd  <- LinearRegressionGLM$new()$fit_gd(X_train, y_train, lr = 0.05, n_iter = 1000)
+
+# ── Results ──────────────────────────────────────────────────────────────────
+cat(sprintf("OLS  — Test R^2: %.4f   RMSE: $%.0f\n",
+            model_ols$score_r2(X_test, y_test), rmse(y_test, model_ols$predict(X_test))))
+cat(sprintf("GD   — Test R^2: %.4f   RMSE: $%.0f\n",
+            model_gd$score_r2(X_test, y_test), rmse(y_test, model_gd$predict(X_test))))
+cat("\nOLS coefs (bias, slope):", model_ols$coef_, "\n")
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+par(mfrow = c(1, 3))
+
+# 1. Data + fit
+x_range <- matrix(seq(min(X), max(X), length.out = 200), ncol = 1)
+plot(X_train, y_train, col = COLORS[1], pch = 16, cex = 0.6,
+     xlab = "House Size (standardized)", ylab = "Price ($)", main = "Linear Regression (GLM)")
+points(X_test, y_test, col = COLORS[2], pch = 16, cex = 0.6)
+lines(x_range, model_ols$predict(x_range), col = "black", lwd = 2)
+legend("topleft", legend = c("Train", "Test", "OLS fit"),
+       col = c(COLORS[1], COLORS[2], "black"), pch = c(16, 16, NA), lty = c(NA, NA, 1), bty = "n")
+
+# 2. GD convergence
+plot(model_gd$loss_history_, type = "l", xlab = "Iteration", ylab = "MSE",
+     main = "Gradient Descent Convergence")
+
+# 3. Residuals
+resid_ols <- y_test - model_ols$predict(X_test)
+plot(model_ols$predict(X_test), resid_ols, col = COLORS[1], pch = 16, cex = 0.6,
+     xlab = "Fitted Values", ylab = "Residuals", main = "Residual Plot (OLS)")
+abline(h = 0, lty = 2)
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+## 4.3  Logistic Regression: Binary Classification
+
+**What are we doing?**
+
+We're trying to build a model that can answer "yes" or "no" (1 or 0) to a question, like: "Will this email be spam?"
+
+**Random component:**
+$Y \sim \text{Bernoulli}(\mu)$
+This just means our answer ($Y$) is random, but it only has two possible choices: 1 ("yes") with probability $\mu$, and 0 ("no") with probability $1-\mu$.
+
+**Link function (the secret sauce):**
+We can't use linear regression because probabilities can only be between 0 and 1, but lines go on forever. So, we "squash" our predictions into the $[0,1]$ range with a function called the "logit" or "sigmoid".
+
+The math formula:
+$$\text{Logit}(\mu) = \log\dfrac{\mu}{1-\mu}$$
+But for dummies:
+If you put in a number (called $\eta$), and run it through the magic sigmoid machine:
+$$\mu = \frac{1}{1 + e^{-\eta}}$$
+You'll always get something between 0 and 1. If $\eta$ is big, answer is near 1; if small (very negative), answer is near 0.
+
+```{r}
+# **Sigmoid function:**
+x_sig <- seq(-10, 10, length.out = 200)
+sigmoid_vals <- 1 / (1 + exp(-x_sig))
+
+plot(x_sig, sigmoid_vals, type = "l", col = COLORS[1], lwd = 2,
+     xlab = "Input (eta)", ylab = "Output (sigmoid(eta))", main = "Sigmoid Function")
+abline(v = 0, col = "grey", lty = 2)
+abline(h = 0.5, col = "grey", lty = 2)
+legend("topleft", legend = "Sigmoid", col = COLORS[1], lwd = 2, bty = "n")
+```
+
+### How does it learn? (Likelihood & Loss)
+
+The model tries to find the "best" values for its numbers (coefficients) so that when you plug in your features, you get high probability for the right answer and low for the wrong.
+
+The way it does this is by maximizing how "likely" it is to see the answers it got, called the likelihood. But computers prefer to minimize things, so we minimize negative log likelihood (called loss function or, specifically, "binary cross-entropy"):
+
+$$J(\boldsymbol{\beta}) = -\frac{1}{n} \sum_{i=1}^n \left[ y_i \log \hat{y}_i + (1 - y_i) \log(1 - \hat{y}_i) \right]$$
+(That's just a scary way to say: "How wrong were the guesses compared to the right answers?")
+
+### How does it *change* to get better? (Gradient)
+
+At each step, the model looks at how its guesses differ from the true answers, and tweaks its numbers to make future guesses a little better.
+The amount to tweak is called the "gradient" and for logistic regression, it's:
+
+$$\frac{1}{n} \mathbf{X}^\top (\hat{\mathbf{y}} - \mathbf{y})$$
+(Just like linear regression, but instead of using raw numbers, we're using our probability guesses.)
+
+### How does it decide your answer? (Decision Rule)
+
+When the model spits out a number (after the squiggle/sigmoid magic), it's just giving you how sure it is that the answer is "yes"—like 80% sure, or 30% sure.
+To actually make a decision, we use a super simple rule: If the number is 0.5 or more, just say "yes" (which means 1); if it's less, say "no" (which means 0).
+
+In math, that's:
+
+$$\hat{y} = \begin{cases} 1 & \text{if probability} \geq 0.5 \\ 0 & \text{otherwise} \end{cases}$$
+
+### Logistic Regression GLM  -  from scratch
+
+```{r}
+# ═══════════════════════════════════════════════════════════════════════════
+#  Logistic Regression GLM  —  from scratch
+# ═══════════════════════════════════════════════════════════════════════════
+
+# This is a very basic implementation of Logistic Regression — a common machine learning
+# algorithm for binary classification (i.e., predicting if something is class 0 or 1).
+# We're building the model ourselves, without any modeling libraries!
+
+LogisticRegressionGLM <- setRefClass(
+  "LogisticRegressionGLM",
+  fields = list(lr = "numeric", n_iter = "numeric", coef_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lr = 0.1, n_iter = 1000, ...) {
+      # lr: learning rate (how big each adjustment step is)
+      # n_iter: number of training loops/steps (epochs)
+      lr <<- lr
+      n_iter <<- n_iter
+      coef_ <<- numeric(0)          # This will hold our learned weights
+      loss_history_ <<- numeric(0)  # We'll remember the loss at each training step
+      callSuper(...)
+    },
+
+    sigmoid = function(z) {
+      # This squashes any number into a value between 0 and 1.
+      # It answers: "What's the probability this is class 1?"
+      # Clipping just prevents overflow.
+      1.0 / (1.0 + exp(-pmin(pmax(z, -500), 500)))
+    },
+
+    add_bias = function(X) {
+      # Adds a "1" at the front of every row (for the intercept/bias term)
+      cbind(1, X)
+    },
+
+    fit = function(X, y) {
+      # Trains (fits) the model to the data! X: features, y: true classes
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      coef_ <<- rep(0, p)          # start weights at zeros
+      loss_history_ <<- numeric(0)
+
+      for (i in seq_len(n_iter)) {
+        y_hat <- sigmoid(as.numeric(X_b %*% coef_))       # predictions (between 0 and 1)
+        grad  <- as.numeric(t(X_b) %*% (y_hat - y)) / n   # gradient (how to tweak weights)
+        coef_ <<- coef_ - lr * grad                       # update the weights
+
+        yh <- pmin(pmax(y_hat, 1e-15), 1 - 1e-15)          # clamp to avoid log(0)
+        loss <- -mean(y * log(yh) + (1 - y) * log(1 - yh))
+        loss_history_ <<- c(loss_history_, loss)
+      }
+
+      invisible(.self)
+    },
+
+    predict_proba = function(X) {
+      # For any new data, return the estimated probability of "class 1"
+      sigmoid(as.numeric(add_bias(X) %*% coef_))
+    },
+
+    predict = function(X, threshold = 0.5) {
+      # Predicts 0 or 1: is prob >= threshold? (default: 0.5, so >50% = class 1)
+      as.integer(predict_proba(X) >= threshold)
+    },
+
+    score_accuracy = function(X, y) {
+      # Calculates the % of correct predictions (accuracy)
+      mean(predict(X) == y)
+    }
+  )
+)
+```
+
+### Classification Reports
+
+In classification tasks, it's important to evaluate how well the model predicts each class.
+We use various metrics, which can be defined mathematically as follows:
+
+- **Precision for class c:**
+  $$
+  \text{Precision}_c = \frac{TP_c}{TP_c + FP_c}
+  $$
+  where $TP_c$ is the number of true positives for class $c$ (samples correctly predicted as $c$),
+  and $FP_c$ is the number of false positives for class $c$ (samples incorrectly predicted as $c$).
+
+- **Recall for class c:**
+  $$
+  \text{Recall}_c = \frac{TP_c}{TP_c + FN_c}
+  $$
+  where $FN_c$ is the number of false negatives for class $c$ (samples of class $c$ incorrectly predicted as not $c$).
+
+- **F1 score for class c:**
+  $$
+  F1_c = 2 \cdot \frac{\text{Precision}_c \cdot \text{Recall}_c}{\text{Precision}_c + \text{Recall}_c}
+  $$
+  The F1 score is the harmonic mean of precision and recall.
+
+- **Support for class c:**
+  $$
+  \text{Support}_c = \text{Number of true samples of class}\ c
+  $$
+
+A comprehensive classification report shows all of these for each class, so we understand where the model performs well and where it doesn't.
+
+```{r}
+# ── Metrics ──────────────────────────────────────────────────────────────────
+
+classification_report <- function(y_true, y_pred, labels = NULL) {
+  # Prints a summary of classification metrics for each class:
+  # - Precision, Recall, F1, Support (see explanation above)
+  if (is.null(labels)) labels <- sort(unique(y_true))
+  header <- sprintf("%8s  %10s  %8s  %8s  %8s", "Class", "Precision", "Recall", "F1", "Support")
+  cat(header, "\n"); cat(strrep("-", nchar(header)), "\n")
+  for (cl in labels) {
+    tp <- sum(y_true == cl & y_pred == cl)             # True Positives
+    fp <- sum(y_true != cl & y_pred == cl)             # False Positives
+    fn <- sum(y_true == cl & y_pred != cl)             # False Negatives
+    prec <- tp / (tp + fp + 1e-15)
+    rec  <- tp / (tp + fn + 1e-15)
+    f1   <- 2 * prec * rec / (prec + rec + 1e-15)
+    supp <- sum(y_true == cl)
+    cat(sprintf("%8s  %10.3f  %8.3f  %8.3f  %8d\n", as.character(cl), prec, rec, f1, supp))
+  }
+}
+
+cat("LogisticRegressionGLM defined.\n")  # Just to confirm our code ran!
+```
+
+```{r}
+# ── Demo: Logistic Regression ──────────────────────────────────────────────
+
+# 1. Simulate some synthetic binary classification data:
+set.seed(1)
+n <- 300
+X_lr <- matrix(rnorm(n * 2), ncol = 2)   # Two input features, normally distributed
+
+# Define the "true" boundary for class 1: linear combination with noise
+logits <- 2.0 * X_lr[, 1] - 1.5 * X_lr[, 2]
+y_lr <- as.integer((logits + rnorm(n) * 0.5) > 0)  # Add noise and threshold at zero
+
+# 2. Randomly split the data into training and test sets (80% train, 20% test):
+idx <- sample(n)
+X_tr <- X_lr[idx[1:240], ];   y_tr <- y_lr[idx[1:240]]    # Training set: first 240 samples
+X_te <- X_lr[idx[241:300], ]; y_te <- y_lr[idx[241:300]]  # Test set: remaining 60 samples
+
+# 3. Instantiate and train the custom Logistic Regression model:
+model_lr <- LogisticRegressionGLM$new(lr = 0.3, n_iter = 800)
+model_lr$fit(X_tr, y_tr)
+
+# 4. Evaluate the model's accuracy on train and test data:
+cat(sprintf("Train Accuracy: %.3f\n", model_lr$score_accuracy(X_tr, y_tr)))
+cat(sprintf("Test  Accuracy: %.3f\n", model_lr$score_accuracy(X_te, y_te)))
+cat("\n")
+
+# 5. Print a detailed classification report on the test set:
+classification_report(y_te, model_lr$predict(X_te))
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+par(mfrow = c(1, 3))
+
+# 1. Decision boundary
+gx <- seq(-3.5, 3.5, length.out = 150)
+gy <- seq(-3.5, 3.5, length.out = 150)
+grid_lr <- as.matrix(expand.grid(gx, gy))
+Z_lr <- matrix(model_lr$predict_proba(grid_lr), nrow = length(gx))
+image(gx, gy, Z_lr, col = colorRampPalette(c(COLORS[1], "white", COLORS[2]))(50),
+      xlab = "Feature 1", ylab = "Feature 2", main = "Decision Boundary (test set)")
+contour(gx, gy, Z_lr, levels = 0.5, add = TRUE, lwd = 2, drawlabels = FALSE)
+points(X_te[, 1], X_te[, 2], col = ifelse(y_te == 1, COLORS[2], COLORS[1]), pch = 16)
+
+# 2. Loss curve
+plot(model_lr$loss_history_, type = "l", col = COLORS[1],
+     xlab = "Iteration", ylab = "Binary Cross-Entropy", main = "Training Loss")
+
+# 3. Probability histogram by class
+probs_lr <- model_lr$predict_proba(X_te)
+hist(probs_lr[y_te == 0], breaks = 20, col = adjustcolor(COLORS[1], alpha.f = 0.6),
+     xlim = c(0, 1), main = "Predicted Probabilities", xlab = "P(class = 1)", ylab = "Count")
+hist(probs_lr[y_te == 1], breaks = 20, col = adjustcolor(COLORS[2], alpha.f = 0.6), add = TRUE)
+abline(v = 0.5, lty = 2)
+legend("topright", legend = c("Class 0", "Class 1", "threshold"),
+       fill = c(COLORS[1], COLORS[2], NA), border = c("black", "black", NA), bty = "n")
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+## 4.4  Multinomial Logistic Regression
+
+### Theory
+
+When you have more than 2 classes (for example, classifying things as A, B, or C instead of just A or B), you can't use the usual logistic (sigmoid) function anymore. Instead, you use something called the **softmax** function.
+
+Think of softmax as a way to turn a bunch of numbers (called "scores" or "logits") into probabilities that add up to 1. The class with the biggest score will get the highest probability.
+
+In math, for each class $k$, the probability that your input belongs to class $k$ is:
+
+$$P(Y = k | \mathbf{x}) = \frac{e^{\text{score for class $k$}}}{\text{sum of exponentials of all class scores}}$$
+
+Or more specifically:
+
+$$P(Y = k \mid \mathbf{x}) = \frac{e^{\mathbf{x}^\top \boldsymbol{\beta}_k}}{\sum_{j=1}^{K} e^{\mathbf{x}^\top \boldsymbol{\beta}_j}}$$
+
+Here, $\mathbf{x}$ is your input, and $\boldsymbol{\beta}_k$ is a set of weights specific to class $k$.
+
+In code/math, all the weights are stored in one big matrix called $\mathbf{W}$, where each column is the set of weights for a class.
+
+One important trick: if the "scores" are really big or really small, exponentials can explode or vanish, causing problems. To avoid this, subtract the biggest score from ALL the scores before exponentiating. This doesn't change the probabilities, but keeps calculations stable.
+
+The "safe" version for softmax:
+
+$$\text{softmax}(\mathbf{z})_k = \frac{e^{z_k - \max_j z_j}}{\sum_j e^{z_j - \max_j z_j}}$$
+
+```{r}
+# Draw softmax "probability vs input" for 3 classes where each class's logit varies
+z_sm <- seq(-4, 4, length.out = 200)
+Z_sm <- rbind(z_sm, rep(0, length(z_sm)), -z_sm)   # Simulate three classes with shifting logits
+exps_sm <- exp(sweep(Z_sm, 2, apply(Z_sm, 2, max), "-"))
+softmax_vals <- sweep(exps_sm, 2, colSums(exps_sm), "/")
+
+plot(z_sm, softmax_vals[1, ], type = "l", col = COLORS[1], lwd = 2, ylim = c(0, 1),
+     xlab = "Logit/Input value for Class 1 (z1)", ylab = "Softmax Probability",
+     main = "Softmax Output for 3 Classes (as z1 varies)")
+lines(z_sm, softmax_vals[2, ], col = COLORS[2], lwd = 2)
+lines(z_sm, softmax_vals[3, ], col = COLORS[3], lwd = 2)
+legend("right", legend = c("Class 1", "Class 2", "Class 3"), col = COLORS[1:3], lwd = 2, bty = "n")
+```
+
+### Understanding the Loss: Categorical Cross-Entropy
+
+Imagine you have a model that tries to guess which class (like cat, dog, or rabbit) each input really belongs to. The "loss" is just a number that tells us how good (small loss) or bad (big loss) our guesses are.
+
+The formula:
+
+$$J(\mathbf{W}) = -\frac{1}{n} \sum_{i=1}^n \sum_{k=1}^K y_{ik} \log \hat{y}_{ik}$$
+
+What does this mean in plain English?
+- For each example (picture, row, whatever), and for each possible class:
+  - $y_{ik}$ is 1 if that example *is* actually class $k$, and 0 otherwise.
+  - $\hat{y}_{ik}$ is the model's predicted probability that the example is class $k$ (between 0 and 1).
+  - We take the log of the predicted probability *only* for the actual, correct class.
+- We add up (sum) all those log probabilities (one per true answer), make them negative, and average over all the examples.
+
+In short: This loss punishes the model if it gives low probability to the right answer. The closer your prediction gets to the correct class, the smaller (better) your loss!
+
+(Note: The "one-hot encoding" for the true class just means we use an array where the true class position is 1, others are 0. For example, dog = [0, 1, 0] if you have [cat, dog, rabbit].)
+
+### Gradient
+
+Suppose you want to know how to adjust your model's weights (the numbers it learns) to make better predictions. The "gradient" tells us which way is downhill for our loss—how to change the weights to get a lower loss.
+
+Here's the gradient formula:
+$$\frac{\partial J}{\partial \mathbf{W}} = \frac{1}{n} \mathbf{X}^\top (\hat{\mathbf{Y}} - \mathbf{Y})$$
+
+What does this mean in super simple terms?
+- $\mathbf{X}$ is your input data.
+- $\hat{\mathbf{Y}}$ is what your model thinks (the predicted probabilities, as a big table).
+- $\mathbf{Y}$ is what the correct answers actually are (the true class labels, also as a table).
+- Subtracting the actual from the predicted ($\hat{\mathbf{Y}} - \mathbf{Y}$) gives you the "error" for each prediction.
+- Multiply this error by your input data (in a special matrix way—a dot product) and average it over all examples ($\frac{1}{n}$).
+- This shows you how to tweak your weights to nudge your predictions closer to the truth next time.
+
+In essence: the gradient points in the direction to change your weights to make the model a tiny bit better.
+
+### Multinomial Logistic Regression  -  from scratch
+
+```{r}
+# ═══════════════════════════════════════════════════════════════════════════
+#  Multinomial Logistic Regression  —  from scratch
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Multinomial logistic regression (for 3 or more classes), implemented from scratch in
+# pure base R. Like binary logistic regression but generalised to K classes using the
+# softmax function — predicts which of 3+ groups each input belongs to.
+
+MultinomialLogisticRegression <- setRefClass(
+  "MultinomialLogisticRegression",
+  fields = list(lr = "numeric", n_iter = "numeric", W_ = "matrix",
+                classes_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lr = 0.05, n_iter = 1000, ...) {
+      # lr = learning rate (how fast you run downhill)
+      # n_iter = how many times to update weights
+      lr <<- lr
+      n_iter <<- n_iter
+      W_ <<- matrix(numeric(0), 0, 0)   # The weights (to be learned)
+      classes_ <<- numeric(0)           # Unique class labels, e.g. 0,1,2
+      loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    softmax_rows = function(Z) {
+      # Apply softmax to each row of Z. Shift by row max first (numerical trick).
+      Z_shift <- Z - apply(Z, 1, max)
+      exp_Z <- exp(Z_shift)
+      exp_Z / rowSums(exp_Z)
+    },
+
+    add_bias = function(X) cbind(1, X),
+
+    fit = function(X, y) {
+      # Learn the weight matrix W using gradient descent.
+      classes_ <<- sort(unique(y))
+      K <- length(classes_)
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+
+      # One-hot encode y
+      y_idx <- match(y, classes_)
+      Y_oh <- matrix(0, n, K)
+      Y_oh[cbind(seq_len(n), y_idx)] <- 1.0
+
+      W_ <<- matrix(0, p, K)
+      loss_history_ <<- numeric(0)
+
+      for (i in seq_len(n_iter)) {
+        P <- softmax_rows(X_b %*% W_)               # shape (n, K)
+        grad <- t(X_b) %*% (P - Y_oh) / n
+        W_ <<- W_ - lr * grad
+
+        P_clip <- pmin(pmax(P, 1e-15), 1.0)
+        loss <- -mean(rowSums(Y_oh * log(P_clip)))
+        loss_history_ <<- c(loss_history_, loss)
+      }
+
+      invisible(.self)
+    },
+
+    predict_proba = function(X) {
+      # Return predicted class probabilities for each sample in X.
+      softmax_rows(add_bias(X) %*% W_)
+    },
+
+    predict = function(X) {
+      # For each sample, pick the class with biggest probability.
+      P <- predict_proba(X)
+      classes_[apply(P, 1, which.max)]
+    },
+
+    score_accuracy = function(X, y) mean(predict(X) == y)
+  )
+)
+
+cat("MultinomialLogisticRegression defined.\n")
+```
+
+```{r}
+# ── Demo: Multinomial Logistic Regression ───────────────────────────────────
+
+# --- Simulate 3-class data (Iris-like) ---
+set.seed(2)
+n_per_class <- 120
+
+# Class 0: centred at (0, 0)
+X0 <- MASS::mvrnorm(n_per_class, mu = c(0.0, 0.0), Sigma = matrix(c(1, 0.4, 0.4, 1), 2, 2))
+# Class 1: centred at (3, 1)
+X1 <- MASS::mvrnorm(n_per_class, mu = c(3.0, 1.0), Sigma = matrix(c(1, 0.2, 0.2, 1), 2, 2))
+# Class 2: centred at (1.5, 4)
+X2 <- MASS::mvrnorm(n_per_class, mu = c(1.5, 4.0), Sigma = matrix(c(1, 0.0, 0.0, 1), 2, 2))
+
+X_mn <- rbind(X0, X1, X2)
+y_mn <- c(rep(0, n_per_class), rep(1, n_per_class), rep(2, n_per_class))
+
+# Shuffle & split
+idx <- sample(length(y_mn))
+X_mn <- X_mn[idx, ]; y_mn <- y_mn[idx]
+split_mn <- floor(0.8 * length(y_mn))
+X_tr_mn <- X_mn[1:split_mn, ];                     y_tr_mn <- y_mn[1:split_mn]
+X_te_mn <- X_mn[(split_mn + 1):length(y_mn), ];    y_te_mn <- y_mn[(split_mn + 1):length(y_mn)]
+
+# Standardise (population mean/sd)
+mu_mn <- colMeans(X_tr_mn)
+sd_mn <- apply(X_tr_mn, 2, function(col) sqrt(mean((col - mean(col))^2)))
+X_tr_mn <- sweep(sweep(X_tr_mn, 2, mu_mn, "-"), 2, sd_mn, "/")
+X_te_mn <- sweep(sweep(X_te_mn, 2, mu_mn, "-"), 2, sd_mn, "/")
+
+model_mn <- MultinomialLogisticRegression$new(lr = 0.3, n_iter = 500)
+model_mn$fit(X_tr_mn, y_tr_mn)
+
+cat(sprintf("Train Accuracy: %.3f\n", model_mn$score_accuracy(X_tr_mn, y_tr_mn)))
+cat(sprintf("Test  Accuracy: %.3f\n", model_mn$score_accuracy(X_te_mn, y_te_mn)))
+cat("\n")
+classification_report(y_te_mn, model_mn$predict(X_te_mn))
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+par(mfrow = c(1, 2))
+
+# 1. Decision regions
+res <- 150
+x1r <- seq(min(X_te_mn[, 1]) - 0.5, max(X_te_mn[, 1]) + 0.5, length.out = res)
+x2r <- seq(min(X_te_mn[, 2]) - 0.5, max(X_te_mn[, 2]) + 0.5, length.out = res)
+grid_mn <- as.matrix(expand.grid(x1r, x2r))
+Z_mn <- matrix(model_mn$predict(grid_mn), nrow = res)
+image(x1r, x2r, Z_mn, col = c("#BBDEFB", "#FFCDD2", "#C8E6C9"),
+      xlab = "Feature 1", ylab = "Feature 2", main = "Decision Regions (test set)")
+for (cl in 0:2) {
+  mask <- y_te_mn == cl
+  points(X_te_mn[mask, 1], X_te_mn[mask, 2], col = COLORS[cl + 1], pch = 16)
+}
+legend("topright", legend = paste("Class", 0:2), col = COLORS[1:3], pch = 16, bty = "n")
+
+# 2. Loss
+plot(model_mn$loss_history_, type = "l", col = COLORS[1],
+     xlab = "Iteration", ylab = "Categorical Cross-Entropy", main = "Training Loss")
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+## 4.5  Poisson Regression
+
+Poisson regression is used when you want to predict a value that is a count (like the number of times something happens) and it can never be negative (like 0, 1, 2, ...).
+
+The basic idea is that the thing we're predicting, call it $Y$, follows a Poisson distribution, which is just a fancy way to model counts. In the Poisson distribution, the chance (probability) of seeing a particular count depends on a value called mu ($\mu$), which is both the average and the spread of the counts.
+
+The formula that gives you the probability of seeing a number $k$ (like 0, 1, 2...) is:
+
+$$
+P(Y = k) = \frac{e^{-\mu} \mu^{k}}{k!}
+$$
+
+where "$!$" means factorial (so $3! = 3 \times 2 \times 1$).
+
+A key thing: For Poisson, the average and variance (how spread out the data is) are equal, both are just $\mu$.
+
+The trick in Poisson regression is to connect our features (things we know about each example) to $\mu$, using a log. Instead of predicting $\mu$ directly, we predict $\log(\mu)$, because $\log(\mu)$ can be any number, but $\mu$ (the expected count) has to be positive. So:
+
+$$
+\log(\mu) = \mathbf{x}^\top \boldsymbol{\beta}
+$$
+
+where $\mathbf{x}^\top \boldsymbol{\beta}$ just means "multiply each feature by a weight ($\beta$), add them up".
+
+So,
+
+$$
+\mu = \exp(\mathbf{x}^\top \boldsymbol{\beta})
+$$
+
+When we train the model, we want to find the weights ($\beta$) that make our predictions as close as possible to actual data. For this, we use something called the log-likelihood: It basically scores how likely the actual counts would be, given what our model predicted.
+
+To train, we want to make this score as high as possible, or in practice, minimize the negative log-likelihood:
+
+$$
+J(\boldsymbol{\beta}) = -\frac{1}{n} \sum_{i=1}^n \left[ y_i (\mathbf{x}_i^\top \boldsymbol{\beta}) - \exp(\mathbf{x}_i^\top \boldsymbol{\beta}) \right]
+$$
+
+When adjusting the model to get better predictions, we use the gradient (just tells us which direction to move the weights for improvement):
+
+$$
+\text{gradient} = -\frac{1}{n} \mathbf{X}^\top (y - \mu)
+$$
+
+where $\mu = \exp(\mathbf{X} \boldsymbol{\beta})$
+
+How to read the model's coefficients? Each increase of $1$ in a feature multiplies the expected count by $\exp(\beta_j)$. So the numbers are on a 'log-rate' scale.
+
+### Poisson Regression  from scratch
+
+```{r}
+# ═══════════════════════════════════════════════════════════════════════════
+#  Poisson Regression  —  from scratch
+# ═══════════════════════════════════════════════════════════════════════════
+
+PoissonRegressionGLM <- setRefClass(
+  "PoissonRegressionGLM",
+  fields = list(lr = "numeric", n_iter = "numeric", coef_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lr = 0.01, n_iter = 2000, ...) {
+      lr <<- lr; n_iter <<- n_iter
+      coef_ <<- numeric(0); loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    add_bias = function(X) cbind(1, X),
+
+    fit = function(X, y) {
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      coef_ <<- rep(0, p)
+      loss_history_ <<- numeric(0)
+
+      for (i in seq_len(n_iter)) {
+        eta <- as.numeric(X_b %*% coef_)     # linear predictor
+        mu  <- exp(eta)                      # predicted counts, always positive
+        grad <- -as.numeric(t(X_b) %*% (y - mu)) / n
+        coef_ <<- coef_ - lr * grad
+        loss <- -mean(y * eta - mu)
+        loss_history_ <<- c(loss_history_, loss)
+      }
+
+      invisible(.self)
+    },
+
+    predict = function(X) exp(as.numeric(add_bias(X) %*% coef_)),
+
+    deviance = function(X, y) {
+      # Poisson 'deviance': lower deviance = better fit.
+      mu <- pmax(predict(X), 1e-15)
+      term <- ifelse(y > 0, y * log(y / mu), 0)
+      2 * sum(term - (y - mu))
+    }
+  )
+)
+
+cat("PoissonRegressionGLM defined.\n")
+```
+
+```{r}
+# ── Demo: Poisson Regression ─────────────────────────────────────────────────
+
+# --- Simulate count data: number of insurance claims ---
+# Features: driver_age (centred), annual_miles (log-scaled)
+set.seed(3)
+n <- 400
+age   <- runif(n, 18, 75)
+miles <- runif(n, 3000, 30000)
+
+# True log-linear model: log(E[claims]) = -2 + 0.02*age + 0.0001*miles
+true_log_mu <- -2.0 + 0.02 * age + 0.0001 * miles
+true_mu     <- exp(true_log_mu)
+y_pois      <- rpois(n, true_mu)
+
+X_pois <- cbind(age, miles)
+
+# Standardise features
+mu_p <- colMeans(X_pois)
+sd_p <- apply(X_pois, 2, function(col) sqrt(mean((col - mean(col))^2)))
+X_pois_std <- sweep(sweep(X_pois, 2, mu_p, "-"), 2, sd_p, "/")
+
+idx <- sample(n)
+split_p <- floor(0.8 * n)
+X_tr_p <- X_pois_std[idx[1:split_p], ];        y_tr_p <- y_pois[idx[1:split_p]]
+X_te_p <- X_pois_std[idx[(split_p + 1):n], ];  y_te_p <- y_pois[idx[(split_p + 1):n]]
+
+model_pois <- PoissonRegressionGLM$new(lr = 0.05, n_iter = 2000)
+model_pois$fit(X_tr_p, y_tr_p)
+
+pred_train <- model_pois$predict(X_tr_p)
+pred_test  <- model_pois$predict(X_te_p)
+
+# Pearson correlation (goodness-of-fit metric for counts)
+corr_train <- cor(y_tr_p, pred_train)
+corr_test  <- cor(y_te_p, pred_test)
+cat(sprintf("Pearson correlation  Train: %.4f   Test: %.4f\n", corr_train, corr_test))
+cat(sprintf("Test  Deviance : %.2f\n", model_pois$deviance(X_te_p, y_te_p)))
+cat("Fitted coefs  :", model_pois$coef_, "\n")
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+par(mfrow = c(1, 3))
+
+# 1. Observed vs Fitted
+mx <- max(y_te_p, pred_test) + 0.5
+plot(y_te_p, pred_test, col = COLORS[1], pch = 16, cex = 0.6,
+     xlab = "Observed counts", ylab = "Fitted counts", main = "Observed vs Fitted (Poisson)")
+lines(c(0, mx), c(0, mx), lty = 2)
+legend("topleft", legend = "Perfect fit", lty = 2, bty = "n")
+
+# 2. Distribution of counts vs Poisson fit
+counts_obs <- tabulate(y_te_p + 1, nbins = 20)
+bar_x <- barplot(counts_obs / sum(counts_obs), col = adjustcolor(COLORS[1], alpha.f = 0.6),
+                  names.arg = 0:19, xlab = "Count", ylab = "Proportion", main = "Count Distribution")
+lambda_hat <- mean(pred_test)
+lines(bar_x, dpois(0:19, lambda_hat), col = "red", type = "o", pch = 16)
+legend("topright", legend = sprintf("Poisson(lambda=%.1f)", lambda_hat),
+       col = "red", pch = 16, lty = 1, bty = "n")
+
+# 3. Loss curve
+plot(model_pois$loss_history_, type = "l", col = COLORS[3],
+     xlab = "Iteration", ylab = "Neg. Log-Likelihood", main = "Training Loss")
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+## 4.6  Ordinal Regression — Proportional Odds Model
+
+### Theory
+
+Ordinal outcomes are types of answers or labels where the choices have a natural order,
+like "bad", "okay", and "good", or survey ratings (1 to 5), or pain levels ("none", "mild", "moderate", "severe"). BUT, we don't know if the step from one level to the next is always the same size or meaning. (For example: the jump from '2' to '3' might not mean the same as '3' to '4'.)
+Because of this, we can't just treat them like regular numbers or as totally unrelated categories.
+
+--- The Proportional Odds Model ("POM") explained simply ---
+
+This model helps predict such ordered categories. It's also called the "Cumulative Logit Model".
+
+Here's the main trick: Instead of guessing the chance of *exactly* each category,
+we ask, "What is the chance that the answer is *at or below* each level?"
+
+Reminder: In math, this looks like:
+
+$$
+\log\left( \frac{P(Y \leq k \mid x)}{P(Y > k \mid x)} \right) = \alpha_k - x \cdot \beta
+$$
+
+(Don't worry: "logit" just means "log-odds", $x \cdot \beta$ means a linear combo of features, $\alpha_k$ is a threshold.)
+
+What this means for you: for each possible threshold $k$, the model decides if someone is likely to pick a value at or below $k$. It does this for every threshold between categories.
+
+Still confused? Think of it this way: If the survey is 1–5, it asks:
+  "Is this a 1 or less?" "Is it a 2 or less?" "A 3 or less?" and so on!
+
+How does it do it?
+- $\alpha_1, \alpha_2, ..., \alpha_{K-1}$: These are like "checkpoints" or "cut lines" between the categories. They are in order.
+- $\beta$: These are the weights for your input features, and are the same for all thresholds.
+
+Here's a key point: if some feature makes the outcome likely to be HIGHER, the weight for that feature ($\beta$) will be positive.
+
+How do we get the chance of being exactly in one category (for example, exactly "3")?
+- We subtract:  $P(Y \leq 3) - P(Y \leq 2)$
+- We treat $P(Y \leq 0) = 0$ (nothing lower than the first), and $P(Y \leq K) = 1$ (everything is $\leq K$).
+
+For training, the model tries to make the probabilities match our data as closely as possible, by maximizing the likelihood (how likely it is to see our actual labels given the predicted probabilities).
+
+To do this, it uses some calculus (gradients!) to figure out how to nudge the checkpoints ($\alpha$) and weights ($\beta$) to make things fit better.
+The details (for the curious):
+  - Gradients with respect to the $\alpha$s: how to move the checkpoints
+  - Gradients with respect to the $\beta$s: how to adjust input weights to shift probabilities
+
+If you're not a math person, you can just remember:
+  *Proportional Odds Model* generalizes logistic regression to ordered categories
+  by modeling the odds that the response falls at or below each possible category.
+
+### Ordinal Regression (Proportional Odds Model)  -  from scratch
+
+```{r}
+# ═══════════════════════════════════════════════════════════════════════════
+#  Ordinal Regression (Proportional Odds Model)  —  from scratch
+# ═══════════════════════════════════════════════════════════════════════════
+
+# This class implements an ordinal regression model called the Proportional Odds Model (POM),
+# also known as the cumulative logit model. Used to predict categories that have a natural
+# order, like "bad", "okay", "good".
+
+OrdinalRegressionPOM <- setRefClass(
+  "OrdinalRegressionPOM",
+  fields = list(lr = "numeric", n_iter = "numeric", alpha_ = "numeric",
+                beta_ = "numeric", classes_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lr = 0.05, n_iter = 3000, ...) {
+      lr <<- lr; n_iter <<- n_iter
+      alpha_ <<- numeric(0)      # Thresholds between the categories
+      beta_  <<- numeric(0)      # The weights on each input feature
+      classes_ <<- numeric(0)    # The actual category labels
+      loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    sigmoid = function(z) 1.0 / (1.0 + exp(-pmin(pmax(z, -500), 500))),
+
+    cumprobs = function(X) {
+      # For each row in X and each cutpoint k: probability that Y is at or below k.
+      eta <- as.numeric(X %*% beta_)
+      M <- matrix(alpha_, nrow = length(eta), ncol = length(alpha_), byrow = TRUE) - eta
+      sigmoid(M)   # (n_samples, n_cutpoints)
+    },
+
+    cat_probs = function(X) {
+      # Turn cumulative probabilities into per-category probabilities.
+      F_cum <- cumprobs(X)
+      K <- length(classes_)
+      n <- nrow(X)
+      P <- matrix(0, n, K)
+      P[, 1] <- F_cum[, 1]
+      if (K > 2) P[, 2:(K - 1)] <- F_cum[, 2:(K - 1)] - F_cum[, 1:(K - 2)]
+      P[, K] <- 1.0 - F_cum[, K - 1]
+      pmin(pmax(P, 1e-15), 1.0)
+    },
+
+    fit = function(X, y) {
+      classes_ <<- sort(unique(y))
+      K <- length(classes_)
+      n <- nrow(X); p <- ncol(X)
+      y_idx <- match(y, classes_) - 1L    # 0-indexed: 0..K-1
+
+      alpha_ <<- seq(-1.5, 1.5, length.out = K - 1)
+      beta_  <<- rep(0, p)
+      loss_history_ <<- numeric(0)
+
+      for (iter in seq_len(n_iter)) {
+        F_cum <- cumprobs(X)
+        dF    <- F_cum * (1.0 - F_cum)
+        P     <- cat_probs(X)
+        p_yi  <- P[cbind(seq_len(n), y_idx + 1L)]
+
+        loss <- -mean(log(p_yi))
+        loss_history_ <<- c(loss_history_, loss)
+
+        # Gradients for cutpoints
+        grad_alpha <- rep(0, K - 1)
+        for (k in 0:(K - 2)) {
+          mask_k  <- (y_idx == k)
+          mask_k1 <- (y_idx == k + 1)
+          if (any(mask_k))  grad_alpha[k + 1] <- grad_alpha[k + 1] - mean(dF[mask_k,  k + 1] / p_yi[mask_k])
+          if (any(mask_k1)) grad_alpha[k + 1] <- grad_alpha[k + 1] + mean(dF[mask_k1, k + 1] / p_yi[mask_k1])
+        }
+
+        # Gradients for the weights
+        grad_beta <- rep(0, p)
+        m0 <- (y_idx == 0)
+        if (any(m0)) grad_beta <- grad_beta + as.numeric((dF[m0, 1] / p_yi[m0]) %*% X[m0, , drop = FALSE])
+        mK <- (y_idx == K - 1)
+        if (any(mK)) grad_beta <- grad_beta - as.numeric((dF[mK, K - 1] / p_yi[mK]) %*% X[mK, , drop = FALSE])
+        if (K > 2) {
+          for (k in 1:(K - 2)) {
+            mk <- (y_idx == k)
+            if (any(mk)) {
+              diff_k <- dF[mk, k + 1] - dF[mk, k]
+              grad_beta <- grad_beta + as.numeric((diff_k / p_yi[mk]) %*% X[mk, , drop = FALSE])
+            }
+          }
+        }
+        grad_beta <- grad_beta / n
+
+        # Gradient descent step
+        alpha_ <<- alpha_ - lr * grad_alpha
+        beta_  <<- beta_  - lr * grad_beta
+        alpha_ <<- sort(alpha_)    # keep cutpoints in order
+      }
+
+      invisible(.self)
+    },
+
+    predict_proba = function(X) cat_probs(X),
+
+    predict = function(X) {
+      P <- predict_proba(X)
+      classes_[apply(P, 1, which.max)]
+    },
+
+    score_accuracy = function(X, y) mean(predict(X) == y)
+  )
+)
+
+cat("OrdinalRegressionPOM defined.\n")
+```
+
+```{r}
+# ── Demo: Ordinal Regression (Explained Like You're 5) ───────────────────────
+
+# Let's pretend we have data about how happy customers are (from 1 to 4 stars).
+# We think this happiness depends on how fast service is and how good the product is.
+
+set.seed(4)
+n <- 500
+speed   <- rnorm(n)     # How fast was the service (random numbers)
+quality <- rnorm(n)     # How good was the product (random too)
+X_ord <- cbind(speed, quality)
+
+# "True score" of happiness by mixing speed & quality, plus random noise
+Z_latent <- 1.2 * speed + 0.8 * quality + rnorm(n) * 0.8
+
+# Sort scores into 4 bins: unhappy, okay, happy, super happy
+cuts <- c(-1.2, 0.0, 1.2)
+y_ord <- findInterval(Z_latent, cuts)   # 0, 1, 2, 3 (customer ratings)
+
+cat("Class distribution:\n")
+print(table(y_ord))
+
+idx <- sample(n)
+split_o <- floor(0.8 * n)
+X_tr_o <- X_ord[idx[1:split_o], ];       y_tr_o <- y_ord[idx[1:split_o]]
+X_te_o <- X_ord[idx[(split_o + 1):n], ]; y_te_o <- y_ord[idx[(split_o + 1):n]]
+
+model_ord <- OrdinalRegressionPOM$new(lr = 0.1, n_iter = 3000)
+model_ord$fit(X_tr_o, y_tr_o)
+
+train_acc <- model_ord$score_accuracy(X_tr_o, y_tr_o)
+test_acc  <- model_ord$score_accuracy(X_te_o, y_te_o)
+cat(sprintf("Train Accuracy: %.3f\n", train_acc))
+cat(sprintf("Test  Accuracy: %.3f\n", test_acc))
+cat("Cutpoints (alpha):", model_ord$alpha_, "\n")
+cat("Coefficients (beta):", model_ord$beta_, "  (true: [1.2, 0.8])\n")
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+par(mfrow = c(1, 3))
+
+# 1. Predicted probability for the true class, by class
+probs_te <- model_ord$predict_proba(X_te_o)
+K_ord <- length(model_ord$classes_)
+box_list <- vector("list", K_ord)
+for (k in 0:(K_ord - 1)) {
+  mask <- (y_te_o == k)
+  box_list[[k + 1]] <- probs_te[mask, k + 1]
+}
+boxplot(box_list, col = adjustcolor(COLORS[1:K_ord], alpha.f = 0.6),
+        names = paste("Class", 0:(K_ord - 1)), ylab = "P(Y = k | x)",
+        main = "Predicted Prob. for True Class")
+
+# 2. Cumulative probabilities, sorted by latent value
+idx_sort <- order(Z_latent[idx[(split_o + 1):n]])
+X_te_sorted <- X_te_o[idx_sort, ]
+F_sorted <- model_ord$cumprobs(X_te_sorted)
+plot(F_sorted[, 1], type = "l", col = COLORS[1], ylim = c(0, 1),
+     xlab = "Samples (sorted by latent value)", ylab = "Cumulative Probability",
+     main = "Cumulative Probabilities")
+if (ncol(F_sorted) > 1) {
+  for (k in 2:ncol(F_sorted)) lines(F_sorted[, k], col = COLORS[k])
+}
+legend("bottomright", legend = paste0("P(Y <= ", 0:(K_ord - 2), ")"),
+       col = COLORS[1:(K_ord - 1)], lwd = 2, bty = "n")
+
+# 3. Training loss
+plot(model_ord$loss_history_, type = "l", col = COLORS[5],
+     xlab = "Iteration", ylab = "Neg. Log-Likelihood", main = "Training Loss")
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+## 4.7  Regularization — Preventing Overfitting
+
+Imagine your model is like a student trying to memorize every detail for a test. If it memorizes too much, it remembers the noise and does badly on new exams!
+**Regularization** is like telling the student: "Don't focus only on memorizing all the weird little details—keep things simple!"
+
+Regularization methods (like Ridge and Lasso) add a "penalty" if your model's coefficients (the numbers it learns) get too big. This helps the model focus on the important patterns and ignore random noise, making it perform better on new, unseen data.
+
+### 4.7.1  The Overfitting Problem
+
+Imagine you're trying to learn for a test, but instead of understanding the big concepts, you just memorize every little detail from your notes—even the random mistakes! If the questions on the real test are a bit different, this "memorizing everything" strategy doesn't work well. You ace your practice (training) but do badly on the real (test) exam. This is called **overfitting**.
+
+In machine learning, overfitting happens when a model pays too much attention to the training data, even its random quirks and errors, instead of learning the actual patterns. This means it won't generalize well to new, unseen data.
+
+**Regularization** is a trick that helps the model not memorize so much. It adds a penalty when the model's learned numbers (coefficients) get too big or wild. You can think of it as telling the model: "Hey, don't get too fancy! Keep it simple."
+
+Mathematically, if $J(\boldsymbol{\beta})$ is the original measure of model 'badness' (called the loss), we add a penalty to get:
+
+$$J_{\text{reg}}(\boldsymbol{\beta}) = J(\boldsymbol{\beta}) + \text{penalty}(\boldsymbol{\beta})$$
+
+This means the model will prefer smaller, simpler coefficient values, making it less likely to overfit. It trades a little bit of accuracy (bias) for a much bigger gain in reliability (less wild predictions) on new data.
+
+---
+
+### 4.7.2 Ridge Regression (L2 Penalty)
+
+Imagine you have a model that is trying to predict scores from some features, but it "cheats" by making its coefficients (the numbers that multiply each feature) really big so it fits the training data exactly, even memorizing the noise.
+
+Ridge regression prevents this by penalizing the model when its coefficients become too large. It says: "Don't go wild with those numbers! If you make your coefficients too big, you'll get a penalty."
+
+Here's what's happening mathematically:
+- The ordinary least squares (OLS) loss function that a model tries to minimize is:
+
+  $$
+  J(\boldsymbol{\beta}) = \frac{1}{n}\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|^2
+  $$
+  where:
+  - $\mathbf{y}$: the vector of true outputs
+  - $\mathbf{X}$: the matrix of feature values
+  - $\boldsymbol{\beta}$: the vector of coefficients
+  - $n$: the number of data points
+
+- Ridge regression adds a penalty for large coefficients, controlled by a parameter $\lambda$:
+
+  $$
+  J_{\text{ridge}}(\boldsymbol{\beta}) = \frac{1}{n}\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|^2 \; + \; \lambda\|\boldsymbol{\beta}\|_2^2
+  $$
+  where $\|\boldsymbol{\beta}\|_2^2 = \sum_{j=1}^p \beta_j^2$ is the sum of squared coefficients, and $\lambda \geq 0$ determines how strongly we care about shrinking the coefficients.
+
+- The total cost is now:
+  (ordinary error from bad predictions) + (penalty for big coefficients) = total loss the model tries to minimize.
+
+What does Ridge Regression actually do?
+- All the feature coefficients are "shrunk" closer to zero, making the model less wild, but usually **not exactly zero** (they rarely get set to exactly zero).
+- This is useful when you think most features are relevant.
+- Typically, the intercept (starting value or bias) is *not* penalized, only the other coefficients.
+
+Short version: Ridge acts like a teacher who stops your model from relying too heavily on individual features, encouraging it to find simpler, more general solutions that work better on new data. It says: "Don't memorize—generalize!"
+
+---
+
+### 4.7.3  Lasso Regression (L1 Penalty)
+
+Think of Lasso regression as a way to make your model *simpler* by actually setting some of the feature weights to exactly zero, telling the model to ignore some features completely!
+
+Imagine you have a model that uses a bunch of features to predict something. Sometimes, not all those features really matter. Lasso regression helps the model "choose" which features are most important by shrinking the less important ones all the way to **zero**, basically doing feature selection for you, automatically.
+
+The loss (cost) function for Lasso looks like this:
+
+$$
+J_{\text{lasso}}(\boldsymbol{\beta}) = \frac{1}{n}\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|^2 + \lambda \|\boldsymbol{\beta}\|_1
+$$
+
+- The first part: how badly your model predictions miss the real results.
+- The second part: a penalty that grows with the total size of the coefficients (using their absolute values, thanks to the $L_1$ penalty).
+- $\lambda$ decides how much you punish the model for using big coefficients.
+
+What's unique about Lasso?
+
+- When you increase $\lambda$, some feature coefficients get pushed all the way to *exactly zero*—meaning those features are dropped from the model.
+- This leads to *sparse* (simpler) solutions—great when only a few features are actually useful.
+
+How does the model figure out which ones to set to zero?
+- There isn't a simple "solve it all at once" formula (because the $L_1$ penalty is not smooth at zero).
+- Instead, it uses a trick called **coordinate descent**: it tweaks one coefficient at a time using something called a "soft-thresholding operator," which nudges small values to zero and shrinks bigger ones.
+
+Why use Lasso?
+- It helps with feature selection: only the *important* features stay; the rest get set to zero!
+- Very handy when you have lots of possibilities but only a few truly matter.
+
+---
+
+### 4.7.4  Elastic Net (L1 + L2)- Explained for Dummies
+
+Imagine you want a model that gets the best of both worlds:
+- Lasso: Makes your model simpler by setting some coefficients **exactly to zero** (so it ignores some features entirely)
+- Ridge: Shrinks all the coefficients, but keeps all features (good when you think most features matter, especially if some are similar to each other)
+
+**Elastic Net combines both!**
+
+Think of Elastic Net as a referee that says:
+> "Hey model, keep things simple by ignoring useless features **AND** don't let any one feature take over, especially when a bunch of them are alike!"
+
+The formula (don't worry, you only need the idea!):
+
+$$
+J_{en}(\boldsymbol{\beta}) = \text{prediction error} + \lambda_1 \times \text{(Lasso penalty)} + \lambda_2 \times \text{(Ridge penalty)}
+$$
+
+Or, spelled out:
+$$
+J_{\text{en}}(\boldsymbol{\beta}) = \frac{1}{n}\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|^2\
+\quad+\quad \lambda_1 \sum |\beta_j| \quad+\quad \lambda_2 \sum \beta_j^2
+$$
+
+**What does Elastic Net do that's special?**
+- If a few features are important, but you have lots, it will set some coefficients to *exactly zero* (like Lasso).
+- If several features are similar/correlated (like "height in cm" and "height in inches"), it tends to **keep or drop them together** (like Ridge).
+- You get a built-in feature selector *and* an insurance policy against weird effects when features are similar.
+
+**Tuning:**
+- $\lambda_1$ controls how much you force coefficients to zero (Lasso part).
+- $\lambda_2$ controls how much you shrink all coefficients together (Ridge part).
+- Set $\lambda_1 = 0$ and you get Ridge.
+- Set $\lambda_2 = 0$ and you get Lasso!
+
+In short:
+**Elastic Net = Lasso + Ridge.**
+It makes your model both *sparse* and *stable*—a great default if you're not sure which regularization to pick.
+
+---
+
+### 4.7.5  How do you pick $\lambda$? (For Dummies)
+
+Think of $\lambda$ as a "penalty strength" knob:
+- Turn it up, and your model cares *more* about keeping things simple (shrinking coefficients, dropping unhelpful features).
+- Turn it down, and your model cares *less* (risk overfitting, but could fit noise!).
+
+But how do you know where to set the knob?
+**You don't guess—you let the data decide!**
+
+The trick:
+1. **Try lots of lambda values** (try turning the knob to many settings)
+2. **For each one, check how well your model does on *new* data** (not the same data you trained on)
+3. **Pick the lambda that works best on "unseen" data**
+
+The common way to do this:
+- **K-fold cross-validation:** Split your data into "K" groups, train on some, test on others, shuffle, and repeat. This helps you see if your chosen lambda will actually work on new data.
+- (Some fancier methods use "AIC", "BIC" scores, but the main idea is the same—pick the penalty that works best without peeking at the answers.)
+
+**Quick tip:**
+Always standardise (scale) your features first - regularisation works better!
+
+### Ridge Regression from scratch
+
+```{r}
+# ═══════════════════════════════════════════════════════════════════════════
+#  Ridge, Lasso, and Elastic Net Regression explained for dummies
+# ═══════════════════════════════════════════════════════════════════════════
+
+# These are three different types of linear regression models that help prevent overfitting.
+# They do this by adding a penalty to large coefficients (the "weights") in the model.
+
+# 1. Ridge Regression (L2 regularization):
+#    - Adds a penalty based on the SQUARE of the size of the coefficients (but not the bias).
+#    - Keeps all coefficients, but makes them smaller.
+#    - Useful if you think ALL features are relevant, but maybe not equally.
+
+RidgeRegression <- setRefClass(
+  "RidgeRegression",
+  fields = list(lam = "numeric", coef_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lam = 1.0, ...) {
+      lam <<- lam
+      coef_ <<- numeric(0); loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    add_bias = function(X) cbind(1, X),
+
+    fit = function(X, y) fit_ols(X, y),   # Alias for fit_ols
+
+    fit_ols = function(X, y) {
+      # Closed-form Ridge: One-step solution. Don't penalize the intercept.
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      I_pen <- diag(p)
+      I_pen[1, 1] <- 0.0                          # No penalty for the bias term
+      A <- t(X_b) %*% X_b + n * lam * I_pen
+      coef_ <<- as.numeric(solve(A, t(X_b) %*% y))
+      invisible(.self)
+    },
+
+    fit_gd = function(X, y, lr = 0.01, n_iter = 2000) {
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      coef_ <<- rep(0, p)
+      loss_history_ <<- numeric(0)
+      pen_mask <- rep(1, p); pen_mask[1] <- 0.0   # Don't penalize bias
+      for (i in seq_len(n_iter)) {
+        residuals <- as.numeric(X_b %*% coef_) - y
+        mse_grad  <- 2 * as.numeric(t(X_b) %*% residuals) / n
+        l2_grad   <- 2 * lam * coef_ * pen_mask
+        coef_ <<- coef_ - lr * (mse_grad + l2_grad)
+        loss <- mean(residuals^2) + lam * sum((coef_ * pen_mask)^2)
+        loss_history_ <<- c(loss_history_, loss)
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) as.numeric(add_bias(X) %*% coef_),
+
+    score_r2 = function(X, y) {
+      y_hat <- predict(X)
+      1 - sum((y - y_hat)^2) / sum((y - mean(y))^2)
+    }
+  )
+)
+
+# 2. Lasso Regression (L1 regularization):
+#    - Adds a penalty based on the ABSOLUTE VALUE of coefficients (again, not the bias).
+#    - Can make some coefficients exactly ZERO (automatic feature selection!).
+#    - Useful if you think ONLY SOME features matter.
+
+LassoRegression <- setRefClass(
+  "LassoRegression",
+  fields = list(lam = "numeric", n_iter = "numeric", tol = "numeric",
+                coef_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lam = 1.0, n_iter = 2000, tol = 1e-6, ...) {
+      lam <<- lam; n_iter <<- n_iter; tol <<- tol
+      coef_ <<- numeric(0); loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    soft_threshold = function(rho, delta) {
+      # Returns 0 if rho is smaller than delta, else shrinks toward zero.
+      sign(rho) * pmax(abs(rho) - delta, 0.0)
+    },
+
+    add_bias = function(X) cbind(1, X),
+
+    fit = function(X, y) {
+      # Coordinate descent: updates one coefficient at a time.
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      coef_ <<- rep(0, p)
+      loss_history_ <<- numeric(0)
+      z <- colSums(X_b^2) / n   # Precompute: each column's squared sum
+
+      for (iteration in seq_len(n_iter)) {
+        coef_old <- coef_
+        for (j in seq_len(p)) {
+          # For each coefficient: temporarily hold it out and calculate its update.
+          r_j <- y - as.numeric(X_b %*% coef_) + coef_[j] * X_b[, j]
+          rho_j <- sum(X_b[, j] * r_j) / n
+
+          if (j == 1) {
+            coef_[j] <<- rho_j / z[j]                       # Don't penalize bias
+          } else {
+            coef_[j] <<- soft_threshold(rho_j, lam) / z[j]  # Shrink toward zero
+          }
+        }
+
+        residuals <- y - as.numeric(X_b %*% coef_)
+        loss <- mean(residuals^2) + lam * sum(abs(coef_[-1]))
+        loss_history_ <<- c(loss_history_, loss)
+
+        if (max(abs(coef_ - coef_old)) < tol) break
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) as.numeric(add_bias(X) %*% coef_),
+
+    score_r2 = function(X, y) {
+      y_hat <- predict(X)
+      1 - sum((y - y_hat)^2) / sum((y - mean(y))^2)
+    }
+  )
+)
+
+# 3. Elastic Net:
+#    - A mix of Ridge and Lasso.
+#    - Adds BOTH L1 and L2 penalties.
+#    - Useful when features are correlated (it groups them) AND you want feature selection.
+
+ElasticNet <- setRefClass(
+  "ElasticNet",
+  fields = list(lam1 = "numeric", lam2 = "numeric", n_iter = "numeric", tol = "numeric",
+                coef_ = "numeric", loss_history_ = "numeric"),
+  methods = list(
+    initialize = function(lam1 = 1.0, lam2 = 1.0, n_iter = 2000, tol = 1e-6, ...) {
+      lam1 <<- lam1; lam2 <<- lam2; n_iter <<- n_iter; tol <<- tol
+      coef_ <<- numeric(0); loss_history_ <<- numeric(0)
+      callSuper(...)
+    },
+
+    soft_threshold = function(rho, delta) sign(rho) * pmax(abs(rho) - delta, 0.0),
+
+    add_bias = function(X) cbind(1, X),
+
+    fit = function(X, y) {
+      X_b <- add_bias(X)
+      n <- nrow(X_b); p <- ncol(X_b)
+      coef_ <<- rep(0, p)
+      loss_history_ <<- numeric(0)
+      z <- colSums(X_b^2) / n
+
+      for (iteration in seq_len(n_iter)) {
+        coef_old <- coef_
+        for (j in seq_len(p)) {
+          r_j   <- y - as.numeric(X_b %*% coef_) + coef_[j] * X_b[, j]
+          rho_j <- sum(X_b[, j] * r_j) / n
+
+          if (j == 1) {
+            coef_[j] <<- rho_j / z[j]                         # Don't penalize bias
+          } else {
+            denom <- z[j] + 2 * lam2
+            coef_[j] <<- soft_threshold(rho_j, lam1) / denom  # Shrink by L1, then L2
+          }
+        }
+
+        residuals <- y - as.numeric(X_b %*% coef_)
+        loss <- (mean(residuals^2)
+                 + lam1 * sum(abs(coef_[-1]))
+                 + lam2 * sum(coef_[-1]^2))
+        loss_history_ <<- c(loss_history_, loss)
+
+        if (max(abs(coef_ - coef_old)) < tol) break
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) as.numeric(add_bias(X) %*% coef_),
+
+    score_r2 = function(X, y) {
+      y_hat <- predict(X)
+      1 - sum((y - y_hat)^2) / sum((y - mean(y))^2)
+    }
+  )
+)
+
+cat("Ridge, Lasso, ElasticNet defined (and explained for dummies).\n")
+```
+
+```{r}
+# ── Demo: Regularization Comparison ─────────────────────────────────────────
+
+# --- Simulate high-dimensional data with sparse signal ---
+set.seed(5)
+n <- 150; p_total <- 30           # 150 samples, 30 features
+n_true <- 5                       # only 5 features are truly relevant
+
+# True coefficients: 5 non-zero, 25 zero
+beta_true <- rep(0, p_total)
+beta_true[1:n_true] <- c(3.0, -2.5, 2.0, -1.5, 1.0)
+beta_true <- sample(beta_true)     # shuffle
+
+X_reg <- matrix(rnorm(n * p_total), nrow = n)
+y_reg <- as.numeric(X_reg %*% beta_true) + rnorm(n) * 1.5
+
+# Add correlated features (pairs) — Elastic Net handles these well
+X_reg[, 11] <- X_reg[, 1] + 0.1 * rnorm(n)
+X_reg[, 12] <- X_reg[, 2] + 0.1 * rnorm(n)
+
+# Standardise
+mu_r <- colMeans(X_reg)
+sd_r <- apply(X_reg, 2, function(col) sqrt(mean((col - mean(col))^2)))
+X_reg_std <- sweep(sweep(X_reg, 2, mu_r, "-"), 2, sd_r, "/")
+
+idx <- sample(n)
+split_r <- floor(0.8 * n)
+X_tr_r <- X_reg_std[idx[1:split_r], ];       y_tr_r <- y_reg[idx[1:split_r]]
+X_te_r <- X_reg_std[idx[(split_r + 1):n], ]; y_te_r <- y_reg[idx[(split_r + 1):n]]
+
+# ── Fit models ───────────────────────────────────────────────────────────────
+ols_model   <- LinearRegressionGLM$new()$fit_ols(X_tr_r, y_tr_r)
+ridge_model <- RidgeRegression$new(lam = 0.1)$fit_ols(X_tr_r, y_tr_r)
+lasso_model <- LassoRegression$new(lam = 0.05, n_iter = 3000)$fit(X_tr_r, y_tr_r)
+en_model    <- ElasticNet$new(lam1 = 0.03, lam2 = 0.05, n_iter = 3000)$fit(X_tr_r, y_tr_r)
+
+models <- list(OLS = ols_model, Ridge = ridge_model, Lasso = lasso_model, ElasticNet = en_model)
+
+cat(sprintf("%-12s %10s %10s %12s\n", "Model", "Train R2", "Test R2", "Non-zero B"))
+cat(strrep("-", 46), "\n")
+for (name in names(models)) {
+  m <- models[[name]]
+  tr2 <- m$score_r2(X_tr_r, y_tr_r)
+  te2 <- m$score_r2(X_te_r, y_te_r)
+  nnz <- sum(abs(m$coef_[-1]) > 1e-4)   # exclude bias
+  cat(sprintf("%-12s %10.4f %10.4f %12d\n", name, tr2, te2, nnz))
+}
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+par(mfrow = c(2, 3))
+
+plot_data <- list(
+  list(name = "OLS",        coefs = ols_model$coef_[-1],   col = COLORS[1]),
+  list(name = "Ridge",      coefs = ridge_model$coef_[-1], col = COLORS[2]),
+  list(name = "Lasso",      coefs = lasso_model$coef_[-1], col = COLORS[3]),
+  list(name = "ElasticNet", coefs = en_model$coef_[-1],    col = COLORS[4])
+)
+
+for (pd in plot_data) {
+  bp <- barplot(pd$coefs, col = pd$col, main = paste(pd$name, "Coefficients"),
+                xlab = "Feature index", ylab = "Coefficient")
+  points(bp, beta_true, pch = 15, col = adjustcolor("black", alpha.f = 0.4))
+  abline(h = 0, lwd = 0.5)
+  legend("topright", legend = "True B", pch = 15, col = adjustcolor("black", alpha.f = 0.4), bty = "n")
+}
+
+# 5. Coefficient path vs lambda for Lasso
+lambdas <- 10^seq(-3, 1, length.out = 40)
+paths <- matrix(0, nrow = length(lambdas), ncol = p_total)
+for (i in seq_along(lambdas)) {
+  m <- LassoRegression$new(lam = lambdas[i], n_iter = 2000)$fit(X_tr_r, y_tr_r)
+  paths[i, ] <- m$coef_[-1]
+}
+path_colors <- ifelse(apply(abs(paths), 2, max) > 0.1,
+                       adjustcolor("steelblue", 0.7), adjustcolor("grey", 0.15))
+matplot(lambdas, paths, type = "l", log = "x", lty = 1, col = path_colors,
+        xlab = "lambda (log scale)", ylab = "Coefficient", main = "Lasso Coefficient Path")
+abline(h = 0, lwd = 0.5)
+
+# 6. Test R2 vs lambda for Ridge / Lasso
+r2_ridge <- sapply(lambdas, function(lv) RidgeRegression$new(lam = lv)$fit_ols(X_tr_r, y_tr_r)$score_r2(X_te_r, y_te_r))
+r2_lasso <- sapply(lambdas, function(lv) LassoRegression$new(lam = lv, n_iter = 2000)$fit(X_tr_r, y_tr_r)$score_r2(X_te_r, y_te_r))
+plot(lambdas, r2_ridge, type = "l", log = "x", col = COLORS[2], lwd = 2,
+     xlab = "lambda (log scale)", ylab = "Test R2", main = "Test R2 vs Regularisation Strength",
+     ylim = range(c(r2_ridge, r2_lasso)))
+lines(lambdas, r2_lasso, col = COLORS[3], lwd = 2)
+legend("bottomleft", legend = c("Ridge", "Lasso"), col = COLORS[2:3], lwd = 2, bty = "n")
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+## 4.8  Picking the Best $\lambda$ with K-Fold Cross-Validation (Simple Explanation)
+
+Instead of picking the regularisation strength (λ) randomly or by trial and error,
+we use a strategy called **K-Fold Cross-Validation**.
+This just means:
+1. Try lots of possible λ values.
+2. For each value, test how well it works by splitting the data into pieces ("folds"),
+   training on some pieces and checking performance on the piece left out.
+3. Average the errors across all the pieces for each lambda.
+4. Choose the λ that gives the lowest average error.
+
+In short: let the computer choose the best λ for us in a fair way!
+
+### Algorithm
+
+```
+for each candidate λ:
+    for each fold k = 1 … K:
+        fit model on all folds except k
+        evaluate on fold k
+    cv_error(λ) = mean(fold errors)
+choose λ* = argmin cv_error(λ)
+```
+
+```{r}
+# ── K-Fold CV for Ridge and Lasso ────────────────────────────────────────────
+
+# Runs K-Fold cross-validation for a given model factory and hyperparameter grid.
+#   X, y: data
+#   make_model: function(lam) -> a fresh, unfitted model object
+#   param_grid: values of the hyperparameter to try
+#   k_folds: number of folds (default 5)
+# Returns: vector of mean validation MSEs (one per hyperparameter value)
+kfold_cv <- function(X, y, make_model, param_grid, k_folds = 5) {
+  n <- length(y)
+  fold_size <- n %/% k_folds
+  idx <- sample(n)               # Shuffle indices
+  cv_scores <- numeric(length(param_grid))
+
+  for (li in seq_along(param_grid)) {
+    lam_val <- param_grid[li]
+    fold_mses <- numeric(k_folds)
+    for (k in 0:(k_folds - 1)) {
+      val_idx   <- idx[(k * fold_size + 1):((k + 1) * fold_size)]   # validation fold
+      train_idx <- setdiff(idx, val_idx)                            # everything else
+
+      X_cv_tr <- X[train_idx, ]; y_cv_tr <- y[train_idx]
+      X_cv_va <- X[val_idx, ];   y_cv_va <- y[val_idx]
+
+      m <- make_model(lam_val)
+      m$fit(X_cv_tr, y_cv_tr)
+      fold_mses[k + 1] <- mse(y_cv_va, m$predict(X_cv_va))
+    }
+    cv_scores[li] <- mean(fold_mses)
+  }
+  cv_scores
+}
+
+set.seed(6)
+lam_grid <- 10^seq(-3, 1, length.out = 50)
+
+cv_ridge <- kfold_cv(X_reg_std, y_reg, function(lam) RidgeRegression$new(lam = lam), lam_grid)
+cv_lasso <- kfold_cv(X_reg_std, y_reg, function(lam) LassoRegression$new(lam = lam, n_iter = 2000), lam_grid)
+
+best_ridge_lam <- lam_grid[which.min(cv_ridge)]
+best_lasso_lam <- lam_grid[which.min(cv_lasso)]
+
+cat(sprintf("Best Ridge lambda: %.4f   CV-MSE: %.4f\n", best_ridge_lam, min(cv_ridge)))
+cat(sprintf("Best Lasso lambda: %.4f   CV-MSE: %.4f\n", best_lasso_lam, min(cv_lasso)))
+
+# ── Plot ─────────────────────────────────────────────────────────────────────
+plot(lam_grid, cv_ridge, type = "l", log = "x", col = COLORS[2], lwd = 2,
+     xlab = "Regularisation Strength lambda (log scale)", ylab = "Cross-Validated MSE",
+     main = "5-Fold CV: Selecting lambda", ylim = range(c(cv_ridge, cv_lasso)))
+lines(lam_grid, cv_lasso, col = COLORS[3], lwd = 2)
+abline(v = best_ridge_lam, col = COLORS[2], lty = 2)
+abline(v = best_lasso_lam, col = COLORS[3], lty = 2)
+legend("topleft", legend = c(sprintf("Ridge (best=%.3f)", best_ridge_lam),
+                              sprintf("Lasso (best=%.3f)", best_lasso_lam)),
+       col = COLORS[2:3], lwd = 2, bty = "n")
+```
+
+---
+
+## Summary
+
+### GLM Family Reference
+
+| Model | Family | Link $g(\mu)$ | Inverse Link $\mu = g^{-1}(\eta)$ | When to Use |
+|-------|--------|--------------|--------------------------------------|-------------|
+| **Linear Regression** | Gaussian | Identity | $\eta$ | Continuous, unbounded $y$ |
+| **Logistic Regression** | Bernoulli | Logit | $\frac{1}{1+e^{-\eta}}$ | Binary outcomes (0/1) |
+| **Multinomial Logistic** | Multinomial | Softmax | $\text{softmax}(\boldsymbol{\eta})$ | $K > 2$ nominal classes |
+| **Poisson Regression** | Poisson | Log | $e^\eta$ | Non-negative integer counts |
+| **Ordinal Regression** | (Multinomial) | Cumulative Logit | $\sigma(\alpha_k - \eta)$ | Ordered categories |
+
+### Regularization Cheatsheet
+
+| Method | Penalty | Closed Form | Sparsity | Use When |
+|--------|---------|------------|---------|----------|
+| **Ridge** | $\lambda\|\boldsymbol{\beta}\|_2^2$ | Yes | No | Many small, dense effects |
+| **Lasso** | $\lambda\|\boldsymbol{\beta}\|_1$ | No (coord. descent) | Yes | Few large effects; feature selection |
+| **Elastic Net** | $\lambda_1\|\boldsymbol{\beta}\|_1 + \lambda_2\|\boldsymbol{\beta}\|_2^2$ | No (coord. descent) | Yes | Correlated features + sparsity |
+
+### Key Equations
+
+$$\text{GLM}: \quad g(E[Y|\mathbf{x}]) = \mathbf{x}^\top\boldsymbol{\beta}$$
+
+$$\text{Gradient Update}: \quad \boldsymbol{\beta} \leftarrow \boldsymbol{\beta} - \alpha \nabla J(\boldsymbol{\beta})$$
+
+$$\text{Ridge Gradient}: \quad \nabla J = \frac{2}{n}\mathbf{X}^\top(\hat{\mathbf{y}}-\mathbf{y}) + 2\lambda\boldsymbol{\beta}$$
+
+$$\text{Lasso Update}: \quad \hat{\beta}_j = \text{sign}(\rho_j)\max(|\rho_j| - \lambda, 0) / z_j$$
+
+---
+
+## Exercises
+
+1. **GLM family**: What distribution and link function would you choose if $Y$ represents the proportion of defective items in a batch (a value between 0 and 1)?
+2. **Logistic calibration**: Add a Platt scaling layer to `LogisticRegressionGLM` to produce better-calibrated probabilities.
+3. **Poisson overdispersion**: When $\text{Var}[Y] > E[Y]$, Poisson is misspecified. Research the Negative Binomial distribution and explain how it generalises Poisson.
+4. **Lasso path**: Modify the coefficient path plot to highlight which features correspond to the true non-zero coefficients.
+5. **Ordinal vs multinomial**: Fit `MultinomialLogisticRegression` on the ordinal demo data and compare test accuracy. When is the proportional odds model more appropriate?
+6. **Regularised Logistic Regression**: Add an L2 penalty to `LogisticRegressionGLM$fit()` and observe the effect on the decision boundary with a high-dimensional simulated dataset.
+
+---
+
+**← Previous:** [Chapter 02: Linear Regression](chapter-02-linear-regression.qmd)
+**→ Next:** [Chapter 04: K-Nearest Neighbors](chapter-04-knn.qmd)

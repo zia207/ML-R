@@ -1,0 +1,326 @@
+---
+title: "Machine Learning in R"
+subtitle: "From Beginner to Advanced: From Scratch without Tears"
+page-layout: full
+toc: true
+toc-depth: 3
+toc-title: Contents
+---
+
+::: {.page-banner}
+![](Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+::: {.badge-row}
+[🟢 Beginner](#beginners-guide){.badge-beginner} [🟡 Intermediate](#intermediate){.badge-intermediate} [🔴 Advanced](#advanced){.badge-advanced} [21 Chapters](#chapter-list){.badge-all} [Base R](#philosophy){.badge-all}
+:::
+
+Machine learning has a reputation for being intimidating — a wall of Greek symbols, black-box libraries, and jargon that makes it feel like something only a specialist could ever understand. This tutorial is built on the opposite belief: that machine learning is a collection of simple, sensible ideas, and that the fastest way to truly understand any of them is to build it yourself.
+
+At its heart, machine learning is just this: instead of writing rules by hand, you show a program examples and let it discover the rules on its own. A spam filter isn't told what spam looks like — it learns from thousands of labeled emails. That single shift, from programming instructions to learning from data, is the whole revolution. Everything else is detail.
+
+And the details are more approachable than they look. Behind every impressive model — a neural network that recognizes faces, a language model that writes text, a system that recommends your next film — sits arithmetic you already know: multiply some numbers, add them up, nudge them in the right direction, repeat. There is no magic step. When you write these models from scratch, in plain base R, the mystery dissolves and what remains is something you can reason about, debug, and trust.
+
+That is the promise of this tutorial. We won't hide the machinery behind a library call. We'll derive the ideas, write the code line by line, and run it until it works — so that by the end you won't just use machine learning, you'll understand exactly what it's doing and why. No hand-waving, and no tears.
+
+**Machine Learning in R** is a free, open-source tutorial that teaches every major ML algorithm by building it from scratch using only **base R** — no caret, no tidymodels, no keras, no torch, no black boxes.
+
+---
+
+## Who Is It For?
+
+This tutorial is designed for:
+
+- R users who want to understand ML from first principles
+- Students taking an introductory ML course and looking for a practical companion
+- Engineers who use ML packages and want to demystify what's happening under the hood
+- Anyone curious about the mathematics behind modern AI systems
+
+**You need:** basic R (variables, loops, functions, vectors, data frames) and high-school algebra. No prior ML experience required. For a more comprehensive introduction to R, see [R for Data Science](https://r4ds.hadley.nz/).
+
+---
+
+## Philosophy
+
+> *"I hear and I forget. I see and I remember. I do and I understand."* — Confucius
+
+> "The best way to understand an algorithm is to implement it from scratch."
+
+Every algorithm in this tutorial is implemented without ML packages. This means:
+
+- No hidden behaviour — you can read every line
+- Genuine understanding — you can modify and experiment
+- Portable knowledge — the math translates to any language or framework
+
+This tutorial uses **only base R** for all core algorithm implementations.  
+No `caret`, no `tidymodels`, no `keras`, no `torch` — just vectors, matrices, and explicit loops.
+
+This forces you to truly understand what each algorithm is doing, not just call `train()`.
+
+---
+
+## Why Tutorials Still Matter in the AI Era
+
+We now live in a world where a working model can appear in seconds. Ask a coding assistant for logistic regression, a CNN, or a transformer, and it will usually produce something that *runs*. Packages, boilerplates, and large language models have made it easy to ship machine learning code without ever writing a loss function, a gradient update, or a split that actually prevents leakage.
+
+That convenience is real. It is also a trap if it becomes a substitute for understanding.
+
+When you depend on AI to write the code **without** the theory behind the model, several things go wrong at once:
+
+- **You cannot tell good output from confident nonsense.** An assistant may use the wrong loss, shuffle time-series data, apply the wrong activation, or treat a leakage-filled accuracy as success. If you do not know what the model is *supposed* to do, you cannot catch it.
+- **You cannot debug.** When training diverges, accuracy plateaus, or a production model silently fails, the stack trace is not enough. You need to know whether the problem is the data, the objective, the optimizer, the capacity of the model, or the evaluation.
+- **You cannot choose.** “Just use a neural net” is not a decision. Linear models, trees, kernels, and deep networks make different assumptions. Without those assumptions, every problem looks like a prompt.
+- **You cannot adapt.** Copy-pasted pipelines work on the demo. They break on missing values, class imbalance, non-stationary data, small samples, and domain shift — the cases that actually matter.
+- **You become dependent on the tool.** The assistant can generate `model <- train(...)`. It cannot give you judgment. Judgment comes from having derived the math and implemented the algorithm yourself at least once.
+
+AI is a powerful multiplier **for people who already know what they are asking for**. It is a liability for people who only know how to ask. The difference is theory: loss functions, inductive bias, overfitting, regularization, evaluation, and the geometry of the model class.
+
+That is what this tutorial is for.
+
+It does not compete with Copilot, ChatGPT, or tidymodels. Those tools are how most production work gets done. The point is to make you the person who can *direct* them: who can read the generated code, reject a wrong architecture, rewrite a broken training loop, and explain why a model succeeded or failed.
+
+::: {.callout-important}
+**The rule of this era:** use AI to write faster, not to think less. If you cannot implement the algorithm without a package, you do not yet understand it well enough to trust AI-generated code that claims to.
+:::
+
+A from-scratch tutorial is slower than prompting. That slowness is the feature. Typing a gradient by hand, watching a decision tree split, or deriving backpropagation on a napkin is how the black box becomes a box you can open. After that, using a package — or asking an assistant to use one — is a choice, not a dependency.
+
+If you skip the theory, you will always be waiting for the next model to tell you what to do. If you learn it once, AI becomes what it should be: an accelerator for someone who already knows the map.
+
+
+## What You'll Learn
+
+This tutorial takes you from the mathematical foundations of machine learning all the way through deep learning and reinforcement learning, with **every algorithm coded from scratch in base R**.
+
+Each chapter follows a consistent structure:
+
+1. **Intuition** — Plain-English motivation
+2. **Theory** — Mathematical formulation with notation explained
+3. **Algorithm** — Step-by-step pseudocode
+4. **From-Scratch R** — Complete, runnable implementation
+5. **Exercises** — Practice problems
+
+The tutorial is grouped into clear learning levels:
+
+| Level | Chapters | Topics |
+|-------|----------|--------|
+| 🟢 Beginner | 00–05 | Prerequisites, Introduction to ML, Linear Regression, Generalized Linear Models, K-Nearest Neighbors, Naive Bayes |
+| 🟡 Intermediate | 06–10 | Decision Trees, Support Vector Machines, Ensemble Methods, K-Means Clustering, Principal Component Analysis |
+| 🔴 Advanced | 11–19 | Neural Networks (MLP), CNNs, RNNs, LSTM, Graph Neural Networks, NLP, Generative Models, Reinforcement Learning |
+| 📊 Essential | 20 | Model Evaluation & Best Practices |
+
+---
+
+## 🟢 Beginner Path {#beginners-guide}
+
+```{=html}
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 00</div>
+    <div class="card-title">Prerequisites & Setup</div>
+    <div class="card-desc">Base R math utilities, vector/matrix operations, data normalization — the toolkit we use in every chapter.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 2–3 hrs</div>
+    <a href="Notebook/chapter-00-prerequisites.html">→ Start Here</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 01</div>
+    <div class="card-title">Introduction to Machine Learning</div>
+    <div class="card-desc">Types of ML, the learning workflow, key terminology, bias-variance tradeoff, and your first baseline model.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 1–2 hrs</div>
+    <a href="Notebook/chapter-01-intro-to-ml.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 02</div>
+    <div class="card-title">Linear Regression</div>
+    <div class="card-desc">Ordinary least squares, gradient descent, MSE cost function, R² evaluation. The foundation of supervised learning.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 3–4 hrs</div>
+    <a href="Notebook/chapter-02-linear-regression.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 03</div>
+    <div class="card-title">Generalized Linear Models</div>
+    <div class="card-desc">The GLM framework unifying linear, logistic, Poisson, and ordinal regression, plus Ridge, Lasso, and Elastic Net.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 5–6 hrs</div>
+    <a href="Notebook/chapter-03-glm.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 04</div>
+    <div class="card-title">K-Nearest Neighbors</div>
+    <div class="card-desc">Distance metrics, lazy learning, KNN for classification and regression, curse of dimensionality.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 2–3 hrs</div>
+    <a href="Notebook/chapter-04-knn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 05</div>
+    <div class="card-title">Naive Bayes</div>
+    <div class="card-desc">Bayes' theorem, Gaussian NB for continuous data, Multinomial NB for text, Laplace smoothing, spam detection.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 3 hrs</div>
+    <a href="Notebook/chapter-05-naive-bayes.html">→ Read Chapter</a>
+  </div>
+</div>
+```
+
+---
+
+## 🟡 Intermediate Path {#intermediate}
+
+```{=html}
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 06</div>
+    <div class="card-title">Decision Trees</div>
+    <div class="card-desc">Entropy, Gini impurity, information gain, CART algorithm for classification and regression.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 4–5 hrs</div>
+    <a href="Notebook/chapter-06-decision-trees.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 07</div>
+    <div class="card-title">Support Vector Machines</div>
+    <div class="card-desc">Maximum margin hyperplane, soft-margin SVM, hinge loss, kernel trick (RBF, polynomial).</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 4–5 hrs</div>
+    <a href="Notebook/chapter-07-svm.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 08</div>
+    <div class="card-title">Ensemble Methods</div>
+    <div class="card-desc">Bagging, Random Forest, Extra Trees, AdaBoost, Gradient Boosting, and XGBoost — classification and regression from scratch with full theory and benchmarks.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-08-ensemble-methods.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 09</div>
+    <div class="card-title">K-Means Clustering</div>
+    <div class="card-desc">Unsupervised clustering, K-Means++ initialization, elbow method, silhouette score.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 3 hrs</div>
+    <a href="Notebook/chapter-09-kmeans.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 10</div>
+    <div class="card-title">Principal Component Analysis</div>
+    <div class="card-desc">Covariance matrix, eigendecomposition via power iteration, dimensionality reduction, explained variance.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 4–5 hrs</div>
+    <a href="Notebook/chapter-10-pca.html">→ Read Chapter</a>
+  </div>
+</div>
+```
+
+---
+
+## 🔴 Advanced Path {#advanced}
+
+```{=html}
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 11</div>
+    <div class="card-title">Neural Networks (MLP)</div>
+    <div class="card-desc">Perceptrons, forward pass, backpropagation, activation functions, He initialization, XOR problem.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-11-neural-networks.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 12</div>
+    <div class="card-title">Convolutional Neural Networks</div>
+    <div class="card-desc">2D convolution, padding, stride, max pooling, feature maps, Sobel edge detection from scratch.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-12-cnn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 13</div>
+    <div class="card-title">CNNs — Advanced Architectures</div>
+    <div class="card-desc">Batch normalisation, residual (skip) connections, depthwise separable conv, IoU, non-maximum suppression, data augmentation.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-13-cnn-advanced.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 14</div>
+    <div class="card-title">Recurrent Neural Networks</div>
+    <div class="card-desc">Vanilla RNN, vanishing gradient problem, BPTT, and GRU architecture.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-14-rnn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 15</div>
+    <div class="card-title">Long Short-Term Memory (LSTM)</div>
+    <div class="card-desc">Gates (forget/input/output), cell state highway, reparameterised gradients, GRU comparison, character-level language model.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-15-lstm.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 16</div>
+    <div class="card-title">Graph Neural Networks</div>
+    <div class="card-desc">Message passing, GCN spectral convolution, GraphSAGE, link prediction, graph pooling, node classification.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-16-gnn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 17</div>
+    <div class="card-title">Natural Language Processing</div>
+    <div class="card-desc">Tokenisation, BPE, TF-IDF, Word2Vec skip-gram, scaled dot-product attention, positional encoding, Transformer encoder.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 8–10 hrs</div>
+    <a href="Notebook/chapter-17-nlp.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 18</div>
+    <div class="card-title">Generative Models</div>
+    <div class="card-desc">VAE (ELBO, reparameterisation trick), GAN (min-max game, mode collapse), diffusion models (forward/reverse process).</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 8–10 hrs</div>
+    <a href="Notebook/chapter-18-generative-models.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 19</div>
+    <div class="card-title">Reinforcement Learning</div>
+    <div class="card-desc">Markov decision processes, Q-learning, Bellman equation, ε-greedy policy, GridWorld agent.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 5–6 hrs</div>
+    <a href="Notebook/chapter-19-reinforcement-learning.html">→ Read Chapter</a>
+  </div>
+</div>
+```
+
+---
+
+## 📊 Best Practices {#chapter-list}
+
+```{=html}
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 20</div>
+    <div class="card-title">Model Evaluation & Best Practices</div>
+    <div class="card-desc">Cross-validation, confusion matrix, ROC-AUC, regression metrics, overfitting/regularization, learning curves.</div>
+    <div class="card-footer"><span class="badge-all">🔵 All Levels</span> · 3–4 hrs</div>
+    <a href="Notebook/chapter-20-model-evaluation.html">→ Read Chapter</a>
+  </div>
+</div>
+```
+
+---
+
+## Suggested Learning Paths
+
+| Path | Chapters | Who it's for |
+|------|----------|-------------|
+| 🟢 **Beginner** | 00 → 01 → 02 → 03 → 04 → 05 → 20 | New to ML |
+| 🟡 **Intermediate** | 00–05 → 06 → 07 → 08 → 09 → 10 → 20 | Comfortable with R |
+| 🔴 **Deep Learning** | 11 → 12 → 13 → 14 → 15 → 20 | Neural network focus |
+| 🔴 **Modern AI** | 15 → 16 → 17 → 18 → 19 → 20 | LSTM, GNNs, NLP, Generative, RL |
+| 🔴 **Full Course** | 00 → 20 in order | Complete mastery |
+
+---
+
+## License
+
+This tutorial is released under the [MIT License](https://opensource.org/licenses/MIT).
+You are free to use, copy, modify, and distribute it — with attribution.
+
+---
+
+## Contributing
+
+Found a bug? Have an improvement? Open an issue or pull request on [GitHub](https://github.com/zia207/ML-R).
+
+---
+
+## Author
+
+This tutorial is written and maintained by **Zia Ahmed, PhD** (Upatta Analytics) — [Zia207](https://github.com/zia207).
+
+Built with [Quarto](https://quarto.org) and hosted on [GitHub Pages](https://zia207.github.io/ML-R).

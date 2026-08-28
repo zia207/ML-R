@@ -1,0 +1,1790 @@
+---
+title: "Chapter 04: K-Nearest Neighbors (KNN)"
+subtitle: "Distance metrics, KNN classification & regression, K-Means clustering, and the curse of dimensionality — all from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+format:
+  html:
+    fig-width: 9
+    fig-height: 4.5
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 04: K-Nearest Neighbors (KNN)
+
+> **Level**: Beginner | **Estimated Time**: 3–4 hours
+
+---
+
+## What You Will Learn
+
+| Section | Topic |
+|---------|-------|
+| 1 | **KNN — The Big Picture** — the "nearest neighbour" intuition |
+| 2 | **Setup** — libraries, scratch implementations, reproducibility |
+| 3 | **Distance Metrics** — Euclidean, Manhattan, Minkowski (theory + code) |
+| 4 | **Visualising Distance Metrics** — unit balls and intuition |
+| 5 | **KNN From Scratch** — classifier & regressor, every line explained |
+| 6 | **KNN on Iris** — Iris dataset exploration, confusion matrix |
+| 7 | **Decision Boundaries** — seeing what KNN actually learns |
+| 8 | **Effect of K** — overfitting vs underfitting, bias-variance tradeoff |
+| 9 | **Choosing K with Cross-Validation** — reliable, data-driven selection |
+| 10 | **KNN Regression** — predicting continuous values |
+| 11 | **K-Means Clustering** — unsupervised grouping, elbow method |
+| 12 | **The Curse of Dimensionality** — why KNN struggles in high dimensions |
+| 13 | **Summary & Exercises** |
+
+Every section follows the same pattern:
+1. **Intuition** — plain-language motivation and real-world analogy
+2. **Theory** — the math behind the method
+3. **From-scratch code** — pure base R, heavily annotated for beginners
+4. **Demo** — real or synthetic data with rich visualisations
+
+---
+
+## 1. The Big Picture - What Is KNN?
+
+### The Real-World Analogy (with Simple Math)
+
+Imagine you just moved to a new city and want to know if your new neighbourhood is safe.
+You ask your **5 nearest neighbours**. Their answers are: [safe, safe, safe, unsafe, safe].
+
+To decide, you simply count:
+- Number who say "safe": 4
+- Number who say "unsafe": 1
+
+Since 4 out of 5 say "safe":
+
+- 4/5 = 0.8 (or 80%) say "safe"
+- You decide your neighbourhood is safe.
+
+In KNN, the **K** is the number of neighbours you ask (here, K=5).
+
+Mathematically, for each new data point:
+1. Calculate the distance (e.g., Euclidean) from this point to every point in the dataset.
+   - Example (Euclidean for 2D):
+     distance = sqrt((x₁ - x₂)² + (y₁ - y₂)²)
+2. Pick the **K** (e.g., 5) closest points (smallest distances).
+3. For classification: Take a **majority vote** among these K points.
+   - Example: If K=5 and the labels are [A, A, B, A, B],
+     Majority is A (3 out of 5) → Predict A.
+4. For regression: Compute the **average** value of the K points.
+   - Example: If K=3, neighbour values are [4, 5, 6],
+     Predicted value = (4 + 5 + 6) / 3 = 5
+
+### Key Properties
+
+| Property | Explanation |
+|---|---|
+| **Lazy learner** | No explicit training — it just memorises the data |
+| **Non-parametric** | Makes no assumption about data distribution |
+| **Instance-based** | Each prediction uses the raw training examples directly |
+| **Training cost** | Almost zero (just store data) |
+| **Prediction cost** | High — must compare to every training point |
+
+### When to Use KNN
+
+✅ Small-to-medium datasets (< 50,000 rows)
+✅ Low-dimensional data (< 20 features)
+✅ When you need a quick, interpretable baseline
+✅ Recommendation systems (users similar to you liked ...)
+
+❌ Very large datasets (slow prediction)
+❌ High-dimensional data (Curse of Dimensionality)
+❌ When features have very different scales (must normalise!)
+
+---
+
+## 2. Setup - Install & Import Libraries
+
+We need a few standard R packages:
+
+| Package | What it does |
+|---|---|
+| base R | Fast numeric vectors/matrices and math — everything below is built from this |
+| `GGally` | Pairplot (`ggpairs`) for exploring the Iris dataset |
+| `MASS` | `mvrnorm()` for simulating multivariate-normal blobs |
+
+Everything else — the KNN classifier/regressor, K-Means, distance metrics, scalers, splitters,
+and metrics — is implemented **from scratch** below, just like the Python original.
+
+```{r}
+# ── Standard library ─────────────────────────────────────────────────────────
+SEED <- 42
+
+# population standard deviation (matches numpy's default ddof=0, unlike R's sd())
+popsd <- function(x) sqrt(mean((x - mean(x))^2))
+
+# ────────────────────────────────────────────────────────────────────────────
+#  ALL IMPLEMENTATIONS FROM SCRATCH
+# ────────────────────────────────────────────────────────────────────────────
+
+# --- DATA LOADING FUNCTIONS ---
+
+load_iris <- function() {
+  # Loads the famous Iris flower dataset (flowers with 4 measurements).
+  # Returns a list with:
+  #   $data: the features (the numbers)
+  #   $target: what type of flower each row is (0, 1, 2)
+  #   $feature_names: names of measurements
+  #   $target_names: names of the actual flower classes
+  # R already ships the Iris dataset built in — we just reshape it.
+  feature_names <- c("sepal length (cm)", "sepal width (cm)", "petal length (cm)", "petal width (cm)")
+  target_names  <- c("setosa", "versicolor", "virginica")
+  X <- as.matrix(iris[, c("Sepal.Length", "Sepal.Width", "Petal.Length", "Petal.Width")])
+  y <- as.integer(iris$Species) - 1L   # factor levels are already setosa, versicolor, virginica
+  list(data = X, target = y, feature_names = feature_names, target_names = target_names)
+}
+
+load_diabetes <- function() {
+  # Loads a diabetes dataset (medical measurements & diagnosis).
+  # Tries to get real data from the internet; if that fails, makes up fake data with same shape.
+  tryCatch({
+    url <- "https://www4.stat.ncsu.edu/~boos/var.select/diabetes.tab.txt"
+    df  <- read.table(url, header = TRUE, sep = "\t")
+    X   <- as.matrix(df[, -ncol(df)]); storage.mode(X) <- "double"
+    y   <- as.numeric(df[, ncol(df)])
+    # Normalize: centre each column, then scale to unit L2 norm (classic diabetes preprocessing)
+    Xc  <- sweep(X, 2, colMeans(X), "-")
+    l2  <- sqrt(colSums(Xc^2))
+    X   <- sweep(Xc, 2, l2, "/")
+    feature_names <- tolower(colnames(df)[-ncol(df)])
+    list(data = X, target = y, feature_names = feature_names)
+  }, error = function(e) {
+    # If download fails, just make up some numbers with the right shape
+    set.seed(0)
+    X <- matrix(rnorm(442 * 10), nrow = 442)
+    X <- sweep(sweep(X, 2, colMeans(X), "-"), 2, apply(X, 2, sd), "/")
+    coef <- c(0.3, -0.1, 0.5, 0.2, -0.3, 0.1, -0.2, 0.4, 0.5, 0.1)
+    y <- as.numeric(X %*% coef) * 100 + 150 + rnorm(442, 0, 30)
+    feature_names <- c("age", "sex", "bmi", "bp", "s1", "s2", "s3", "s4", "s5", "s6")
+    list(data = X, target = y, feature_names = feature_names)
+  })
+}
+
+make_moons <- function(n_samples = 100, noise = 0.1, random_state = NULL) {
+  # Makes fake 2D data that looks like two crescent moons interleaved.
+  # Returns list(X=features, y=labels) with 2 classes.
+  if (!is.null(random_state)) set.seed(random_state)
+  n1 <- n_samples %/% 2; n2 <- n_samples - n1
+  theta1 <- seq(0, pi, length.out = n1)
+  theta2 <- seq(0, pi, length.out = n2)
+  X1 <- cbind(cos(theta1),     sin(theta1))
+  X2 <- cbind(1 - cos(theta2), 1 - sin(theta2) - 0.5)
+  X  <- rbind(X1, X2)
+  y  <- c(rep(0, n1), rep(1, n2))
+  if (noise > 0) X <- X + matrix(rnorm(length(X), sd = noise), nrow = nrow(X))
+  perm <- sample(n_samples)
+  list(X = X[perm, ], y = y[perm])
+}
+
+make_classification <- function(n_samples = 100, n_features = 2, n_informative = 2,
+                                 n_redundant = 0, n_repeated = 0, n_classes = 2,
+                                 random_state = NULL) {
+  # Make random blobs of data for classification (several classes, separated).
+  # n_informative = how many features are actually "useful" (rest are just noise).
+  if (!is.null(random_state)) set.seed(random_state)
+  n_informative <- max(1, min(n_informative, n_features))
+  centroids <- matrix(rnorm(n_classes * n_informative) * 2.0, nrow = n_classes)
+  X_info_list <- list(); y_list <- integer(0)
+  per_class <- n_samples %/% n_classes
+  for (c in 0:(n_classes - 1)) {
+    count <- if (c < n_classes - 1) per_class else n_samples - per_class * (n_classes - 1)
+    Xc <- matrix(rnorm(count * n_informative), nrow = count)
+    Xc <- sweep(Xc, 2, centroids[c + 1, ], "+")
+    X_info_list[[c + 1]] <- Xc
+    y_list <- c(y_list, rep(c, count))
+  }
+  X_info <- do.call(rbind, X_info_list)
+  n_noise <- n_features - n_informative
+  X <- if (n_noise > 0) cbind(X_info, matrix(rnorm(n_samples * n_noise), nrow = n_samples)) else X_info
+  perm <- sample(n_samples)
+  list(X = X[perm, , drop = FALSE], y = y_list[perm])
+}
+
+make_regression <- function(n_samples = 100, n_features = 1, noise = 0.0, random_state = NULL) {
+  # Create a synthetic dataset for predicting numbers ("regression").
+  if (!is.null(random_state)) set.seed(random_state)
+  X <- matrix(rnorm(n_samples * n_features), nrow = n_samples)
+  coef <- rnorm(n_features)
+  y <- as.numeric(X %*% coef)
+  if (noise > 0) y <- y + rnorm(n_samples, sd = noise)
+  list(X = X, y = y)
+}
+
+# --- MODEL SELECTION HELPERS ---
+
+train_test_split <- function(X, y, test_size = 0.2, random_state = NULL, stratify = NULL) {
+  # Breaks up your data into training and testing parts. Can "stratify" so all classes
+  # are equally represented in train and test.
+  # Usage: split <- train_test_split(X, y); split$X_train ...
+  if (!is.null(random_state)) set.seed(random_state)
+  n <- if (is.matrix(X) || is.data.frame(X)) nrow(X) else length(X)
+
+  if (!is.null(stratify)) {
+    classes <- sort(unique(stratify))
+    train_idx <- integer(0); test_idx <- integer(0)
+    for (cls in classes) {
+      cls_idx <- sample(which(stratify == cls))
+      n_cls_test <- max(1, round(length(cls_idx) * test_size))
+      test_idx  <- c(test_idx,  cls_idx[seq_len(n_cls_test)])
+      train_idx <- c(train_idx, cls_idx[(n_cls_test + 1):length(cls_idx)])
+    }
+  } else {
+    perm   <- sample(n)
+    n_test <- max(1, round(n * test_size))
+    test_idx  <- perm[seq_len(n_test)]
+    train_idx <- perm[(n_test + 1):n]
+  }
+
+  idx_rows <- function(A, idx) if (is.matrix(A) || is.data.frame(A)) A[idx, , drop = FALSE] else A[idx]
+
+  list(X_train = idx_rows(X, train_idx), X_test = idx_rows(X, test_idx),
+       y_train = idx_rows(y, train_idx), y_test = idx_rows(y, test_idx))
+}
+
+cross_val_score <- function(make_estimator, X, y, cv = 5, scoring = "accuracy") {
+  # Checks how good your model is via k-fold cross-validation.
+  # make_estimator: a function() returning a FRESH, unfitted estimator each call
+  # (this plays the role of Python's copy.deepcopy(estimator) per fold).
+  X <- as.matrix(X); n <- nrow(X)
+  fold_size <- n %/% cv
+  scores <- numeric(cv)
+  for (fold in 0:(cv - 1)) {
+    start <- fold * fold_size + 1
+    end   <- if (fold < cv - 1) start + fold_size - 1 else n
+    mask  <- rep(FALSE, n); mask[start:end] <- TRUE
+    X_tr <- X[!mask, , drop = FALSE]; X_te <- X[mask, , drop = FALSE]
+    y_tr <- y[!mask]; y_te <- y[mask]
+    est <- make_estimator()
+    est$fit(X_tr, y_tr)
+    y_pred <- est$predict(X_te)
+    score <- if (scoring == "accuracy") mean(y_pred == y_te)
+             else if (scoring %in% c("r2", "r2_score")) r2_score(y_te, y_pred)
+             else mean(y_pred == y_te)
+    scores[fold + 1] <- score
+  }
+  scores
+}
+
+# --- FEATURE SCALING / PREPROCESSING ---
+
+StandardScaler <- setRefClass(
+  "StandardScaler",
+  fields = list(mean_ = "numeric", scale_ = "numeric"),
+  methods = list(
+    fit = function(X) {
+      X <- as.matrix(X)
+      mean_ <<- colMeans(X)
+      s <- apply(X, 2, popsd)
+      s[s == 0] <- 1.0   # avoid dividing by zero if a column is constant
+      scale_ <<- s
+      invisible(.self)
+    },
+    transform = function(X) {
+      X <- as.matrix(X)
+      sweep(sweep(X, 2, mean_, "-"), 2, scale_, "/")
+    },
+    fit_transform = function(X) { fit(X); transform(X) }
+  )
+)
+
+# --- METRIC FUNCTIONS FOR EVALUATING MODELS ---
+
+accuracy_score <- function(y_true, y_pred) mean(y_true == y_pred)
+
+confusion_matrix <- function(y_true, y_pred) {
+  # Rows: true labels. Columns: predicted labels.
+  classes <- sort(unique(y_true))
+  n <- length(classes)
+  idx_map <- setNames(seq_len(n), as.character(classes))
+  cm <- matrix(0L, n, n)
+  for (i in seq_along(y_true)) {
+    r <- idx_map[[as.character(y_true[i])]]; c <- idx_map[[as.character(y_pred[i])]]
+    cm[r, c] <- cm[r, c] + 1L
+  }
+  cm
+}
+
+classification_report <- function(y_true, y_pred, target_names = NULL) {
+  # precision / recall / f1-score / support for each class, plus accuracy & weighted avg.
+  classes <- sort(unique(y_true))
+  if (is.null(target_names)) target_names <- as.character(classes)
+  cat(sprintf("%20s %10s %10s %10s %10s\n", "", "precision", "recall", "f1-score", "support"))
+  cat("\n")
+  total_support <- 0; w_p <- w_r <- w_f <- 0.0
+  for (i in seq_along(classes)) {
+    cl <- classes[i]; name <- target_names[i]
+    tp <- sum(y_true == cl & y_pred == cl)
+    fp <- sum(y_true != cl & y_pred == cl)
+    fn <- sum(y_true == cl & y_pred != cl)
+    support   <- sum(y_true == cl)
+    precision <- if (tp + fp > 0) tp / (tp + fp) else 0.0
+    recall    <- if (tp + fn > 0) tp / (tp + fn) else 0.0
+    f1 <- if (precision + recall > 0) 2 * precision * recall / (precision + recall) else 0.0
+    cat(sprintf("%20s %10.2f %10.2f %10.2f %10d\n", name, precision, recall, f1, support))
+    w_p <- w_p + precision * support; w_r <- w_r + recall * support; w_f <- w_f + f1 * support
+    total_support <- total_support + support
+  }
+  acc <- accuracy_score(y_true, y_pred)
+  cat("\n")
+  cat(sprintf("%20s %10s %10s %10.2f %10d\n", "accuracy", "", "", acc, total_support))
+  cat(sprintf("%20s %10.2f %10.2f %10.2f %10d\n", "weighted avg",
+              w_p / total_support, w_r / total_support, w_f / total_support, total_support))
+}
+
+mean_squared_error <- function(y_true, y_pred) mean((y_true - y_pred)^2)
+
+r2_score <- function(y_true, y_pred) {
+  # "R squared": 1 is perfect, 0 is same as always guessing the mean, negative is worse.
+  ss_res <- sum((y_true - y_pred)^2)
+  ss_tot <- sum((y_true - mean(y_true))^2)
+  1.0 - ss_res / (ss_tot + 1e-10)
+}
+
+# --- THE KNN MODELS (vectorised, sklearn-style) ---
+
+KNeighborsClassifier <- setRefClass(
+  "KNeighborsClassifier",
+  fields = list(n_neighbors = "numeric", metric = "character", weights = "character",
+                X_train_ = "matrix", y_train_ = "ANY"),
+  methods = list(
+    initialize = function(n_neighbors = 5, metric = "euclidean", weights = "uniform", ...) {
+      n_neighbors <<- n_neighbors; metric <<- metric; weights <<- weights
+      callSuper(...)
+    },
+    fit = function(X, y) {
+      # Just remembers all the training data (KNN is a "lazy learner": no real training)
+      X_train_ <<- as.matrix(X); y_train_ <<- y
+      invisible(.self)
+    },
+    distances_to = function(x) {
+      # Distance from x to every row in training data
+      diff <- sweep(X_train_, 2, x, "-")
+      if (metric == "manhattan") rowSums(abs(diff)) else sqrt(rowSums(diff^2))
+    },
+    predict_one = function(x) {
+      # Find the k closest neighbors and vote
+      d <- distances_to(x)
+      idx <- order(d)[seq_len(n_neighbors)]
+      labs <- y_train_[idx]
+      tbl <- table(labs)
+      as.numeric(names(tbl)[which.max(tbl)])
+    },
+    predict = function(X) {
+      X <- as.matrix(X)
+      vapply(seq_len(nrow(X)), function(i) predict_one(X[i, ]), numeric(1))
+    },
+    score = function(X, y) accuracy_score(y, predict(X))
+  )
+)
+
+KNeighborsRegressor <- setRefClass(
+  "KNeighborsRegressor",
+  fields = list(n_neighbors = "numeric", metric = "character", weights = "character",
+                X_train_ = "matrix", y_train_ = "numeric"),
+  methods = list(
+    initialize = function(n_neighbors = 5, metric = "euclidean", weights = "uniform", ...) {
+      n_neighbors <<- n_neighbors; metric <<- metric; weights <<- weights
+      callSuper(...)
+    },
+    fit = function(X, y) {
+      X_train_ <<- as.matrix(X); y_train_ <<- as.numeric(y)
+      invisible(.self)
+    },
+    predict_one = function(x) {
+      diff <- sweep(X_train_, 2, x, "-")
+      d <- sqrt(rowSums(diff^2))
+      idx <- order(d)[seq_len(n_neighbors)]
+      mean(y_train_[idx])
+    },
+    predict = function(X) {
+      X <- as.matrix(X)
+      vapply(seq_len(nrow(X)), function(i) predict_one(X[i, ]), numeric(1))
+    },
+    score = function(X, y) r2_score(y, predict(X))
+  )
+)
+
+# --- DECISION BOUNDARY DISPLAY FOR 2D DEMOS ---
+
+decision_boundary_grid <- function(estimator, X, grid_resolution = 80) {
+  # Computes a grid of predictions over the 2D span of X, for background shading.
+  X <- as.matrix(X)
+  pad <- 0.5
+  gx <- seq(min(X[, 1]) - pad, max(X[, 1]) + pad, length.out = grid_resolution)
+  gy <- seq(min(X[, 2]) - pad, max(X[, 2]) + pad, length.out = grid_resolution)
+  grid <- as.matrix(expand.grid(gx, gy))
+  Z <- matrix(estimator$predict(grid), nrow = length(gx))
+  list(gx = gx, gy = gy, Z = Z)
+}
+
+# --- RANDOMNESS CONTROL FOR REPEATABILITY ---
+set.seed(SEED)
+
+cat("All from-scratch implementations loaded!\n")
+```
+
+---
+
+## 3. Distance Metrics
+
+To use KNN, we need a way to decide how "close" two data points are. This is done using a **distance metric**—a mathematical formula that calculates how far apart two points are in the feature space. The choice of distance metric determines how neighbors are found and can affect KNN's performance and behavior.
+
+### 3.1 Euclidean Distance (L2) - The "Ruler" Distance
+
+Imagine you have two points on a piece of paper. If you use a ruler to measure
+the straight line from one to the other, that's the Euclidean distance! It's the
+most common way to figure out "how far apart" two things are.
+
+Here's the formula (don't worry, it's not scary):
+
+$$d(\mathbf{a}, \mathbf{b}) = \sqrt{(a_1 - b_1)^2 + (a_2 - b_2)^2 + ... + (a_n - b_n)^2}$$
+
+In simple terms: For each coordinate, subtract one from the other, square it (so negatives go away), add them all up, and then take the square root at the end.
+
+It's just the good old Pythagorean theorem — like in a right triangle, but for as many dimensions as you need!
+
+### 3.2 Manhattan Distance (L1) - The City Block
+
+Picture a city with streets in a perfect grid—think of the blocks in Manhattan, New York.
+To get from one place to another, you can't walk through buildings or cut across parks;
+you have to walk or drive only along the streets, making turns at the corners.
+
+Manhattan distance is just "How many blocks will you walk if you always go straight,
+then turn, never moving diagonally?" You add up the number of blocks up/down and left/right.
+
+**Formula:**
+$$d(\mathbf{a}, \mathbf{b}) = \sum_{i=1}^{n} |a_i - b_i|$$
+
+In even simpler terms: for each direction, count how far apart you are, ignore whether
+it's positive or negative, and add all those distances together.
+
+Why use it? It's less "shocked" by one big odd value (an outlier) than Euclidean distance.
+
+### 3.3 Minkowski Distance – The "Shape-Shifter" Distance
+
+Think of Minkowski distance like a superhero distance formula that can act like both Euclidean and Manhattan distance, just by changing a setting called "p":
+
+$$d(\mathbf{a}, \mathbf{b}) = \left(\sum_{i=1}^{n} |a_i - b_i|^p\right)^{1/p}$$
+
+- If you set $p = 1$, you get Manhattan distance (the city block kind).
+- If you set $p = 2$, you get Euclidean distance (the straight-line with a ruler).
+
+So, by changing "p", you decide HOW the distance is measured!
+
+> **Why should I care about feature scaling?**
+> Imagine you're measuring height (in meters, so just 0–2) and bank balance (in dollars, could be 0–100,000!).
+> Without fixing this, the bank balance will "shout" so loud that height doesn't matter at all in the calculation.
+> **Always put your features on the same scale before running KNN – otherwise one big number will drown out the rest!**
+
+```{r}
+# Visualize these distances
+A <- c(1, 2)
+B <- c(4, 6)
+
+par(mfrow = c(1, 3))
+
+# ----- (1) Raw points and Euclidean path -----
+plot(c(A[1], B[1]), c(A[2], B[2]), col = c("blue", "red"), pch = 16, cex = 2,
+     xlim = c(0, 5), ylim = c(0, 7), xlab = "", ylab = "", main = "Points and Euclidean Path")
+lines(c(A[1], B[1]), c(A[2], B[2]), lty = 2)
+text(A[1], A[2], "A", pos = 1); text(B[1], B[2], "B", pos = 3)
+grid()
+
+# ----- (2) Manhattan distance path -----
+plot(c(A[1], B[1]), c(A[2], B[2]), col = c("blue", "red"), pch = 16, cex = 2,
+     xlim = c(0, 5), ylim = c(0, 7), xlab = "", ylab = "", main = "Manhattan (L1) Path")
+lines(c(A[1], B[1]), c(A[2], A[2]), col = "red", lwd = 2)
+lines(c(B[1], B[1]), c(A[2], B[2]), col = "red", lwd = 2)
+text(A[1], A[2], "A", pos = 1); text(B[1], B[2], "B", pos = 3)
+grid()
+
+# ----- (3) Minkowski distances for different p -----
+ps <- c(1, 2, 3, 10)
+ds <- sapply(ps, function(p) sum(abs(A - B)^p)^(1 / p))
+plot(ps, ds, type = "o", pch = 16, xaxt = "n", ylim = c(0, max(ds)),
+     xlab = "p", ylab = "distance", main = "Minkowski distance vs p")
+axis(1, at = ps)
+grid()
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+# ── Three distance functions, explained ─────────────────────────────────────
+
+euclidean_distance <- function(a, b) {
+  # Straight-line (ruler) distance between two points.
+  # Step 1: subtract each coordinate pair. Step 2: square. Step 3: sum. Step 4: sqrt.
+  sqrt(sum((a - b)^2))
+}
+
+manhattan_distance <- function(a, b) {
+  # City-block distance — sum of absolute differences.
+  sum(abs(a - b))
+}
+
+minkowski_distance <- function(a, b, p = 2) {
+  # General Minkowski distance. p=1 -> Manhattan, p=2 -> Euclidean.
+  sum(abs(a - b)^p)^(1 / p)
+}
+
+# ── Quick demo ────────────────────────────────────────────────────────────────
+A <- c(1, 2)   # Point A
+B <- c(4, 6)   # Point B
+
+cat(sprintf("Points: A=(%g, %g), B=(%g, %g)\n", A[1], A[2], B[1], B[2]))
+cat(sprintf("Euclidean distance : %.4f\n", euclidean_distance(A, B)))   # sqrt(9+16) = 5
+cat(sprintf("Manhattan distance : %.4f\n", manhattan_distance(A, B)))   # 3+4 = 7
+cat(sprintf("Minkowski (p=3)    : %.4f\n", minkowski_distance(A, B, p = 3)))
+```
+
+---
+
+## 4. Visualising Distance Metrics
+
+The plots below show all points that are **exactly distance = 1** from the origin, for each metric.
+This shape is called the **unit ball** for that metric.
+
+- **Euclidean** → circle (natural straight-line)
+- **Manhattan** → diamond (city-block grid)
+- **Chebyshev** → square (maximum dimension jump)
+
+```{r}
+par(mfrow = c(1, 3))
+theta <- seq(0, 2 * pi, length.out = 300)
+
+# ── Euclidean unit ball (circle) ─────────────────────────────────────────────
+plot(cos(theta), sin(theta), type = "l", col = "steelblue", lwd = 2.5, asp = 1,
+     xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5), xlab = "x", ylab = "y",
+     main = "Euclidean (L2)\nUnit Ball = Circle")
+points(0, 0, col = "red", pch = 16, cex = 1.3)
+abline(h = 0, col = "gray", lwd = 0.5); abline(v = 0, col = "gray", lwd = 0.5)
+legend("topright", legend = "Origin", col = "red", pch = 16, bty = "n")
+
+# ── Manhattan unit ball (diamond) ────────────────────────────────────────────
+diamond_x <- c(1, 0, -1, 0, 1); diamond_y <- c(0, 1, 0, -1, 0)
+plot(diamond_x, diamond_y, type = "l", col = "darkorange", lwd = 2.5, asp = 1,
+     xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5), xlab = "x", ylab = "",
+     main = "Manhattan (L1)\nUnit Ball = Diamond")
+polygon(diamond_x, diamond_y, col = adjustcolor("darkorange", alpha.f = 0.15), border = NA)
+points(0, 0, col = "red", pch = 16, cex = 1.3)
+abline(h = 0, col = "gray", lwd = 0.5); abline(v = 0, col = "gray", lwd = 0.5)
+legend("topright", legend = "Origin", col = "red", pch = 16, bty = "n")
+
+# ── Chebyshev unit ball (square) ─────────────────────────────────────────────
+square_x <- c(1, 1, -1, -1, 1); square_y <- c(1, -1, -1, 1, 1)
+plot(square_x, square_y, type = "l", col = "forestgreen", lwd = 2.5, asp = 1,
+     xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5), xlab = "x", ylab = "",
+     main = "Chebyshev (Linf)\nUnit Ball = Square")
+polygon(square_x, square_y, col = adjustcolor("forestgreen", alpha.f = 0.15), border = NA)
+points(0, 0, col = "red", pch = 16, cex = 1.3)
+abline(h = 0, col = "gray", lwd = 0.5); abline(v = 0, col = "gray", lwd = 0.5)
+legend("topright", legend = "Origin", col = "red", pch = 16, bty = "n")
+
+par(mfrow = c(1, 1))
+cat('\nInsight: The shape of the "unit ball" determines which neighbours are considered equidistant.\n')
+```
+
+```{r}
+# ── Visual Intuition: How KNN Classifies a New Point ─────────────────────────
+# We'll plot a tiny 2D toy dataset and manually show how KNN works for K=3
+
+# Training data: two classes (red = 0, blue = 1)
+red_pts  <- rbind(c(1, 2), c(2, 1), c(1.5, 3), c(2.5, 2), c(3, 1))
+blue_pts <- rbind(c(6, 7), c(7, 6), c(5, 6.5), c(6.5, 5), c(7.5, 7))
+
+# The mystery point we want to classify
+query <- c(4, 5)
+
+all_pts    <- rbind(red_pts, blue_pts)
+all_labels <- c(rep(0, 5), rep(1, 5))
+dists      <- sqrt(rowSums(sweep(all_pts, 2, query, "-")^2))
+ord        <- order(dists)
+k_nearest_idx <- ord[1:3]   # K=3
+
+plot(NULL, xlim = c(0, 9), ylim = c(0, 9), xlab = "Feature 1", ylab = "Feature 2", main = "")
+
+points(red_pts,  col = "tomato",    pch = 16, cex = 2)
+points(blue_pts, col = "steelblue", pch = 16, cex = 2)
+points(query[1], query[2], col = "gold", pch = 8, cex = 3, lwd = 2)
+
+# Draw lines to K=3 nearest neighbours
+for (i in k_nearest_idx) {
+  col <- if (all_labels[i] == 0) "tomato" else "steelblue"
+  lines(c(query[1], all_pts[i, 1]), c(query[2], all_pts[i, 2]), lty = 2, col = col, lwd = 1.8)
+}
+
+# Draw the circle that just reaches the 3rd neighbour
+r <- dists[k_nearest_idx[3]]
+symbols(query[1], query[2], circles = r, add = TRUE, inches = FALSE, fg = "purple", lty = 3, lwd = 2)
+
+# Verdict
+votes  <- table(all_labels[k_nearest_idx])
+winner <- names(votes)[which.max(votes)]
+title(main = sprintf("KNN Intuition (K=3)\nVotes -> Class 0: %d, Class 1: %d  ->  Predicted Class: %s",
+                      sum(all_labels[k_nearest_idx] == 0), sum(all_labels[k_nearest_idx] == 1), winner))
+legend("topleft", legend = c("Class 0 (Red)", "Class 1 (Blue)", "Query point (?)"),
+       col = c("tomato", "steelblue", "gold"), pch = c(16, 16, 8), bty = "n")
+
+cat("Step-by-step:\n")
+for (rank in seq_along(k_nearest_idx)) {
+  i <- k_nearest_idx[rank]
+  cat(sprintf("  Neighbour #%d: point=(%.1f, %.1f), label=%d, distance=%.3f\n",
+              rank, all_pts[i, 1], all_pts[i, 2], all_labels[i], dists[i]))
+}
+cat(sprintf("\nMajority vote: %s  ->  Predicted class = %s\n",
+            paste(sprintf("%s: %d", names(votes), votes), collapse = ", "), winner))
+```
+
+---
+
+## 5. KNN From-Scratch
+
+Building KNN from scratch helps you understand exactly what happens under the hood.
+Every line below is annotated so a complete beginner can follow along.
+
+### The Algorithm in Plain English
+
+```
+For each new test point:
+    1. Calculate the distance to EVERY training point
+    2. Sort those distances from smallest to largest
+    3. Keep only the first K entries (K nearest neighbours)
+    4. For classification: take a majority vote of their labels
+       For regression:     take the average of their values
+```
+
+```{r}
+# ────────────────────────────────────────────────────────────────────────────
+#  KNN CLASSIFIER — from scratch, line-by-line explanation
+# ────────────────────────────────────────────────────────────────────────────
+
+KNNClassifierScratch <- setRefClass(
+  "KNNClassifierScratch",
+  fields = list(k = "numeric", metric = "character", X_train = "ANY", y_train = "ANY"),
+  methods = list(
+    initialize = function(k = 3, metric = "euclidean", ...) {
+      # Store hyperparameters — these are set BEFORE training
+      k <<- k; metric <<- metric
+      X_train <<- NULL; y_train <<- NULL   # placeholders — filled during fit()
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      # 'Training' step — KNN is a LAZY learner, so fit() just stores data.
+      X_train <<- X   # memorise features
+      y_train <<- y   # memorise labels
+      invisible(.self)   # allow chaining: clf$fit(X, y)$predict(X_test)
+    },
+
+    compute_distance = function(a, b) {
+      # Compute the distance between two points a and b.
+      if (metric == "euclidean") {
+        sqrt(sum((a - b)^2))       # sqrt(sum (ai - bi)^2)
+      } else if (metric == "manhattan") {
+        sum(abs(a - b))            # sum |ai - bi|
+      } else {
+        stop(sprintf("Unknown metric '%s'. Use 'euclidean' or 'manhattan'.", metric))
+      }
+    },
+
+    predict_single = function(x) {
+      # Predict the class label for ONE query point x. This is the core KNN logic.
+      # STEP 1: distance from x to every training point
+      dists <- vapply(seq_len(nrow(X_train)), function(i) compute_distance(x, X_train[i, ]), numeric(1))
+      # STEP 2: sort by distance (closest first) & STEP 3: keep only the K nearest
+      k_nearest <- order(dists)[seq_len(k)]
+      # STEP 4: labels of those K neighbours
+      k_labels <- y_train[k_nearest]
+      # STEP 5: majority vote — the most common label wins
+      tbl <- table(k_labels)
+      as.numeric(names(tbl)[which.max(tbl)])
+    },
+
+    predict = function(X) {
+      # Predict labels for a matrix of query points.
+      vapply(seq_len(nrow(X)), function(i) predict_single(X[i, ]), numeric(1))
+    },
+
+    accuracy = function(X, y_true) {
+      # Convenience: predict and compute accuracy in one call.
+      y_pred <- predict(X)
+      mean(y_pred == y_true)
+    }
+  )
+)
+
+cat("KNNClassifierScratch defined!\n")
+```
+
+```{r}
+# ── Test the from-scratch classifier on an Iris-like toy dataset ─────────────
+# Features: [petal length, petal width]
+# Labels:    0 = setosa, 1 = versicolor, 2 = virginica
+
+X_train_toy <- rbind(
+  c(1.4, 0.2), c(1.3, 0.2), c(1.5, 0.1),   # setosa (short, narrow petals)
+  c(4.7, 1.4), c(4.5, 1.5), c(4.9, 1.5),   # versicolor (medium petals)
+  c(6.3, 1.8), c(5.8, 1.8), c(7.1, 2.1)    # virginica (long, wide petals)
+)
+y_train_toy <- c(0, 0, 0, 1, 1, 1, 2, 2, 2)
+
+X_test_toy <- rbind(c(1.6, 0.3), c(4.8, 1.6), c(6.5, 2.0))
+y_test_toy <- c(0, 1, 2)
+
+cat(strrep("=", 55), "\n")
+cat(sprintf("%4s  %20s  %9s\n", "K", "Predictions", "Accuracy"))
+cat(strrep("=", 55), "\n")
+
+for (k in c(1, 3, 5)) {
+  clf <- KNNClassifierScratch$new(k = k, metric = "euclidean")
+  clf$fit(X_train_toy, y_train_toy)
+  preds <- clf$predict(X_test_toy)
+  acc   <- clf$accuracy(X_test_toy, y_test_toy)
+  cat(sprintf("K=%2d  Predictions: %14s  Accuracy: %.2f\n", k, paste(preds, collapse = ","), acc))
+}
+
+cat(strrep("=", 55), "\n")
+cat(sprintf("\nTrue labels: %s\n", paste(y_test_toy, collapse = ", ")))
+cat("\nAll K values get this small toy dataset correct!\n")
+```
+
+```{r}
+# ── KNN REGRESSOR — from scratch ─────────────────────────────────────────────
+# For REGRESSION (predicting a continuous number) the only difference
+# from the classifier is STEP 5:
+#   - Classifier -> majority VOTE  (pick the most common label)
+#   - Regressor  -> AVERAGE        (take the mean of K neighbours' values)
+
+KNNRegressorScratch <- setRefClass(
+  "KNNRegressorScratch",
+  fields = list(k = "numeric", X_train = "ANY", y_train = "ANY"),
+  methods = list(
+    initialize = function(k = 3, ...) {
+      k <<- k; X_train <<- NULL; y_train <<- NULL
+      callSuper(...)
+    },
+    fit = function(X, y) { X_train <<- X; y_train <<- y; invisible(.self) },
+    predict_single = function(x) {
+      # Compute distance to every training point, nearest first, average their K targets
+      dists <- vapply(seq_len(nrow(X_train)), function(i) sqrt(sum((x - X_train[i, ])^2)), numeric(1))
+      k_nearest <- order(dists)[seq_len(k)]
+      mean(y_train[k_nearest])   # return their AVERAGE (not a vote!)
+    },
+    predict = function(X) vapply(seq_len(nrow(X)), function(i) predict_single(X[i, ]), numeric(1))
+  )
+)
+
+# Demo: predict house price from size (in hundreds of sq ft)
+X_houses <- matrix(c(10, 15, 20, 25, 30, 35, 40), ncol = 1)
+y_prices <- c(150, 200, 250, 310, 350, 410, 480)   # price in $1000s
+
+reg <- KNNRegressorScratch$new(k = 3)
+reg$fit(X_houses, y_prices)
+
+queries <- matrix(c(12, 22, 38), ncol = 1)
+predictions <- reg$predict(queries)
+
+cat("KNN Regression — House Price Prediction\n")
+cat(strrep("-", 45), "\n")
+cat(sprintf("%18s  %21s\n", "Size (x100 sqft)", "Predicted Price ($k)"))
+cat(strrep("-", 45), "\n")
+for (i in seq_along(predictions)) {
+  cat(sprintf("%18d  $%19.1f\n", queries[i, 1], predictions[i]))
+}
+```
+
+---
+
+## 6. KNN on the Iris Dataset
+
+### The Iris Dataset
+
+A classic ML benchmark: 150 iris flowers from 3 species.
+
+| Feature | Description |
+|---|---|
+| sepal length | Length of the sepal (cm) |
+| sepal width | Width of the sepal (cm) |
+| petal length | Length of the petal (cm) |
+| petal width | Width of the petal (cm) |
+| **target** | 0=setosa, 1=versicolor, 2=virginica |
+
+We will load the dataset using our from-scratch `load_iris()` loader, explore it visually,
+then train and evaluate our from-scratch `KNeighborsClassifier` — covering the full
+classification pipeline: split → scale → fit → predict → evaluate.
+
+```{r}
+# ── Load and explore the Iris dataset ────────────────────────────────────────
+
+iris_data <- load_iris()
+
+df <- as.data.frame(iris_data$data)
+colnames(df) <- iris_data$feature_names
+df$species <- iris_data$target_names[iris_data$target + 1]
+df$target  <- iris_data$target
+
+cat("Shape:", dim(df), "\n")
+cat("\nFirst 5 rows:\n")
+print(head(df, 5))
+
+cat("\nClass distribution:\n")
+print(table(df$species))
+
+cat("\nBasic statistics:\n")
+print(round(sapply(df[iris_data$feature_names], summary), 2))
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 7
+# ── Pairplot: visualise all feature combinations ─────────────────────────────
+# A pairplot shows:
+#   - Diagonal:      distribution of each feature per class
+#   - Off-diagonal:  scatter plot of two features, coloured by class
+# This reveals which features separate the classes best.
+
+GGally::ggpairs(
+  iris, columns = 1:4, mapping = ggplot2::aes(color = Species),
+  diag = list(continuous = "densityDiag")
+) + ggplot2::theme_bw() +
+  ggplot2::labs(title = "Iris Dataset — Pairplot of All Feature Combinations")
+
+cat("\nKey observations:\n")
+cat("- Setosa is clearly separated from the other two species\n")
+cat("- Petal length & petal width are the most discriminating features\n")
+cat("- Versicolor & virginica overlap slightly — harder to separate\n")
+```
+
+```{r}
+# ── Train and evaluate a KNN classifier on Iris ──────────────────────────────
+
+# --- Step 1: Select features and target ---
+X_ir <- iris_data$data     # all 4 features, shape (150, 4)
+y_ir <- iris_data$target   # class labels: 0, 1, or 2
+
+# --- Step 2: Split into train (80%) and test (20%) ---
+split_ir <- train_test_split(X_ir, y_ir, test_size = 0.2, random_state = SEED, stratify = y_ir)
+X_train <- split_ir$X_train; X_test <- split_ir$X_test
+y_train <- split_ir$y_train; y_test <- split_ir$y_test
+
+cat(sprintf("Training set size : %d samples\n", nrow(X_train)))
+cat(sprintf("Test set size     : %d samples\n", nrow(X_test)))
+
+# --- Step 3: SCALE the features ---
+# KNN is distance-based -> features must be on the same scale!
+scaler <- StandardScaler$new()
+X_train_sc <- scaler$fit_transform(X_train)   # learn mean/std from train, then scale
+X_test_sc  <- scaler$transform(X_test)        # use SAME mean/std (never fit on test!)
+
+# --- Step 4: Train the KNN model ---
+knn <- KNeighborsClassifier$new(n_neighbors = 5, metric = "euclidean", weights = "uniform")
+knn$fit(X_train_sc, y_train)
+
+# --- Step 5: Predict on the test set ---
+y_pred <- knn$predict(X_test_sc)
+
+# --- Step 6: Evaluate ---
+acc <- accuracy_score(y_test, y_pred)
+cat(sprintf("\nTest Accuracy (K=5): %.4f  (%.1f%%)\n", acc, acc * 100))
+cat("\nDetailed Classification Report:\n")
+classification_report(y_test, y_pred, target_names = iris_data$target_names)
+```
+
+```{r}
+# ── Confusion Matrix ──────────────────────────────────────────────────────────
+# Rows: TRUE labels. Columns: PREDICTED labels. Diagonal: correct predictions.
+
+cm <- confusion_matrix(y_test, y_pred)
+rownames(cm) <- iris_data$target_names
+colnames(cm) <- iris_data$target_names
+
+op <- par(mar = c(5, 8, 4, 2))
+image(seq_len(ncol(cm)), seq_len(nrow(cm)), t(cm[nrow(cm):1, ]),
+      col = colorRampPalette(c("white", "steelblue"))(50),
+      axes = FALSE, xlab = "Predicted Label", ylab = "")
+axis(1, at = seq_len(ncol(cm)), labels = colnames(cm))
+axis(2, at = seq_len(nrow(cm)), labels = rev(rownames(cm)), las = 1)
+mtext("True Label", side = 2, line = 6)
+for (i in seq_len(nrow(cm))) {
+  for (j in seq_len(ncol(cm))) {
+    text(j, nrow(cm) - i + 1, cm[i, j], col = if (cm[i, j] > max(cm) / 2) "white" else "black")
+  }
+}
+title(main = sprintf("Confusion Matrix — KNN (K=5) on Iris Test Set\nAccuracy = %.1f%%", acc * 100))
+par(op)
+
+cat("How to read:\n")
+cat("  Each cell [row i, col j] = number of times class i was predicted as class j\n")
+cat("  Large numbers on the diagonal = good model\n")
+```
+
+---
+
+## 7. Decision Boundaries - Seeing What KNN Learns
+
+A **decision boundary** is the line (or surface) that separates different classes.
+For KNN, this boundary is determined by where the majority class changes.
+
+We'll use only **2 features** (petal length & petal width) so we can draw it in 2D.
+We colour every point in the 2D space with its predicted class — this creates the "background".
+Then we overlay the actual training and test points on top.
+
+```{r}
+# ── Decision Boundary Plot (2 features only) ─────────────────────────────────
+
+feature_idx <- c(3, 4)   # petal length, petal width
+X_2d <- iris_data$data[, feature_idx]
+y_2d <- iris_data$target
+
+split_2d <- train_test_split(X_2d, y_2d, test_size = 0.2, random_state = SEED, stratify = y_2d)
+X_tr <- split_2d$X_train; X_te <- split_2d$X_test
+y_tr <- split_2d$y_train; y_te <- split_2d$y_test
+
+sc2 <- StandardScaler$new()
+X_tr_sc <- sc2$fit_transform(X_tr)
+X_te_sc <- sc2$transform(X_te)
+
+knn_2d <- KNeighborsClassifier$new(n_neighbors = 5, metric = "euclidean")
+knn_2d$fit(X_tr_sc, y_tr)
+
+colors_bg  <- c("#FADBD8", "#D6EAF8", "#D5F5E3")   # light pastel backgrounds
+colors_pts <- c("#E74C3C", "#2980B9", "#27AE60")   # solid colours for dots
+
+grid_info <- decision_boundary_grid(knn_2d, X_tr_sc, grid_resolution = 100)
+
+plot(NULL, xlim = range(grid_info$gx), ylim = range(grid_info$gy),
+     xlab = "Petal Length (scaled)", ylab = "Petal Width (scaled)", main = "")
+image(grid_info$gx, grid_info$gy, grid_info$Z, col = colors_bg, add = TRUE)
+
+for (cls in 0:2) {
+  mask_tr <- y_tr == cls; mask_te <- y_te == cls
+  points(X_tr_sc[mask_tr, 1], X_tr_sc[mask_tr, 2], col = colors_pts[cls + 1], pch = 16, cex = 1.1)
+  points(X_te_sc[mask_te, 1], X_te_sc[mask_te, 2], col = colors_pts[cls + 1], pch = 17, cex = 1.5)
+}
+
+acc_2d <- knn_2d$score(X_te_sc, y_te)
+title(main = sprintf("KNN (K=5) Decision Boundary — Petal Features Only\nTest Accuracy = %.1f%%", acc_2d * 100))
+legend("topleft", legend = c(paste(iris_data$target_names, "(train)"), paste(iris_data$target_names, "(test)")),
+       col = rep(colors_pts, 2), pch = c(16, 16, 16, 17, 17, 17), cex = 0.7, bty = "n", ncol = 2)
+
+cat("\nKey insight:\n")
+cat("The coloured regions show where KNN would classify ANY new point.\n")
+cat("Notice the jagged, non-linear boundary — this is characteristic of KNN.\n")
+```
+
+---
+
+## 8. How K Affects the Model
+
+K is the most important hyperparameter in KNN. It controls the **bias-variance tradeoff**:
+
+| K value | Boundary | Bias | Variance | Risk |
+|---|---|---|---|---|
+| **Small K (e.g. K=1)** | Very jagged, irregular | Low | High | Overfitting |
+| **Medium K** | Smoother | Medium | Medium | Best sweet spot |
+| **Large K (e.g. K=n)** | Very smooth, almost flat | High | Low | Underfitting |
+
+> **K=1**: Model perfectly memorises training data — predicts training labels with 100% accuracy,
+> but fails on new data.
+> **K=n** (n = number of training samples): Predicts the same class for everything — the majority class.
+
+Let's visualise this with 4 different K values side by side.
+
+```{r}
+#| fig-width: 11
+# ── Side-by-side decision boundaries for K=1, 5, 15, 50 ──────────────────────
+
+moons <- make_moons(n_samples = 300, noise = 0.25, random_state = SEED)
+X_moons <- moons$X; y_moons <- moons$y
+
+split_m <- train_test_split(X_moons, y_moons, test_size = 0.2, random_state = SEED)
+X_m_tr <- split_m$X_train; X_m_te <- split_m$X_test
+y_m_tr <- split_m$y_train; y_m_te <- split_m$y_test
+
+k_values <- c(1, 5, 15, 50)
+par(mfrow = c(1, 4))
+
+for (k in k_values) {
+  clf <- KNeighborsClassifier$new(n_neighbors = k)
+  clf$fit(X_m_tr, y_m_tr)
+  train_acc <- clf$score(X_m_tr, y_m_tr)
+  test_acc  <- clf$score(X_m_te, y_m_te)
+
+  grid_info <- decision_boundary_grid(clf, X_m_tr, grid_resolution = 100)
+  plot(NULL, xlim = range(grid_info$gx), ylim = range(grid_info$gy),
+       xlab = "Feature 1", ylab = if (k == 1) "Feature 2" else "", main = "")
+  image(grid_info$gx, grid_info$gy, grid_info$Z,
+        col = colorRampPalette(c("#D73027", "#FFFFBF", "#4575B4"))(50), add = TRUE)
+  points(X_m_tr[, 1], X_m_tr[, 2], col = ifelse(y_m_tr == 0, "#D73027", "#4575B4"), pch = 16, cex = 0.7)
+
+  label <- if (k == 1) "Overfit (High Variance)" else if (k == 50) "Underfit (High Bias)" else "Good Fit"
+  title(main = sprintf("K = %d\nTrain: %.0f%% | Test: %.0f%%\n%s", k, train_acc * 100, test_acc * 100, label))
+}
+par(mfrow = c(1, 1))
+
+cat("Observations:\n")
+cat("  K=1  -> jagged boundary, overfit (train=100%, test drops)\n")
+cat("  K=5  -> smoother, good generalisation\n")
+cat("  K=15 -> even smoother, still good\n")
+cat("  K=50 -> very smooth/flat, losing the shape of the true boundary\n")
+```
+
+---
+
+## 9. Choosing the Best K with Cross-Validation
+
+### What Is Cross-Validation?
+
+Instead of evaluating on a single train/test split (which can be lucky or unlucky), **k-fold cross-validation** splits the training data into **k equally-sized folds**.
+For each fold:
+- Use that fold as a mini-test set
+- Train on the remaining folds
+- Record accuracy
+
+Finally, average the k accuracy scores.
+This gives a much more **reliable** estimate of model performance.
+
+> ⚠️ Note: The "k" in k-fold cross-validation is different from the "K" in KNN!
+
+```{r}
+# ── Find the best K using 5-fold cross-validation ────────────────────────────
+
+X_full <- iris_data$data
+y_full <- iris_data$target
+
+scaler_full <- StandardScaler$new()
+X_full_sc <- scaler_full$fit_transform(X_full)
+
+k_range  <- 1:30   # test K from 1 to 30
+cv_means <- numeric(length(k_range))
+cv_stds  <- numeric(length(k_range))
+
+set.seed(SEED)
+for (i in seq_along(k_range)) {
+  k <- k_range[i]
+  # cross_val_score runs 5-fold CV and returns 5 accuracy scores
+  scores <- cross_val_score(function() KNeighborsClassifier$new(n_neighbors = k),
+                             X_full_sc, y_full, cv = 5, scoring = "accuracy")
+  cv_means[i] <- mean(scores)
+  cv_stds[i]  <- popsd(scores)
+}
+
+best_i <- which.max(cv_means)
+best_k <- k_range[best_i]
+cat(sprintf("Best K = %d  |  CV Accuracy = %.4f +/- %.4f\n", best_k, max(cv_means), cv_stds[best_i]))
+```
+
+```{r}
+# ── Plot CV accuracy vs K ─────────────────────────────────────────────────────
+
+k_arr <- k_range; cv_means_arr <- cv_means; cv_stds_arr <- cv_stds
+
+plot(k_arr, cv_means_arr, type = "n", xaxt = "n", ylim = c(0.9, 1.01),
+     xlab = "K (Number of Neighbours)", ylab = "5-Fold CV Accuracy",
+     main = "Cross-Validation Accuracy vs K — Iris Dataset")
+axis(1, at = k_arr)
+
+# Annotate overfit / underfit regions
+rect(1, 0.9, 5, 1.01, col = adjustcolor("red", alpha.f = 0.05), border = NA)
+rect(20, 0.9, 30, 1.01, col = adjustcolor("purple", alpha.f = 0.05), border = NA)
+
+# Shaded region = +/-1 standard deviation
+polygon(c(k_arr, rev(k_arr)), c(cv_means_arr - cv_stds_arr, rev(cv_means_arr + cv_stds_arr)),
+        col = adjustcolor("steelblue", alpha.f = 0.2), border = NA)
+
+# Mean accuracy line
+lines(k_arr, cv_means_arr, col = "steelblue", lwd = 2.5)
+points(k_arr, cv_means_arr, col = "steelblue", pch = 16, cex = 0.8)
+
+# Mark the best K
+abline(v = best_k, col = "red", lty = 2, lwd = 1.8)
+points(best_k, max(cv_means_arr), col = "red", pch = 16, cex = 1.5)
+text(best_k + 1.5, max(cv_means_arr) - 0.005, sprintf("Best K=%d\nAcc=%.4f", best_k, max(cv_means_arr)),
+     col = "red", cex = 0.8)
+
+text(2, min(cv_means_arr) + 0.001, "High\nVariance", col = "red", cex = 0.8)
+text(25, min(cv_means_arr) + 0.001, "High\nBias", col = "purple", cex = 0.8)
+
+legend("bottomleft", legend = c("Mean CV Accuracy", "+/-1 Std Dev", sprintf("Best K = %d", best_k)),
+       col = c("steelblue", adjustcolor("steelblue", 0.4), "red"),
+       lwd = c(2.5, 8, 1.8), lty = c(1, 1, 2), bty = "n", cex = 0.7)
+
+cat("\nHow to interpret:\n")
+cat("  - Left side  (small K) -> accuracy is lower and noisier (overfitting training data)\n")
+cat("  - Middle     (optimal K) -> best generalisation\n")
+cat("  - Right side (large K) -> accuracy drops off (too much smoothing)\n")
+```
+
+---
+
+## 10. KNN for Regression
+
+KNN isn't just for classification. For **regression** (predicting a continuous number),
+it works exactly the same way but returns the **average** of the K neighbours' values.
+
+Example use cases:
+- Predicting house prices from nearby comparable sales
+- Predicting a patient's blood pressure based on similar patients
+- Forecasting stock price from historically similar patterns
+
+### Comparison of K values for Regression
+
+| Small K | Large K |
+|---|---|
+| Follows the data closely (wiggly line) | Very smooth line |
+| Can overfit noise | May miss real patterns |
+| Low bias, high variance | High bias, low variance |
+
+```{r}
+#| fig-width: 11
+# ── KNN Regression on synthetic data ─────────────────────────────────────────
+
+set.seed(SEED)
+X_reg <- matrix(seq(0, 2 * pi, length.out = 200), ncol = 1)   # 200 evenly spaced x values
+y_reg <- sin(X_reg[, 1]) + rnorm(200, 0, 0.2)                 # sine + noise
+
+split_reg <- train_test_split(X_reg, y_reg, test_size = 0.25, random_state = SEED)
+X_r_tr <- split_reg$X_train; X_r_te <- split_reg$X_test
+y_r_tr <- split_reg$y_train; y_r_te <- split_reg$y_test
+
+k_values_reg <- c(1, 3, 10, 30)
+X_plot <- matrix(seq(0, 2 * pi, length.out = 500), ncol = 1)
+y_true_plot <- sin(X_plot[, 1])
+
+par(mfrow = c(1, 4))
+for (k in k_values_reg) {
+  reg <- KNeighborsRegressor$new(n_neighbors = k)
+  reg$fit(X_r_tr, y_r_tr)
+  y_pred_plot <- reg$predict(X_plot)
+  y_pred_test <- reg$predict(X_r_te)
+
+  rmse_k <- sqrt(mean_squared_error(y_r_te, y_pred_test))
+  r2_k   <- r2_score(y_r_te, y_pred_test)
+
+  plot(X_plot[, 1], y_true_plot, type = "l", lty = 2, col = "gray40",
+       xlab = "x", ylab = if (k == 1) "y" else "", ylim = range(c(y_true_plot, y_r_tr)))
+  lines(X_plot[, 1], y_pred_plot, col = "tomato", lwd = 2)
+  points(X_r_tr[, 1], y_r_tr, col = "steelblue", pch = 16, cex = 0.5)
+
+  label <- if (k == 1) "Overfit" else if (k == 30) "Underfit" else "Good"
+  title(main = sprintf("K = %d  [%s]\nRMSE=%.3f  R2=%.3f", k, label, rmse_k, r2_k))
+  if (k == 1) legend("topright", legend = c("True sin(x)", "KNN", "Train pts"),
+                      col = c("gray40", "tomato", "steelblue"), lty = c(2, 1, NA), pch = c(NA, NA, 16),
+                      cex = 0.6, bty = "n")
+}
+par(mfrow = c(1, 1))
+
+cat("Metrics explained:\n")
+cat("  RMSE (Root Mean Squared Error): average prediction error in y units — lower is better\n")
+cat("  R2   (Coefficient of determination): 1.0 = perfect, 0.0 = as good as just predicting mean\n")
+```
+
+```{r}
+# ── KNN Regression on the Diabetes dataset (loaded from scratch) ─────────────
+# load_diabetes() is defined in the setup cell
+
+diab <- load_diabetes()
+X_d <- diab$data
+y_d <- diab$target   # disease progression score after 1 year
+
+split_d <- train_test_split(X_d, y_d, test_size = 0.2, random_state = SEED)
+X_d_tr <- split_d$X_train; X_d_te <- split_d$X_test
+y_d_tr <- split_d$y_train; y_d_te <- split_d$y_test
+
+sc_d <- StandardScaler$new()
+X_d_tr_sc <- sc_d$fit_transform(X_d_tr)
+X_d_te_sc <- sc_d$transform(X_d_te)
+
+# Try different K values
+results_diab <- data.frame(K = 1:30, RMSE = NA_real_, R2 = NA_real_)
+for (i in seq_len(nrow(results_diab))) {
+  k <- results_diab$K[i]
+  reg <- KNeighborsRegressor$new(n_neighbors = k)
+  reg$fit(X_d_tr_sc, y_d_tr)
+  y_pred <- reg$predict(X_d_te_sc)
+  results_diab$RMSE[i] <- sqrt(mean_squared_error(y_d_te, y_pred))
+  results_diab$R2[i]   <- r2_score(y_d_te, y_pred)
+}
+
+best_k_reg <- results_diab$K[which.min(results_diab$RMSE)]
+
+par(mfrow = c(1, 2))
+
+plot(results_diab$K, results_diab$RMSE, type = "o", col = "tomato", pch = 16,
+     xlab = "K", ylab = "RMSE (lower = better)", main = "RMSE vs K — Diabetes Dataset")
+abline(v = best_k_reg, col = "red", lty = 2, lwd = 1.5)
+legend("topright", legend = sprintf("Best K=%d", best_k_reg), col = "red", lty = 2, bty = "n")
+
+plot(results_diab$K, results_diab$R2, type = "o", col = "steelblue", pch = 16,
+     xlab = "K", ylab = "R2 (higher = better)", main = "R2 vs K — Diabetes Dataset")
+abline(v = best_k_reg, col = "red", lty = 2, lwd = 1.5)
+legend("topright", legend = sprintf("Best K=%d", best_k_reg), col = "red", lty = 2, bty = "n")
+
+par(mfrow = c(1, 1))
+
+best_row <- results_diab[results_diab$K == best_k_reg, ]
+cat(sprintf("Best K = %d  |  RMSE = %.2f  |  R2 = %.3f\n", best_k_reg, best_row$RMSE, best_row$R2))
+```
+
+---
+
+## 11. K-Means Clustering - Unsupervised Grouping
+
+### KNN vs K-Means — What Is the Difference?
+
+Both algorithms have a **K** and both use **distances**, but they solve completely different problems:
+
+| Feature | KNN (K-Nearest Neighbors) | K-Means Clustering |
+|---------|--------------------------|-------------------|
+| **Learning type** | Supervised (needs labels) | Unsupervised (no labels needed) |
+| **Goal** | Classify new points / predict values | Discover hidden groups in data |
+| **K refers to** | Number of neighbours to consult | Number of clusters to form |
+| **Training** | Lazy — just stores all data | Iterative centroid update |
+| **Output** | Class label or numeric value | Cluster assignment (0, 1, 2, …) |
+| **Distance used for** | Finding the K closest training points | Assigning each point to its nearest centroid |
+
+> **Simple rule**: if you have labels → use KNN (supervised). If you have no labels → use K-Means (unsupervised).
+
+---
+
+### 11.1 The Real-World Analogy
+
+Imagine a teacher receives 200 student essays but has **no marking rubric** and no grades yet.
+She reads through them and naturally groups similar essays together:
+- Group A: short, poorly structured, many grammar errors
+- Group B: medium length, decent structure
+- Group C: long, well-argued, near-perfect grammar
+
+She did **K-Means clustering with K=3** — found 3 natural groups with **no predefined labels**!
+
+---
+
+### 11.2 The Algorithm Step-by-Step
+
+```
+INITIALISE: Randomly place K centroid points anywhere in the data space
+
+REPEAT until centroids stop moving:
+    STEP 1 — ASSIGN: For every data point, compute its distance to each centroid.
+                     Assign the point to the NEAREST centroid.
+    STEP 2 — UPDATE: For each cluster, move its centroid to the MEAN
+                     (average) position of all points assigned to it.
+
+STOP when centroid movement < tolerance (convergence)
+```
+
+### 11.3 Key Vocabulary
+
+| Term | Plain English |
+|------|--------------|
+| **Centroid** | The "center" of a cluster — the average position of all its member points |
+| **Cluster** | A group of data points that are closer to each other than to other groups |
+| **Inertia** | Total squared distance of every point to its nearest centroid — **lower = tighter clusters** |
+| **Convergence** | When centroids barely move between iterations (algorithm has found a stable solution) |
+| **Elbow method** | Plot inertia vs K values — look for the "knee" where adding more clusters stops helping much |
+
+### 11.4 When to Use K-Means
+
+✅ Customer segmentation (group customers by purchasing behaviour)
+✅ Image compression (group similar pixel colours)
+✅ Document clustering (group similar articles)
+✅ Anomaly detection (points far from all centroids are outliers)
+
+❌ When clusters have very different sizes
+❌ When clusters are non-spherical / ring-shaped
+❌ When you don't know a good K upfront (use elbow method to find it!)
+
+```{r}
+# ── K-Means Clustering — from scratch, every line explained ──────────────────
+# Just like KNNClassifierScratch, this class uses ONLY base R.
+# Every step is annotated so a beginner can follow along.
+
+KMeans <- setRefClass(
+  "KMeans",
+  fields = list(n_clusters = "numeric", max_iter = "numeric", random_state = "ANY", tol = "numeric",
+                cluster_centers_ = "matrix", labels_ = "numeric", inertia_history_ = "numeric",
+                inertia_ = "numeric", n_iter_ = "numeric"),
+  methods = list(
+    initialize = function(n_clusters = 3, max_iter = 300, random_state = NULL, tol = 1e-4, ...) {
+      n_clusters <<- n_clusters; max_iter <<- max_iter; random_state <<- random_state; tol <<- tol
+      cluster_centers_ <<- matrix(numeric(0), 0, 0)
+      labels_ <<- numeric(0); inertia_history_ <<- numeric(0)
+      inertia_ <<- NA_real_; n_iter_ <<- 0
+      callSuper(...)
+    },
+
+    assign_labels = function(X) {
+      # For each data point in X, find the index of the nearest centroid (0-indexed).
+      K <- nrow(cluster_centers_)
+      dists <- vapply(seq_len(K), function(k) {
+        sqrt(rowSums(sweep(X, 2, cluster_centers_[k, ], "-")^2))
+      }, numeric(nrow(X)))   # shape: (n_samples, K), always a matrix even if K==1
+      apply(dists, 1, which.min) - 1L
+    },
+
+    compute_inertia = function(X, labels, centers) {
+      # Inertia = sum of squared distances from each point to its cluster centroid.
+      total <- 0.0
+      for (k in 0:(n_clusters - 1)) {
+        mask <- labels == k
+        if (any(mask)) {
+          diff <- sweep(X[mask, , drop = FALSE], 2, centers[k + 1, ], "-")
+          total <- total + sum(diff^2)
+        }
+      }
+      total
+    },
+
+    fit = function(X) {
+      # Find K clusters in the dataset X. NO LABELS needed — this is unsupervised!
+      X <- as.matrix(X)
+      if (!is.null(random_state)) set.seed(random_state)
+
+      # INITIALISATION: randomly pick K existing data points as starting centroids
+      idx <- sample(seq_len(nrow(X)), n_clusters, replace = FALSE)
+      cluster_centers_ <<- X[idx, , drop = FALSE]
+
+      labels_ <<- rep(0L, nrow(X))
+      inertia_history_ <<- numeric(0)
+
+      iteration <- 0
+      for (it in seq_len(max_iter)) {
+        iteration <- it
+
+        # STEP 1: ASSIGN — find nearest centroid for every point
+        new_labels <- assign_labels(X)
+
+        # STEP 2: UPDATE — move each centroid to its cluster's mean
+        new_centers <- do.call(rbind, lapply(0:(n_clusters - 1), function(k) {
+          if (any(new_labels == k)) colMeans(X[new_labels == k, , drop = FALSE])
+          else cluster_centers_[k + 1, ]   # keep old centroid if cluster is empty
+        }))
+
+        inertia <- compute_inertia(X, new_labels, new_centers)
+        inertia_history_ <<- c(inertia_history_, inertia)
+
+        # CONVERGENCE CHECK: did centroids move much?
+        shift <- sqrt(sum((new_centers - cluster_centers_)^2))
+
+        cluster_centers_ <<- new_centers
+        labels_ <<- new_labels
+
+        if (shift < tol) break   # centroids barely moved — stable solution!
+      }
+
+      inertia_ <<- inertia_history_[length(inertia_history_)]
+      n_iter_  <<- iteration
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      # Assign NEW (unseen) data points to the nearest existing centroid.
+      assign_labels(as.matrix(X))
+    },
+
+    fit_predict = function(X) { fit(X); labels_ }
+  )
+)
+
+cat("KMeans class defined!\n\n")
+cat("Key attributes available AFTER calling $fit(X):\n")
+cat("  $cluster_centers_  -> centroid coordinates, shape (K, n_features)\n")
+cat("  $labels_           -> cluster index for each training point, shape (n_samples,)\n")
+cat("  $inertia_          -> final within-cluster sum of squares (lower = better)\n")
+cat("  $inertia_history_  -> vector of inertia at each iteration (shows convergence)\n")
+cat("  $n_iter_           -> number of iterations until convergence\n")
+```
+
+```{r}
+#| fig-width: 12
+# ── K-Means Demo: Step-by-step on 2D blob data ───────────────────────────────
+# We create 3 well-separated groups of points — but we give K-Means
+# NO LABELS. It has to discover the groups entirely on its own!
+
+set.seed(SEED)
+centers_true <- rbind(c(0, 0), c(5, 0), c(2.5, 4.5))   # hidden true positions
+X_km <- do.call(rbind, lapply(1:3, function(i) {
+  sweep(matrix(rnorm(80 * 2), ncol = 2), 2, centers_true[i, ], "+")   # 80 points per cluster
+}))
+X_km <- X_km[sample(nrow(X_km)), ]   # mix all points — no labels, just raw coordinates!
+
+km <- KMeans$new(n_clusters = 3, random_state = SEED)
+km$fit(X_km)
+
+cluster_colors <- c("#E74C3C", "#2980B9", "#27AE60")
+
+par(mfrow = c(1, 3))
+
+# Panel 1: raw data as K-Means sees it (no colours = no labels)
+plot(X_km, col = "gray50", pch = 16, cex = 0.8, xlab = "Feature 1", ylab = "Feature 2",
+     main = "Step 0 — Raw Data\n(No labels)")
+
+# Panel 2: K-Means discovered clusters
+plot(NULL, xlim = range(X_km[, 1]), ylim = range(X_km[, 2]), xlab = "Feature 1", ylab = "", main = "")
+for (k in 0:2) {
+  mask <- km$labels_ == k
+  points(X_km[mask, 1], X_km[mask, 2], col = cluster_colors[k + 1], pch = 16, cex = 0.8)
+}
+points(km$cluster_centers_[, 1], km$cluster_centers_[, 2], col = "gold", pch = 8, cex = 3, lwd = 2)
+title(main = sprintf("Step Final — K-Means Result (K=3)\nConverged in %d iterations | Inertia = %.1f",
+                      km$n_iter_, km$inertia_))
+legend("topright", legend = c(sprintf("Cluster %d (n=%d)", 0:2, as.numeric(table(km$labels_))), "Centroids"),
+       col = c(cluster_colors, "gold"), pch = c(16, 16, 16, 8), cex = 0.6, bty = "n")
+
+# Panel 3: discovered vs true centroids
+plot(X_km, col = "lightgray", pch = 16, cex = 0.6, xlab = "Feature 1", ylab = "", main = "")
+for (k in 0:2) points(km$cluster_centers_[k + 1, 1], km$cluster_centers_[k + 1, 2],
+                       col = cluster_colors[k + 1], pch = 8, cex = 2.5)
+points(centers_true[, 1], centers_true[, 2], col = "black", pch = 4, cex = 2, lwd = 2)
+title(main = "Discovered vs True Centroids\n(How close did K-Means get?)")
+legend("topright", legend = c("Found centroid", "True (hidden) centroid"), col = "black", pch = c(8, 4),
+       cex = 0.7, bty = "n")
+
+par(mfrow = c(1, 1))
+
+# ── Print numerical comparison ────────────────────────────────────────────────
+cat("Results Summary:\n")
+cat(sprintf("  Converged in : %d iterations\n", km$n_iter_))
+cat(sprintf("  Final inertia: %.2f\n", km$inertia_))
+cat("\nDiscovered centroids (sorted by x):\n")
+order_c <- order(km$cluster_centers_[, 1])
+true_sorted <- centers_true[order(centers_true[, 1]), ]
+for (i in seq_along(order_c)) {
+  k <- order_c[i]
+  found <- km$cluster_centers_[k, ]
+  true_c <- true_sorted[i, ]
+  err <- sqrt(sum((found - true_c)^2))
+  cat(sprintf("  Cluster %d: found=(%.2f, %.2f), true=(%.1f, %.1f), error=%.3f\n",
+              k - 1, found[1], found[2], true_c[1], true_c[2], err))
+}
+cat("\nK-Means found the hidden groups with NO labels — impressive!\n")
+```
+
+```{r}
+# ── The Elbow Method: How to Choose K for K-Means ────────────────────────────
+# Problem: K-Means requires us to set K upfront. But how do we know the right K?
+# Answer: Run K-Means for K=1..10, record inertia, plot inertia vs K, and look
+# for the "elbow" — the point where the curve starts to bend and flatten.
+
+par(mfrow = c(1, 2))
+
+# Left panel: inertia convergence for a single K=3 run (iteration by iteration)
+plot(seq_along(km$inertia_history_), km$inertia_history_, type = "o", col = "steelblue", lwd = 2.5,
+     xlab = "Iteration Number", ylab = "Inertia (Within-Cluster Sum of Squares)",
+     main = "K-Means Convergence (K=3)")
+
+# Right panel: elbow plot — inertia vs number of clusters K
+K_range <- 1:10
+inertias <- sapply(K_range, function(k) {
+  km_k <- KMeans$new(n_clusters = k, random_state = SEED)
+  km_k$fit(X_km)
+  km_k$inertia_
+})
+
+plot(K_range, inertias, type = "o", col = "tomato", lwd = 2.5, pch = 18,
+     xlab = "K — Number of Clusters", ylab = "Inertia",
+     main = "Elbow Method — Choosing K")
+abline(v = 3, col = "red", lty = 2, lwd = 2)
+points(3, inertias[3], col = "red", pch = 16, cex = 1.5)
+text(5, inertias[3] + (inertias[1] - inertias[length(inertias)]) * 0.12,
+     "<- Elbow!\nBest K = 3", col = "red", cex = 0.85)
+
+par(mfrow = c(1, 1))
+
+# ── Print the inertia table ───────────────────────────────────────────────────
+cat("Elbow Method Table:\n")
+cat(sprintf("  %3s  %10s  %14s\n", "K", "Inertia", "Drop from K-1"))
+for (i in seq_along(K_range)) {
+  k <- K_range[i]
+  drop <- if (i > 1) inertias[i - 1] - inertias[i] else 0
+  marker <- if (k == 3) " <- ELBOW (best K)" else ""
+  cat(sprintf("  %3d  %10.1f  %14.1f%s\n", k, inertias[i], drop, marker))
+}
+cat("\nRule of thumb: choose K where the \"drop from K-1\" column stops being huge.\n")
+```
+
+```{r}
+#| fig-width: 11
+# ── KNN vs K-Means: Side-by-Side Visual Comparison ───────────────────────────
+# Same dataset. Same K. Completely different algorithms and goals.
+
+set.seed(SEED)
+cmp <- make_classification(n_samples = 150, n_features = 2, n_informative = 2,
+                            n_redundant = 0, n_classes = 3, random_state = SEED)
+X_cmp <- cmp$X; y_cmp <- cmp$y
+
+split_cmp <- train_test_split(X_cmp, y_cmp, test_size = 0.3, random_state = SEED)
+X_cmp_tr <- split_cmp$X_train; X_cmp_te <- split_cmp$X_test
+y_cmp_tr <- split_cmp$y_train; y_cmp_te <- split_cmp$y_test
+
+# ── KNN: supervised — fits using both X and y (labels) ───────────────────────
+sc_cmp <- StandardScaler$new()
+X_cmp_tr_sc <- sc_cmp$fit_transform(X_cmp_tr)
+X_cmp_te_sc <- sc_cmp$transform(X_cmp_te)
+
+knn_cmp <- KNeighborsClassifier$new(n_neighbors = 5)
+knn_cmp$fit(X_cmp_tr_sc, y_cmp_tr)   # needs LABELS
+
+# ── K-Means: unsupervised — fits using ONLY X (ignores labels entirely) ──────
+km_cmp <- KMeans$new(n_clusters = 3, random_state = SEED)
+km_cmp$fit(X_cmp_tr_sc)              # NO labels passed — completely ignored!
+
+colors_3 <- c("#E74C3C", "#2980B9", "#27AE60")
+
+par(mfrow = c(1, 2))
+
+# ── Left panel: KNN (Supervised Classification) ──────────────────────────────
+grid_cmp <- decision_boundary_grid(knn_cmp, X_cmp_tr_sc, grid_resolution = 100)
+plot(NULL, xlim = range(grid_cmp$gx), ylim = range(grid_cmp$gy),
+     xlab = "Feature 1 (scaled)", ylab = "Feature 2 (scaled)", main = "")
+image(grid_cmp$gx, grid_cmp$gy, grid_cmp$Z, col = adjustcolor(colors_3, alpha.f = 0.25), add = TRUE)
+for (cls in 0:2) {
+  points(X_cmp_tr_sc[y_cmp_tr == cls, 1], X_cmp_tr_sc[y_cmp_tr == cls, 2], col = colors_3[cls + 1], pch = 16, cex = 0.9)
+  points(X_cmp_te_sc[y_cmp_te == cls, 1], X_cmp_te_sc[y_cmp_te == cls, 2], col = colors_3[cls + 1], pch = 17, cex = 1.3)
+}
+acc_cmp <- knn_cmp$score(X_cmp_te_sc, y_cmp_te)
+title(main = sprintf("KNN (K=5) - SUPERVISED Classification\nNeeds labels! Test Accuracy = %.1f%%", acc_cmp * 100))
+
+# ── Right panel: K-Means (Unsupervised Clustering) ───────────────────────────
+plot(NULL, xlim = range(X_cmp_tr_sc[, 1]), ylim = range(X_cmp_tr_sc[, 2]),
+     xlab = "Feature 1 (scaled)", ylab = "", main = "")
+for (k in 0:2) {
+  mask <- km_cmp$labels_ == k
+  points(X_cmp_tr_sc[mask, 1], X_cmp_tr_sc[mask, 2], col = colors_3[k + 1], pch = 16, cex = 0.9)
+}
+points(km_cmp$cluster_centers_[, 1], km_cmp$cluster_centers_[, 2], col = "gold", pch = 8, cex = 3, lwd = 2)
+title(main = sprintf("K-Means (K=3) - UNSUPERVISED Clustering\nNo labels used! Inertia = %.1f", km_cmp$inertia_))
+
+par(mfrow = c(1, 1))
+
+# ── Text summary table ────────────────────────────────────────────────────────
+cat("KEY DIFFERENCES — KNN vs K-Means\n")
+cat(strrep("-", 65), "\n")
+cat(sprintf("%-25s %-20s %s\n", "Feature", "KNN", "K-Means"))
+cat(strrep("-", 65), "\n")
+rows <- list(
+  c("Learning type",     "Supervised",        "Unsupervised"),
+  c("Needs labels?",     "YES (required)",    "NO (never uses them)"),
+  c("K refers to",       "# neighbours",      "# clusters to form"),
+  c("Training",          "Lazy (store data)", "Iterative centroid update"),
+  c("Prediction output", "Class / value",     "Cluster index (0,1,2...)"),
+  c("Distance used for", "Find K neighbours", "Assign to nearest centroid"),
+  c("Use case",          "Classify new point","Discover groups in data"),
+  c("Conf. matrix?",     "Yes",               "No (no true labels)")
+)
+for (r in rows) cat(sprintf("  %-23s %-20s %s\n", r[1], r[2], r[3]))
+cat(strrep("-", 65), "\n")
+```
+
+---
+
+## 12. The Curse of Dimensionality
+
+### The Problem
+
+KNN relies on the idea that **nearby points are similar**.  But in high-dimensional spaces, this idea breaks down.
+
+### Intuition
+
+Imagine you want to cover 10% of a line segment (1D): you need a segment of length 0.1.
+To cover 10% of a square (2D): you need a side of length √0.1 ≈ 0.32.
+To cover 10% of a cube (3D): you need a side of √∛0.1 ≈ 0.46.
+In 10 dimensions (10D): you need a side of 0.1^(1/10) ≈ **0.79** — almost the entire space!
+
+$$\text{Side length to cover fraction } f \text{ in } d \text{ dimensions} = f^{1/d}$$
+
+**Consequence**: In high dimensions, the K nearest neighbours are no longer actually "near".
+All pairwise distances become approximately **equal**, making KNN meaningless.
+
+### Solutions
+
+- **Dimensionality reduction**: PCA, t-SNE, UMAP before applying KNN
+- **Feature selection**: remove irrelevant features
+- **Switch to a different model**: tree-based models, SVMs, neural nets handle high-d better
+
+```{r}
+# ── Visualising the Curse of Dimensionality ───────────────────────────────────
+
+par(mfrow = c(1, 2))
+
+# ── Plot 1: Side length needed to capture 10% of the data ────────────────────
+dims <- 1:50
+fraction <- 0.10
+side_lengths <- fraction^(1 / dims)
+
+plot(dims, side_lengths, type = "o", col = "tomato", pch = 16, cex = 0.5,
+     xlab = "Number of Dimensions", ylab = "Side Length Needed",
+     main = "Side Length to Capture 10% of Data\nvs Number of Dimensions")
+abline(h = 1.0, col = "gray", lty = 2)
+
+# ── Plot 2: Distance concentration — all distances become similar ────────────
+dims_test <- c(1, 2, 5, 10, 20, 50, 100, 200)
+n_samples_test <- 500
+relative_contrast <- numeric(length(dims_test))
+
+set.seed(SEED)
+for (i in seq_along(dims_test)) {
+  d <- dims_test[i]
+  X_rand <- matrix(rnorm(n_samples_test * d), nrow = n_samples_test)
+  idx <- sample(n_samples_test, 200)
+  dists_sample <- c()
+  for (ii in 1:(length(idx) - 1)) {
+    for (jj in (ii + 1):min(ii + 4, length(idx))) {
+      dists_sample <- c(dists_sample, sqrt(sum((X_rand[idx[ii], ] - X_rand[idx[jj], ])^2)))
+    }
+  }
+  relative_contrast[i] <- (max(dists_sample) - min(dists_sample)) / (min(dists_sample) + 1e-10)
+}
+
+plot(dims_test, relative_contrast, type = "o", col = "steelblue", lwd = 2.5, pch = 15, log = "x",
+     xlab = "Number of Dimensions", ylab = "Relative Distance Contrast\n(max-min)/min",
+     main = "Distance Concentration in High Dimensions\n(contrast -> 0 means all distances similar)")
+abline(h = 0, col = "red", lty = 2)
+
+par(mfrow = c(1, 1))
+
+cat("Key takeaway:\n")
+cat("As dimensions increase:\n")
+cat("  1. You need a larger and larger neighbourhood to find K neighbours\n")
+cat("  2. All pairwise distances become nearly equal\n")
+cat('  3. The concept of "nearest" loses meaning\n')
+cat("  -> KNN performance degrades rapidly above ~20 features\n")
+```
+
+```{r}
+# ── How KNN accuracy degrades as dimensionality grows ────────────────────────
+
+n_samples_cod <- 400
+dim_range <- c(2, 5, 10, 20, 50, 100)
+knn_accs <- numeric(length(dim_range))
+
+for (i in seq_along(dim_range)) {
+  d <- dim_range[i]
+  cod <- make_classification(n_samples = n_samples_cod, n_features = d,
+                              n_informative = max(2, d %/% 4), n_redundant = 0,
+                              random_state = SEED)
+  X_cod <- cod$X; y_cod <- cod$y
+  split_cod <- train_test_split(X_cod, y_cod, test_size = 0.3, random_state = SEED)
+  X_c_tr <- split_cod$X_train; X_c_te <- split_cod$X_test
+  y_c_tr <- split_cod$y_train; y_c_te <- split_cod$y_test
+
+  sc_c <- StandardScaler$new()
+  X_c_tr_sc <- sc_c$fit_transform(X_c_tr)
+  X_c_te_sc <- sc_c$transform(X_c_te)
+
+  knn_c <- KNeighborsClassifier$new(n_neighbors = 5)
+  knn_c$fit(X_c_tr_sc, y_c_tr)
+  knn_accs[i] <- knn_c$score(X_c_te_sc, y_c_te)
+}
+
+plot(dim_range, knn_accs, type = "o", col = "tomato", lwd = 2.5, pch = 18, log = "x",
+     ylim = c(0.4, 1.05), xlab = "Number of Features (Dimensions)", ylab = "Test Accuracy",
+     main = "KNN Accuracy vs Dimensionality (K=5, fixed n=400 samples)")
+abline(h = 0.5, col = "gray", lty = 2, lwd = 1.5)
+text(dim_range, knn_accs + 0.03, sprintf("%.2f", knn_accs), cex = 0.8)
+legend("topright", legend = "Random chance (50%)", col = "gray", lty = 2, bty = "n")
+
+cat("As the number of features grows (with a fixed training set size),\n")
+cat("KNN accuracy drops toward random chance — confirming the Curse of Dimensionality.\n")
+```
+
+## Summary
+
+In this chapter, we explored the principles and practical aspects of K-Nearest Neighbors (KNN) for both classification and regression, along with the K-Means clustering algorithm for unsupervised learning. Key takeaways include the importance of feature scaling in distance-based algorithms, understanding the tradeoffs in choosing the K hyperparameter, and recognizing how high dimensionality can harm KNN performance due to the "Curse of Dimensionality." We compared KNN and K-Means, highlighting their differences in learning type, input requirements, and outputs. The chapter also covered techniques such as cross-validation for model selection and methods for evaluating clustering, equipping you with foundational knowledge to apply and interpret these algorithms effectively.
+
+## Exercises
+
+1. **Feature scaling:** Demonstrate the impact of feature scaling on KNN accuracy using any real dataset. Try min-max scaling and standardization.
+2. **Choosing K:** Run KNN classification on a dataset of your choice for K values ranging from 1 to 15. Plot test accuracy versus K. What trend do you observe, and how would you choose the "best" K?
+3. **Curse of Dimensionality:** Using `make_classification()`, simulate datasets with a fixed number of samples and gradually increase the number of features. Plot KNN accuracy as dimensionality increases (as shown above). Explain why this occurs.
+4. **Distance metrics:** Compare KNN performance using Euclidean and Manhattan distance metrics. On what types of problems might one distance metric be preferable?
+5. **KNN for regression:** Apply KNN regression to a synthetic dataset (e.g., `make_regression`). Vary K and observe bias-variance tradeoff on the test set. Plot prediction results for a few K values.
+6. **K-Means clustering demo:** Use K-Means to cluster synthetic 2D data with three clusters. Visualize cluster assignments and centroids. Try different K values and discuss how inertia changes.
+
+---
+
+**← Previous:** [Chapter 04: GLM](chapter-03-glm.qmd)
+**→ Next:** [Chapter 05: Naive Bayes](chapter-05-naive-bayes.qmd)
+
+## 13. Summary & Exercises
+
+### Chapter Summary — KNN
+
+| Concept | What You Learned |
+|---|---|
+| **KNN Intuition** | Ask K nearest neighbours, take majority vote (classify) or average (regress) |
+| **Distance Metrics** | Euclidean (L2), Manhattan (L1), Minkowski — **always scale features first!** |
+| **Lazy Learner** | No real training — stores all data, does all computation at prediction time |
+| **Classification** | Returns the most common class label among K neighbours |
+| **Regression** | Returns the mean target value among K neighbours |
+| **K hyperparameter** | Small K = high variance (overfit) · Large K = high bias (underfit) |
+| **Cross-validation** | Reliable, data-driven way to find the best K without touching the test set |
+| **Feature scaling** | **Mandatory** — without scaling, large-range features dominate distances |
+| **Curse of Dimensionality** | KNN degrades above ~20 features — all distances become similar, "near" loses meaning |
+
+### Chapter Summary — K-Means Clustering
+
+| Concept | What You Learned |
+|---|---|
+| **K-Means Intuition** | Iteratively assign points to K centroids and re-centre until convergence |
+| **Unsupervised** | Requires **no labels** — discovers natural groups in raw data |
+| **Centroid** | The mean (average) position of all points in a cluster |
+| **Inertia** | Within-cluster sum of squared distances — lower = tighter clusters |
+| **Elbow Method** | Plot inertia vs K; pick the K at the "elbow" where gains flatten |
+| **Convergence** | Centroids stop moving when assignments no longer change |
+
+### KNN vs K-Means — Quick Reference
+
+| | KNN | K-Means |
+|--|-----|---------|
+| **Type** | Supervised | Unsupervised |
+| **Labels needed?** | Yes | No |
+| **K means** | Number of neighbours | Number of clusters |
+| **Distance used for** | Finding nearest training points | Assigning to nearest centroid |
+| **Output** | Class label / numeric value | Cluster index (0, 1, 2, …) |
+
+### Complexity
+
+| Algorithm | Operation | Time Complexity |
+|-----------|-----------|----------------|
+| KNN | Training | $O(1)$ — just store data |
+| KNN | Prediction (brute force) | $O(n \cdot p)$ per query |
+| KNN | Prediction (KD-tree) | $O(p \cdot \log n)$ per query |
+| K-Means | Fit (per iteration) | $O(n \cdot K \cdot p)$ |
+| K-Means | Predict | $O(K \cdot p)$ per point |
+
+where $n$ = training samples, $p$ = features, $K$ = number of neighbours / clusters.
+
+---
+
+### Exercises
+
+**Beginner:**
+1. Manually compute the 3 nearest neighbours to the point `c(5.0, 1.7)` from the Iris training set (petal features only). What class does KNN predict?
+2. What accuracy does KNN with K=1 achieve on the **training** set? Why? (Hint: think about what K=1 means when the query point is itself a training point.)
+3. Modify `KNNClassifierScratch` to use Manhattan distance. Do you get different results on the toy Iris data?
+4. Run `KMeans$new(n_clusters = 2)` on the Iris dataset (features only). Which two classes does it lump together?
+
+**Intermediate:**
+5. Implement **weighted KNN** where closer neighbours get higher vote weight ($w = 1/d$). Does it improve accuracy on Iris?
+6. What happens when two classes tie in votes in `KNNClassifierScratch`? Add a tie-breaking rule.
+7. Apply K-Means to the Iris features. Use the Elbow method to confirm K=3. How does inertia compare with K=2 and K=4?
+8. Implement **K-Means++ initialisation** — initialise centroids far apart instead of randomly, to improve convergence stability.
+
+**Advanced:**
+9. Add **Cosine similarity** distance to `KNNClassifierScratch`. When is cosine similarity more appropriate than Euclidean?
+10. Apply **PCA** to reduce Iris to 2D, then apply both KNN (K=5) and K-Means (K=3). Compare the results visually.
+11. Implement **silhouette score** as an alternative to the elbow method for evaluating K-Means cluster quality.
+12. Implement a **KD-tree** data structure from scratch and use it to speed up the nearest-neighbour search in `KNeighborsClassifier`. How does the search time scale compared to brute force as the dataset grows?
+
+---
+
+**← Previous:** [Chapter 04: GLM](chapter-03-glm.qmd)
+**→ Next:** [Chapter 05: Naive Bayes](chapter-05-naive-bayes.qmd)

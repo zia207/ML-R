@@ -1,0 +1,5 @@
+/.quarto/
+**/*.quarto_ipynb
+Notebook/*.html
+Notebook/*.knit.md
+Notebook/*_files/

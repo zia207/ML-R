@@ -1,0 +1,1127 @@
+---
+title: "Chapter 20: Model Evaluation & Best Practices"
+subtitle: "A from-scratch toolkit: splits, cross-validation, classification/regression/ranking/clustering metrics, baselines, and hyperparameter search"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 20: Model Evaluation & Best Practices
+
+> **Level**: All Levels | **Estimated Time**: 4–5 hours
+
+---
+
+## 20.1 Why Evaluation Matters
+
+Training accuracy is meaningless. A model that memorizes the training set scores 100% but fails completely on new data (**overfitting**).
+
+We need **unbiased estimates** of how our model will perform on unseen data.
+
+> **What's new in this expanded chapter.** Evaluation is not one-size-fits-all — the right tool depends on *what kind of model* you built. This chapter now provides a from-scratch toolkit that covers **most model types**:
+>
+> | Model type | Section | Example metrics |
+> |------------|---------|-----------------|
+> | Binary / multiclass classifiers | 20.4–20.6 | accuracy, F1 (macro/micro/weighted), κ, MCC |
+> | Probabilistic classifiers | 20.5 | ROC-AUC, PR-AUC, log-loss, Brier, calibration |
+> | Multi-label classifiers | 20.6 | Hamming loss, subset accuracy, top-k |
+> | Regressors | 20.7 | MAE, RMSE, R², MAPE, sMAPE, adj-R², MSLE |
+> | Rankers / recommenders / retrieval | 20.8 | P@k, R@k, MAP, NDCG, MRR |
+> | Clustering (unsupervised) | 20.9 | silhouette, adjusted Rand index, purity |
+>
+> Everything is implemented in **base R** (no external packages) so you can see exactly how each number is computed.
+
+---
+
+## 20.2 The Train / Validation / Test Split
+
+```
+All Data
+├── Training Set (60–70%)   ← model learns from this
+├── Validation Set (15–20%) ← hyperparameter tuning
+└── Test Set (15–20%)       ← final evaluation (touch once!)
+```
+
+**Golden rule**: Never use the test set during model development. It simulates future, unseen data.
+
+For **classification**, prefer a *stratified* split so every class keeps its proportion in each subset — critical for imbalanced data.
+
+```{r}
+# Split your data into three parts: training, validation, and test.
+#
+# Imagine you have a big box of data and want to check if your model is actually learning, not
+# just memorizing.
+# - Training set: Your model looks at this and learns from it.
+# - Validation set: You use this to test the model a little bit, to tune it, but NOT for the
+#   final test.
+# - Test set: You hide this until the end for the FINAL test—like a pop quiz.
+#
+# This function shuffles your data and splits it up based on the proportions you give.
+# Returns a list with X_train/X_val/X_test and y_train/y_val/y_test.
+train_val_test_split <- function(X, y, val_ratio = 0.15, test_ratio = 0.15, seed = 42) {
+  set.seed(seed)
+  n <- length(X)
+  idx <- sample(n)                              # shuffle all indices
+  test_end <- floor(n * test_ratio)
+  val_end <- test_end + floor(n * val_ratio)
+  test_idx <- idx[seq_len(test_end)]
+  val_idx <- idx[(test_end + 1):val_end]
+  train_idx <- idx[(val_end + 1):n]
+  list(X_train = X[train_idx], X_val = X[val_idx], X_test = X[test_idx],
+       y_train = y[train_idx], y_val = y[val_idx], y_test = y[test_idx])
+}
+
+# Split your data so that the train and test sets have about the same number of each class.
+# (This is SUPER important when some labels are much more common than others, like 90 cats and
+# 10 dogs.) Think of it like making sure your small test sample is still a good mini version of
+# the big data box.
+#
+# - X: your data (features); y: your labels; test_ratio: fraction wanted in the test set
+# Returns list(X_train, X_test, y_train, y_test)
+stratified_split <- function(X, y, test_ratio = 0.2, seed = 42) {
+  set.seed(seed)
+  train_idx <- c(); test_idx <- c()
+  # Put each index into a group for its label, shuffle within group, split
+  for (cls in unique(y)) {
+    idxs <- sample(which(y == cls))
+    # Always take at least one for the test for each label
+    cut <- max(1, floor(length(idxs) * test_ratio))
+    test_idx <- c(test_idx, idxs[seq_len(cut)])
+    train_idx <- c(train_idx, idxs[(cut + 1):length(idxs)])
+  }
+  # Shuffle again so the order is random
+  train_idx <- sample(train_idx); test_idx <- sample(test_idx)
+  list(X_train = X[train_idx], X_test = X[test_idx], y_train = y[train_idx], y_test = y[test_idx])
+}
+
+# quick check to show how this works:
+# Let's pretend we have 100 things: 80 are class 0, 20 are class 1
+X_demo <- 0:99
+y_demo <- c(rep(0, 80), rep(1, 20))
+split_demo <- stratified_split(X_demo, y_demo, 0.2)
+cat("train class balance:\n"); print(table(split_demo$y_train))
+cat("test  class balance:\n"); print(table(split_demo$y_test))
+```
+
+---
+
+## 20.3 Cross-Validation
+
+When data is limited, k-fold CV uses all data for both training and validation:
+
+```
+Fold 1: [VAL][TRN][TRN][TRN][TRN]
+Fold 2: [TRN][VAL][TRN][TRN][TRN]
+Fold 3: [TRN][TRN][VAL][TRN][TRN]
+...
+Score = mean ± std across all folds
+```
+
+Standard: k = 5 or 10. Use **stratified** k-fold for classification, and **nested** CV when you tune hyperparameters *and* estimate performance (an outer loop for the honest estimate, an inner loop for tuning) so the test folds never influence model selection.
+
+```{r}
+# k-fold cross-validation, explained super simply:
+# - We want to check how well our model does on data it hasn't seen.
+# - So, we split our data into k groups ("folds").
+# - Each time, we hold out one group for testing, and use the rest for training.
+# - We repeat this so every group gets a turn being the test set.
+# - We collect a "score" each time (like accuracy).
+# - At the end, we have k scores showing how well the model did on each held-out group.
+#
+# Inputs:
+#   - model_fn: a function that takes (X_train, y_train) and returns a trained model with a
+#     $predict(X) method (an R list with a `predict` field works fine, as used below).
+#   - X, y: the data and labels; k: how many folds; metric_fn: scoring function (default accuracy)
+# Returns: vector of length k, one score per fold.
+k_fold_cv <- function(model_fn, X, y, k = 5, metric_fn = NULL, seed = 42) {
+  set.seed(seed)
+  n <- length(X)
+  indices <- sample(n)             # Shuffle all data indices for randomness!
+  fold_size <- n %/% k             # How big is each fold?
+  scores <- c()
+  for (fold in 0:(k - 1)) {        # For each fold...
+    vs <- fold * fold_size + 1
+    ve <- if (fold < k - 1) vs + fold_size - 1 else n  # last fold gobbles up leftovers
+    val_idx <- indices[vs:ve]                 # Indices for validation/testing
+    train_idx <- setdiff(indices, val_idx)    # All the rest for training
+    X_tr <- X[train_idx]; y_tr <- y[train_idx]
+    X_va <- X[val_idx]; y_va <- y[val_idx]
+    model <- model_fn(X_tr, y_tr)             # Train the model!
+    y_pred <- model$predict(X_va)             # Predict on the validation set
+    if (!is.null(metric_fn)) {
+      scores <- c(scores, metric_fn(y_va, y_pred))
+    } else {
+      # Default: accuracy (how many did we get right?)
+      scores <- c(scores, mean(y_pred == y_va))
+    }
+  }
+  scores
+}
+
+# Make the k-fold split "stratified" so every fold has the same proportions of each class.
+# (Important for classification so each group is balanced!)
+# Returns: list of k vectors, each containing indices for one fold.
+stratified_k_fold_indices <- function(y, k = 5, seed = 42) {
+  set.seed(seed)
+  folds <- vector("list", k)
+  for (i in 1:k) folds[[i]] <- c()
+  # For each class, shuffle its indices, then distribute them to the folds evenly (round robin)
+  for (cls in unique(y)) {
+    idxs <- sample(which(y == cls))
+    for (j in seq_along(idxs)) {
+      fold_num <- ((j - 1) %% k) + 1
+      folds[[fold_num]] <- c(folds[[fold_num]], idxs[j])
+    }
+  }
+  folds
+}
+
+# After running cross-validation, summarize the results:
+# - Returns the average (mean) and the spread (standard deviation) of your scores.
+# - Shows: "On average my model got X, but results can wiggle +-Y"
+cv_summary <- function(scores) {
+  m <- mean(scores)
+  sd_ <- sqrt(mean((scores - m)^2))
+  list(mean = m, sd = sd_)
+}
+```
+
+---
+
+## 20.4 Classification Metrics
+
+### Confusion Matrix
+
+```
+                 Predicted +    Predicted -
+Actual +     True Positive (TP)   False Negative (FN)
+Actual -     False Positive (FP)  True Negative (TN)
+```
+
+### Derived Metrics
+
+$$\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}$$
+
+$$\text{Precision} = \frac{TP}{TP + FP} \quad \leftarrow \text{of predicted +, how many correct?}$$
+
+$$\text{Recall} = \frac{TP}{TP + FN} \quad \leftarrow \text{of actual +, how many found?}$$
+
+$$\text{F1 Score} = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$$
+
+**When to use which**:
+- **Accuracy**: balanced classes
+- **Precision**: false positives are costly (marking good email as spam)
+- **Recall**: false negatives are costly (missing a cancer patient)
+- **F1**: imbalanced classes, balance precision/recall
+
+### Multiclass averaging
+
+With more than two classes you must *average* the per-class scores:
+- **macro** — unweighted mean over classes (every class counts equally; good when you care about rare classes)
+- **weighted** — mean weighted by class support (reflects the overall population)
+- **micro** — pool all TP/FP/FN first (for single-label multiclass this equals accuracy)
+
+### Agreement metrics that correct for chance
+
+- **Cohen's κ** — accuracy adjusted for the agreement expected by chance (0 = chance, 1 = perfect).
+- **Matthews correlation coefficient (MCC)** — a balanced score even under heavy class imbalance (−1 to +1).
+
+```{r}
+# --- Dummy-Friendly Explanations Below ---
+
+# How many did we get right, out of all tries?
+accuracy <- function(y_true, y_pred) mean(y_true == y_pred)
+
+# Make a square table (matrix) showing how many times things were guessed right or wrong.
+# Rows = real answers, columns = guesses. Each cell counts how often ('cat', 'dog'), etc.
+confusion_matrix <- function(y_true, y_pred, classes = NULL) {
+  if (is.null(classes)) classes <- sort(unique(c(y_true, y_pred)))  # all possible labels
+  idx <- setNames(seq_along(classes), as.character(classes))       # map classes to numbers
+  size <- length(classes)
+  cm <- matrix(0, nrow = size, ncol = size)  # square grid, all zeros
+  for (i in seq_along(y_true)) {             # tally counts: row = true, col = predicted
+    ri <- idx[[as.character(y_true[i])]]; ci <- idx[[as.character(y_pred[i])]]
+    cm[ri, ci] <- cm[ri, ci] + 1
+  }
+  list(cm = cm, classes = classes)
+}
+
+# For each class (e.g., 'cat', 'dog'):
+#   TP (True Positive): Correctly guessed as this class
+#   FP (False Positive): Wrongly guessed as this class
+#   FN (False Negative): Should have been this class, but guessed wrong
+# Calculate precision, recall, f1, and support (how many times actually this class)
+per_class_stats <- function(cm) {
+  k <- nrow(cm)
+  stats <- vector("list", k)
+  for (i in 1:k) {
+    TP <- cm[i, i]
+    FP <- sum(cm[, i]) - TP
+    FN <- sum(cm[i, ]) - TP
+    support <- sum(cm[i, ])  # How many real examples of this class
+    precision <- if (TP + FP > 0) TP / (TP + FP) else 0.0
+    recall <- if (TP + FN > 0) TP / (TP + FN) else 0.0
+    f1 <- if (precision + recall > 0) 2 * precision * recall / (precision + recall) else 0.0
+    stats[[i]] <- list(precision = precision, recall = recall, f1 = f1, support = support)
+  }
+  stats
+}
+
+# Compute overall (precision, recall, f1) for the whole prediction task.
+# There are different ways to 'average' over classes:
+#   - macro: treat all classes equally
+#   - weighted: big classes matter more
+#   - micro: treat every individual prediction equally
+precision_recall_f1 <- function(y_true, y_pred, average = "macro") {
+  cm <- confusion_matrix(y_true, y_pred)$cm
+  stats <- per_class_stats(cm)
+  k <- nrow(cm)
+  if (average == "macro") {
+    p <- mean(sapply(stats, function(s) s$precision))
+    r <- mean(sapply(stats, function(s) s$recall))
+    f <- mean(sapply(stats, function(s) s$f1))
+  } else if (average == "weighted") {
+    total <- sum(sapply(stats, function(s) s$support)); if (total == 0) total <- 1
+    p <- sum(sapply(stats, function(s) s$precision * s$support)) / total
+    r <- sum(sapply(stats, function(s) s$recall * s$support)) / total
+    f <- sum(sapply(stats, function(s) s$f1 * s$support)) / total
+  } else if (average == "micro") {
+    TP <- sum(diag(cm))
+    total <- sum(cm); if (total == 0) total <- 1
+    p <- r <- f <- TP / total
+  } else {
+    stop("average must be macro, weighted, or micro")
+  }
+  list(precision = p, recall = r, f1 = f)
+}
+
+# Print a nice summary table of all the scores, for each class and overall.
+classification_report <- function(y_true, y_pred) {
+  classes <- sort(unique(c(y_true, y_pred)))
+  cm <- confusion_matrix(y_true, y_pred, classes)$cm
+  stats <- per_class_stats(cm)
+  cat(sprintf("%-12s%10s%10s%10s%10s\n", "Class", "Precision", "Recall", "F1", "Support"))
+  cat(strrep("-", 52), "\n")
+  for (i in seq_along(classes)) {
+    s <- stats[[i]]
+    cat(sprintf("%-12s%10.3f%10.3f%10.3f%10d\n", as.character(classes[i]), s$precision, s$recall, s$f1, s$support))
+  }
+  cat(strrep("-", 52), "\n")
+  for (avg in c("macro", "weighted")) {
+    r <- precision_recall_f1(y_true, y_pred, avg)
+    cat(sprintf("%-12s%10.3f%10.3f%10.3f%10d\n", paste0(avg, " avg"), r$precision, r$recall, r$f1, length(y_true)))
+  }
+  acc <- accuracy(y_true, y_pred)
+  cat(sprintf("%-12s%10s%10s%10.3f%10d\n", "accuracy", "", "", acc, length(y_true)))
+}
+
+# How much better are we than random guessing? (1=perfect, 0=guessing as likely as chance)
+cohen_kappa <- function(y_true, y_pred) {
+  cm <- confusion_matrix(y_true, y_pred)$cm
+  n <- sum(cm); if (n == 0) n <- 1
+  p_observed <- sum(diag(cm)) / n  # How often did we agree?
+  row_totals <- rowSums(cm); col_totals <- colSums(cm)
+  p_expected <- sum(row_totals * col_totals) / (n * n)  # How often would we agree by chance?
+  if (p_expected != 1) (p_observed - p_expected) / (1 - p_expected) else 0.0
+}
+
+# Matthews Correlation Coefficient: Smart measure for binary problems (balanced for class sizes).
+# Range: -1 (worst) to 1 (perfect), 0 = random.
+matthews_corrcoef <- function(y_true, y_pred) {
+  TP <- sum(y_true == 1 & y_pred == 1)  # Got positive right
+  TN <- sum(y_true == 0 & y_pred == 0)  # Got negative right
+  FP <- sum(y_true == 0 & y_pred == 1)  # Guessed positive but shouldn't
+  FN <- sum(y_true == 1 & y_pred == 0)  # Missed positive (guessed negative)
+  numerator <- TP * TN - FP * FN
+  denominator <- sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))
+  if (denominator != 0) numerator / denominator else 0.0
+}
+
+# Example: Suppose we want to try this code!
+set.seed(1)
+classes3 <- c("cat", "dog", "fox")   # We have 3 possible animals
+yt3 <- sample(classes3, 150, replace = TRUE)  # Make up some true answers
+# Now, try to guess, sometimes getting it wrong on purpose
+yp3 <- sapply(yt3, function(cl) if (runif(1) > 0.25) cl else sample(classes3, 1))
+classification_report(yt3, yp3)
+cat(sprintf("\nCohen's kappa: %.3f\n", cohen_kappa(yt3, yp3)))
+```
+
+---
+
+## 20.5 Probabilistic & Threshold-Based Metrics
+
+Many classifiers output a **probability**, not just a label. These metrics judge the quality of those probabilities and how the model behaves across all decision thresholds — essential for imbalanced problems and for any model whose threshold you'll tune later.
+
+- **ROC-AUC** — ranking quality across thresholds (0.5 = random, 1.0 = perfect). Can look optimistic under heavy imbalance.
+- **PR-AUC / Average Precision** — area under the precision–recall curve; far more informative than ROC when positives are rare.
+- **Log-loss (cross-entropy)** — punishes confident wrong probabilities harshly.
+- **Brier score** — mean squared error of the predicted probability (lower is better).
+- **Calibration** — do predicted probabilities match observed frequencies? A model that says "0.8" should be right ~80% of the time.
+
+```{r}
+# Calculates the ROC-AUC (Area Under the Receiver Operating Characteristic Curve) for binary
+# classification.
+#
+# In plain English:
+#   - y_true: vector of true answers (0 for negative, 1 for positive).
+#   - y_scores: each item's predicted "score" or probability of being positive.
+#   - ROC-AUC tells you how good the model is at ranking positives above negatives.
+#     1.0 = perfect; 0.5 = random.
+#
+# Returns: list(auc, fpr, tpr) -- the AUC plus the curve's False/True Positive Rate values.
+roc_auc <- function(y_true, y_scores) {
+  # Pair up each prediction and its true label, then sort from highest score down (best guess first)
+  ord <- order(-y_scores)
+  ys <- y_scores[ord]; yt <- y_true[ord]
+  n_pos <- sum(y_true); n_neg <- length(y_true) - n_pos  # How many actual positives/negatives?
+
+  tpr_list <- c(0.0); fpr_list <- c(0.0)  # Will store the curve
+  tp <- 0; fp <- 0                        # Start with no true/false positives counted
+  prev <- NULL
+
+  for (i in seq_along(ys)) {
+    if (is.null(prev) || ys[i] != prev) {  # Whenever the score changes, record our current rates
+      tpr_list <- c(tpr_list, if (n_pos > 0) tp / n_pos else 0)
+      fpr_list <- c(fpr_list, if (n_neg > 0) fp / n_neg else 0)
+      prev <- ys[i]
+    }
+    if (yt[i] == 1) tp <- tp + 1 else fp <- fp + 1
+  }
+  tpr_list <- c(tpr_list, 1.0); fpr_list <- c(fpr_list, 1.0)
+
+  # Calculate area under the curve using trapezoids
+  auc <- 0
+  for (i in 1:(length(tpr_list) - 1)) {
+    auc <- auc + (fpr_list[i + 1] - fpr_list[i]) * (tpr_list[i + 1] + tpr_list[i]) / 2
+  }
+  list(auc = auc, fpr = fpr_list, tpr = tpr_list)
+}
+
+# Computes Average Precision (the area under the Precision-Recall curve).
+# For dummies:
+#   - Shows you at all possible thresholds how well the model finds positives and how "precise" it is.
+#   - Suits rare-target problems. 1.0 = perfect, lower = worse.
+pr_auc <- function(y_true, y_scores) {
+  ord <- order(-y_scores)
+  ys <- y_scores[ord]; yt <- y_true[ord]
+  n_pos <- sum(y_true); if (n_pos == 0) n_pos <- 1  # Avoid dividing by 0 if no positives
+
+  tp <- 0; fp <- 0; ap <- 0.0; prev_recall <- 0.0
+  for (i in seq_along(ys)) {
+    if (yt[i] == 1) tp <- tp + 1 else fp <- fp + 1
+    precision <- tp / (tp + fp)
+    recall <- tp / n_pos
+    ap <- ap + precision * (recall - prev_recall)  # area of segment
+    prev_recall <- recall
+  }
+  ap
+}
+
+# Computes "log loss" (cross-entropy).
+# - Punishes wrong, overconfident probability predictions. Lower = better.
+log_loss <- function(y_true, y_prob, eps = 1e-15) {
+  p <- pmin(pmax(y_prob, eps), 1 - eps)  # Make sure probabilities never hit exact 0 or 1
+  -mean(y_true * log(p) + (1 - y_true) * log(1 - p))
+}
+
+# Brier score is just mean squared error for probabilities.
+# For each datapoint, subtract the probability you guessed for the true class, square, average.
+# Lower is better, 0 is perfect.
+brier_score <- function(y_true, y_prob) mean((y_prob - y_true)^2)
+
+# Makes a calibration curve.
+# - Bins the predicted probabilities (e.g. 0-0.1, 0.1-0.2, etc).
+# - For each bin: shows average predicted probability, actual fraction truly positive, and how
+#   many samples fell in the bin.
+# - If your model is well-calibrated, numbers should be close (e.g. things you predict as 0.8
+#   should be correct about 80% of the time).
+# Returns: list of list(mean_pred, observed, count) for each non-empty bin.
+calibration_curve <- function(y_true, y_prob, bins = 10) {
+  edges <- seq(0, 1, length.out = bins + 1)  # Define bin edges 0.0 .. 1.0
+  out <- list()
+  for (b in 1:bins) {
+    lo <- edges[b]; hi <- edges[b + 1]
+    sel <- if (b < bins) which(y_prob >= lo & y_prob < hi) else which(y_prob >= lo & y_prob <= hi)
+    if (length(sel) > 0) {  # If there's at least something in the bin
+      mp <- mean(y_prob[sel])  # mean predicted
+      of <- mean(y_true[sel])  # observed frequency
+      out[[length(out) + 1]] <- list(mean_pred = mp, observed = of, count = length(sel))
+    }
+  }
+  out
+}
+
+# Demo for Dummies: Let's try these metrics with a pretend model!
+set.seed(7)
+# Imagine 400 items, with true answers randomly chosen (1 = positive, 0 = negative)
+yt <- sample(c(0, 1), 400, replace = TRUE)
+# The model is pretty good: it gives 0.75 for real positives, 0.25 for negatives, plus some noise
+yp <- sapply(yt, function(v) min(1, max(0, (if (v == 1) 0.75 else 0.25) + rnorm(1, 0, 0.18))))
+
+cat(sprintf("ROC-AUC : %.3f   # Closer to 1 means model separates classes well\n", roc_auc(yt, yp)$auc))
+cat(sprintf("PR-AUC  : %.3f       # High means model finds positives without including too many false alarms\n", pr_auc(yt, yp)))
+cat(sprintf("Log-loss: %.3f     # Lower is better and means your probability guesses match reality\n", log_loss(yt, yp)))
+cat(sprintf("Brier   : %.3f   # Again, lower = better\n", brier_score(yt, yp)))
+
+cat("\nCalibration (mean_pred -> observed):\n")
+for (b in calibration_curve(yt, yp, bins = 5)) {
+  cat(sprintf("  %.2f -> %.2f  (n=%d)   # How well does 'I'm X%% confident' match reality?\n", b$mean_pred, b$observed, b$count))
+}
+```
+
+---
+
+## 20.6 Multi-class Top-k & Multi-label Metrics
+
+**Top-k accuracy** (multiclass): the true label is counted correct if it appears among the model's *k* highest-scoring classes — standard for large label spaces (e.g. ImageNet top-5).
+
+**Multi-label** problems let each example carry *several* labels at once (tags on an article, objects in an image). Represent predictions and truth as sets:
+- **Subset accuracy** — the strict score: the predicted set must match *exactly*.
+- **Hamming loss** — fraction of individual label slots that are wrong (much more forgiving).
+
+```{r}
+# Dummy explanation:
+# In problems where you have to pick from many classes (like 'which animal is in this picture?'),
+# sometimes we care if the right answer is among the top-k guesses, not just the single best.
+# This function counts how often the true answer is in the model's top k most confident predictions.
+#
+# y_true: vector of correct classes; y_scores_list: for each example, a named list {class: score}
+# k: how many guesses are allowed (top-k).
+# Returns the fraction of times the true class was in the top k guesses.
+top_k_accuracy <- function(y_true, y_scores_list, k = 3) {
+  correct <- 0
+  for (i in seq_along(y_true)) {
+    scores <- y_scores_list[[i]]
+    # Sort classes by score (highest first), keep top k classes
+    topk <- names(scores)[order(-unlist(scores))][1:min(k, length(scores))]
+    correct <- correct + (as.character(y_true[i]) %in% topk)  # Was the true class among the top k?
+  }
+  correct / length(y_true)
+}
+
+# Dummy explanation:
+# In multi-label problems (each example can have several tags/labels), subset accuracy measures
+# how often the predicted set was EXACTLY right -- no missing labels, no extras.
+#
+# y_true_sets, y_pred_sets: lists of label vectors for each example.
+# Returns the fraction of times the prediction was *perfect* (all labels matched exactly).
+subset_accuracy <- function(y_true_sets, y_pred_sets) {
+  mean(mapply(function(t, p) setequal(t, p), y_true_sets, y_pred_sets))
+}
+
+# Dummy explanation:
+# Hamming loss measures how many label decisions were wrong out of all possible ones.
+# (Think: For every label ("cat", "dog", etc), was it flipped on/off correctly in each example?)
+# For example, 3 labels and 2 examples gives 6 label slots. If 2 slots are wrong, loss = 2/6.
+#
+# all_labels: every possible label that can exist.
+# Returns the average fraction of label-slots that are wrong (lower is better).
+hamming_loss <- function(y_true_sets, y_pred_sets, all_labels) {
+  L <- length(all_labels)
+  n <- length(y_true_sets)
+  wrong <- 0
+  for (i in 1:n) {
+    t <- y_true_sets[[i]]; p <- y_pred_sets[[i]]
+    # symmetric difference: labels present in one set but not the other (the incorrect ones)
+    wrong <- wrong + length(union(setdiff(t, p), setdiff(p, t)))
+  }
+  wrong / (n * L)
+}
+
+# DUMMY DEMO!
+set.seed(3)
+labels_ <- c("a", "b", "c", "d")
+
+# For multi-label: each example is tagged with 1 or 2 random labels
+truth <- lapply(1:50, function(i) sample(labels_, sample(1:2, 1)))
+pred <- lapply(1:50, function(i) sample(labels_, sample(1:2, 1)))
+cat(sprintf("Subset accuracy: %.3f   # Exact match rate, hard to get high\n", subset_accuracy(truth, pred)))
+cat(sprintf("Hamming loss   : %.3f   # Fraction of wrong label slots (lower is better)\n", hamming_loss(truth, pred, labels_)))
+
+# For top-k demo: each example gets random scores for each label, but only 1 is the "truth"
+scores_list <- lapply(1:50, function(i) setNames(as.list(runif(length(labels_))), labels_))
+single_truth <- sample(labels_, 50, replace = TRUE)
+cat(sprintf("Top-1 accuracy : %.3f   # Only top guess allowed\n", top_k_accuracy(single_truth, scores_list, 1)))
+cat(sprintf("Top-2 accuracy : %.3f   # Top 2 guesses allowed\n", top_k_accuracy(single_truth, scores_list, 2)))
+```
+
+---
+
+## 20.7 Regression Metrics
+
+| Metric | Formula | Notes |
+|--------|---------|-------|
+| MAE | $\frac{1}{n}\sum\|y_i-\hat{y}_i\|$ | robust to outliers, same units as target |
+| MSE | $\frac{1}{n}\sum (y_i-\hat{y}_i)^2$ | penalizes large errors more |
+| RMSE | $\sqrt{\text{MSE}}$ | same units as target |
+| R² | $1-\frac{SS_{res}}{SS_{tot}}$ | 1 = perfect, 0 = baseline, <0 = worse than mean |
+| Adjusted R² | $1-(1-R^2)\frac{n-1}{n-p-1}$ | R² penalized for number of features $p$ |
+| MAPE | $\frac{1}{n}\sum\frac{\|y_i-\hat{y}_i\|}{\|y_i\|}$ | percentage error (undefined at $y_i=0$) |
+| sMAPE | $\frac{1}{n}\sum\frac{\|y_i-\hat{y}_i\|}{(\|y_i\|+\|\hat{y}_i\|)/2}$ | symmetric, bounded |
+| MSLE | $\frac{1}{n}\sum(\log(1+y_i)-\log(1+\hat{y}_i))^2$ | for targets spanning orders of magnitude |
+| Median AE | $\text{median}(\|y_i-\hat{y}_i\|)$ | very outlier-robust |
+
+Pick MAE/median-AE when outliers shouldn't dominate, RMSE when large errors matter most, MAPE/sMAPE when relative error is what stakeholders care about, and MSLE for skewed positive targets (prices, counts).
+
+```{r}
+mae <- function(y_true, y_pred) mean(abs(y_true - y_pred))              # Mean Absolute Error
+mse <- function(y_true, y_pred) mean((y_true - y_pred)^2)               # Mean Squared Error
+rmse <- function(y_true, y_pred) sqrt(mse(y_true, y_pred))              # Root Mean Squared Error
+
+# Coefficient of determination (R^2)
+r_squared <- function(y_true, y_pred) {
+  m <- mean(y_true)
+  ss_tot <- sum((y_true - m)^2)
+  ss_res <- sum((y_true - y_pred)^2)
+  if (ss_tot != 0) 1 - ss_res / ss_tot else 0.0
+}
+
+# Adjusted R^2 (penalizes adding features)
+adjusted_r2 <- function(y_true, y_pred, n_features) {
+  n <- length(y_true)
+  r2 <- r_squared(y_true, y_pred)
+  denom <- n - n_features - 1
+  if (denom > 0) 1 - (1 - r2) * (n - 1) / denom else NaN
+}
+
+# Mean Absolute Percentage Error (careful: undefined at y=0)
+mape <- function(y_true, y_pred, eps = 1e-9) mean(abs(y_true - y_pred) / pmax(abs(y_true), eps))
+
+# Symmetric Mean Absolute Percentage Error (bounded, robust to zeros)
+smape <- function(y_true, y_pred, eps = 1e-9) {
+  mean(abs(y_true - y_pred) / pmax((abs(y_true) + abs(y_pred)) / 2, eps))
+}
+
+# Mean Squared Log Error (for targets spanning orders of magnitude)
+msle <- function(y_true, y_pred) mean((log1p(pmax(y_true, 0)) - log1p(pmax(y_pred, 0)))^2)
+
+# Median Absolute Error (more robust to outliers than MAE)
+median_absolute_error <- function(y_true, y_pred) median(abs(y_true - y_pred))
+
+# Explained Variance score
+explained_variance <- function(y_true, y_pred) {
+  resid <- y_true - y_pred
+  var_res <- mean((resid - mean(resid))^2)
+  var_y <- mean((y_true - mean(y_true))^2)
+  if (var_y != 0) 1 - var_res / var_y else 0.0
+}
+
+# DEMO: Generate dummy regression data and print all metrics
+# Create a toy regression problem: yt = true values, yp = noisy predictions
+set.seed(5)
+yt <- as.numeric(1:40)                  # "Ground truth" values [1, 2, ..., 40]
+yp <- yt + rnorm(40, 0, 2)               # Add Gaussian noise for predictions
+
+# Show all metrics so you can see typical ranges
+metric_fns <- list(MAE = mae, RMSE = rmse, R2 = r_squared, MAPE = mape, sMAPE = smape,
+                    MSLE = msle, MedianAE = median_absolute_error, ExplVar = explained_variance)
+for (nm in names(metric_fns)) cat(sprintf("%9s: %.4f\n", nm, metric_fns[[nm]](yt, yp)))
+# Show adjusted R^2 as well for reference (pretend we had 3 features)
+cat(sprintf("%9s: %.4f\n", "Adj-R2", adjusted_r2(yt, yp, n_features = 3)))
+```
+
+---
+
+## 20.8 Ranking / Recommendation / Retrieval Metrics
+
+Search engines, recommenders and retrieval systems don't output a single label — they output an *ordered list*, and what matters is whether the relevant items sit near the top.
+
+- **Precision@k / Recall@k** — of the top *k* results, how many are relevant / how many of all relevant items did we surface.
+- **Average Precision (AP)** and its mean over queries, **MAP** — reward putting relevant items early.
+- **DCG / NDCG** — discounted cumulative gain, normalized to [0,1]; handles graded relevance and position discounting.
+- **MRR** — mean reciprocal rank of the first relevant hit (great for "one right answer" tasks).
+- **Hit rate@k** — did at least one relevant item make the top *k*.
+
+```{r}
+# "For dummies" explanation versions of each metric:
+
+# Of the top k items that the system recommended, how many were actually relevant?
+precision_at_k <- function(recommended, relevant, k) {
+  topk <- recommended[1:k]
+  sum(topk %in% relevant) / k
+}
+
+# Of all the relevant (correct) items possible, how many did we manage to show in the first k
+# recommendations?
+recall_at_k <- function(recommended, relevant, k) {
+  if (length(relevant) == 0) return(0.0)
+  topk <- recommended[1:k]
+  sum(topk %in% relevant) / length(relevant)
+}
+
+# Measures how well we put relevant items early in our ranked list.
+# For every relevant item, it checks: when you saw it, what was the precision up to that point?
+# Then it averages those values, rewarding lists with good stuff near the top.
+average_precision <- function(recommended, relevant) {
+  if (length(relevant) == 0) return(0.0)
+  hits <- 0; score <- 0.0
+  for (i in seq_along(recommended)) {
+    if (recommended[i] %in% relevant) {
+      hits <- hits + 1
+      score <- score + hits / i  # Precision at this spot in the list
+    }
+  }
+  score / length(relevant)
+}
+
+# The 'average of averages'. For a batch of searches/users, take each one's average_precision,
+# then average those numbers.
+mean_average_precision <- function(list_of_recommended, list_of_relevant) {
+  aps <- mapply(average_precision, list_of_recommended, list_of_relevant)
+  if (length(aps) > 0) mean(aps) else 0.0
+}
+
+# Discounted Cumulative Gain: Gives credit for relevant items near the top, but less credit as
+# you go down. 'relevance' = a named list: bigger numbers mean more relevant.
+dcg_at_k <- function(recommended, relevance, k) {
+  total <- 0.0
+  n <- min(k, length(recommended))
+  for (i in seq_len(n)) {
+    item <- recommended[i]
+    score <- if (item %in% names(relevance)) relevance[[item]] else 0
+    total <- total + score / log2(i + 1)
+  }
+  total
+}
+
+# Normalized DCG: Same as DCG, but we divide by the best possible score.
+# So you get a value between 0 and 1: 1 means you put all the most important stuff at the very top.
+ndcg_at_k <- function(recommended, relevance, k) {
+  dcg <- dcg_at_k(recommended, relevance, k)
+  ideal <- sort(unlist(relevance), decreasing = TRUE)[1:min(k, length(relevance))]
+  idcg <- sum(sapply(seq_along(ideal), function(i) ideal[i] / log2(i + 1)))
+  if (idcg != 0) dcg / idcg else 0.0
+}
+
+# Look at each search/user: where was their first relevant item? If it was first, you get 1
+# point; second, 1/2; third, 1/3, etc. Then average across all users.
+mean_reciprocal_rank <- function(list_of_recommended, list_of_relevant) {
+  total <- 0.0
+  for (i in seq_along(list_of_recommended)) {
+    rec <- list_of_recommended[[i]]; rel_set <- list_of_relevant[[i]]
+    rr <- 0.0
+    for (j in seq_along(rec)) {
+      if (rec[j] %in% rel_set) { rr <- 1 / j; break }  # Found first hit at rank i
+    }
+    total <- total + rr
+  }
+  total / length(list_of_recommended)
+}
+
+# For each user/query: did they see at least one relevant item in the top k? (Yes=1, No=0)
+hit_rate_at_k <- function(list_of_recommended, list_of_relevant, k) {
+  hits <- 0
+  for (i in seq_along(list_of_recommended)) {
+    rec <- list_of_recommended[[i]]; rel_set <- list_of_relevant[[i]]
+    if (any(rec[1:min(k, length(rec))] %in% rel_set)) hits <- hits + 1
+  }
+  hits / length(list_of_recommended)
+}
+
+# Demos with simple explanations
+
+# Let's say our system recommends these 5 docs, in this order:
+recs <- c("d1", "d2", "d3", "d4", "d5")
+# And the user thinks d1, d3, and d5 are the relevant ones.
+rel <- c("d1", "d3", "d5")
+
+cat(sprintf("Precision@3: %.3f  # Of top 3, what fraction is relevant?\n", precision_at_k(recs, rel, 3)))
+cat(sprintf("Recall@3   : %.3f     # Of all relevant docs, how many are in top 3?\n", recall_at_k(recs, rel, 3)))
+cat(sprintf("AP         : %.3f  # Did we rank relevant docs early?\n", average_precision(recs, rel)))
+graded <- list(d1 = 3, d2 = 0, d3 = 2, d4 = 0, d5 = 1)
+cat(sprintf("NDCG@5     : %.3f     # Did we put the highest-importance docs at the very top?\n", ndcg_at_k(recs, graded, 5)))
+
+# Example with multiple users/queries:
+R_ <- list(c("a", "b", "c"), c("x", "y", "z"))
+RL_ <- list(c("b"), c("x", "z"))  # What each user actually wanted
+cat(sprintf("MAP        : %.3f  # Are relevant items near the top, averaged over users?\n", mean_average_precision(R_, RL_)))
+cat(sprintf("MRR        : %.3f     # How quickly do we return a first relevant doc, on average?\n", mean_reciprocal_rank(R_, RL_)))
+cat(sprintf("HitRate@2  : %.3f         # For each user, did at least 1 relevant show up in top 2?\n", hit_rate_at_k(R_, RL_, 2)))
+```
+
+---
+
+## 20.9 Clustering & Unsupervised Metrics
+
+Unsupervised models have no labels to compare against directly, so evaluation splits into two families.
+
+**Internal** (labels not needed) — judge the geometry of the clustering:
+- **Silhouette score** — for each point, how much closer it is to its own cluster than to the nearest other cluster (−1 to +1, higher is better).
+
+**External** (ground-truth labels available) — compare discovered clusters to known classes:
+- **Adjusted Rand Index (ARI)** — agreement between two labelings, corrected for chance (0 = random, 1 = identical).
+- **Purity** — fraction of points that fall in the majority-class of their cluster (simple, but grows with cluster count).
+
+```{r}
+# Distance between two points (think: measuring with a ruler)
+euclidean_dist <- function(a, b) sqrt(sum((a - b)^2))
+
+# Silhouette Score, explained simply:
+#   - For each point:
+#       - Calculate how close it is, on average, to other points in its own cluster ('a').
+#       - Calculate how far it is, on average, from points in the *next best* other cluster ('b').
+#       - Score for that point = (b - a) / max(a, b)
+#   - Average this score for all points. Result is from -1 (bad) to +1 (great).
+silhouette_score <- function(X, labels) {
+  n <- length(X)
+  clusters <- split(seq_len(n), labels)
+  total <- 0.0
+  for (i in 1:n) {
+    own <- labels[i]
+    same <- setdiff(clusters[[as.character(own)]], i)
+    # a: How close am I to my own group?
+    a <- if (length(same) > 0) mean(sapply(same, function(j) euclidean_dist(X[[i]], X[[j]]))) else 0.0
+    b <- Inf
+    # b: How close am I, on average, to the other groups? (take the nearest one)
+    for (lab in names(clusters)) {
+      if (lab == as.character(own)) next
+      members <- clusters[[lab]]
+      d <- mean(sapply(members, function(j) euclidean_dist(X[[i]], X[[j]])))
+      if (d < b) b <- d
+    }
+    s <- if (max(a, b) == 0) 0.0 else (b - a) / max(a, b)
+    total <- total + s
+  }
+  total / n
+}
+
+comb2 <- function(x) x * (x - 1) / 2
+
+# Adjusted Rand Index (ARI), for dummies:
+#   - Compare your clusters to the real answer.
+#   - It measures how much the two labelings agree, *corrected for lucky guesses*.
+#   - 0 means random chance, 1 means perfect match, can go negative if really bad.
+adjusted_rand_index <- function(labels_true, labels_pred) {
+  n <- length(labels_true)
+  tab <- table(labels_true, labels_pred)
+  sum_comb <- sum(comb2(as.vector(tab)))
+  sum_a <- sum(comb2(rowSums(tab)))
+  sum_b <- sum(comb2(colSums(tab)))
+  total_comb <- comb2(n)
+  expected <- if (total_comb != 0) sum_a * sum_b / total_comb else 0
+  maxi <- (sum_a + sum_b) / 2
+  if (maxi != expected) (sum_comb - expected) / (maxi - expected) else 1.0
+}
+
+# Purity, for dummies:
+#   - For each predicted group, find out which real class has the most members inside it.
+#   - Count these 'correct' ones and divide by total points.
+#   - 1.0 means perfect match, 0 means a mess!
+purity <- function(labels_true, labels_pred) {
+  tab <- table(labels_pred, labels_true)
+  correct <- sum(apply(tab, 1, max))
+  correct / length(labels_true)
+}
+
+# Dummy example anyone can understand: Make two groups of blobs (like drawing two clusters with
+# a marker)
+set.seed(11)
+blobA <- lapply(1:40, function(i) c(rnorm(1, 0, 0.5), rnorm(1, 0, 0.5)))  # Cluster 1
+blobB <- lapply(1:40, function(i) c(rnorm(1, 4, 0.5), rnorm(1, 4, 0.5)))  # Cluster 2
+X_clust <- c(blobA, blobB)
+pred_labels <- c(rep(0, 40), rep(1, 40))  # Prediction: Points 1-40 in cluster 0, 41-80 in cluster 1
+true_labels <- c(rep(0, 40), rep(1, 40))  # "True" answer: same as prediction
+
+# Print out the dummy scores
+cat(sprintf("Silhouette : %.3f  # +1 is best, -1 is worst, 0 is eh\n", silhouette_score(X_clust, pred_labels)))
+cat(sprintf("ARI        : %.3f  # 1 is perfect, 0 is random, <0 is bad\n", adjusted_rand_index(true_labels, pred_labels)))
+cat(sprintf("Purity     : %.3f  # 1 is perfect, lower means more mixing\n", purity(true_labels, pred_labels)))
+```
+
+---
+
+## 20.10 Overfitting, Underfitting & Learning Curves
+
+```
+         Training Error   Test Error
+Underfit:    High            High       (model too simple)
+Good fit:    Low             Low        (generalization)
+Overfit:     Low             High       (memorization)
+```
+
+A **learning curve** plots training and validation error as the training-set size grows. It's the single most useful diagnostic:
+- Both errors high and close → **underfitting** (add capacity / features).
+- Big gap, train low & val high → **overfitting** (more data / regularization / simpler model).
+- Both low and converging → **good fit**.
+
+### Remedies
+
+**Overfitting:** more data, regularization (L1/L2), simpler model, dropout, early stopping, cross-validation.
+**Underfitting:** more complex model, better features, less regularization, train longer.
+
+```{r}
+# Let's break this down "for dummies" - simple, step-by-step, no jargon.
+
+# Checks how well a model gets better with more data.
+# - Trains the model on small chunks, then bigger ones, then all data.
+# - At each step, checks errors on both the training and a "test" (validation) set.
+# - Returns rows: how many points we used, how wrong it was on training, and on test.
+learning_curve <- function(model_fn, X, y, metric_fn, sizes = c(0.2, 0.4, 0.6, 0.8, 1.0),
+                            val_ratio = 0.25, seed = 42) {
+  set.seed(seed)  # Always mix up data the same way, for fairness.
+  idx <- sample(length(X))  # Mix up all data point positions.
+  cut <- floor(length(X) * (1 - val_ratio))  # Where to split between training and testing.
+  tr_idx <- idx[1:cut]; va_idx <- idx[(cut + 1):length(X)]
+  Xva <- X[va_idx]; yva <- y[va_idx]  # "Test" set (not used for training).
+  rows <- list()
+  for (frac in sizes) {  # Try with small portion, then bigger, up to all the data.
+    m <- max(1, floor(length(tr_idx) * frac))  # How many training points to use at this step.
+    use <- tr_idx[1:m]
+    Xtr <- X[use]; ytr <- y[use]
+    model <- model_fn(Xtr, ytr)  # Train the model however is needed.
+    # 1 - accuracy = how wrong we are. (A perfect model: error=0)
+    tr_err <- 1 - metric_fn(ytr, model$predict(Xtr))  # Oopsies on our own training data.
+    va_err <- 1 - metric_fn(yva, model$predict(Xva))  # Oopsies on the set the model never saw.
+    rows[[length(rows) + 1]] <- c(n = m, train_err = tr_err, val_err = va_err)  # Write it down.
+  }
+  rows
+}
+
+# Simple, "for dummies" k-nearest-neighbors classifier. It just looks at its friends' answers!
+# `k` neighbors, trained on X (list of numeric vectors) and y (labels).
+make_knn <- function(k, X, y) {
+  list(
+    predict = function(Xs) {
+      sapply(Xs, function(x) {  # For each question...
+        # Find the k closest points in our training set
+        dists <- sapply(X, function(xt) sum((x - xt)^2))
+        nn_idx <- order(dists)[1:k]
+        labs <- y[nn_idx]  # What are each neighbor's answers?
+        tab <- table(labs)
+        as.numeric(names(tab)[which.max(tab)])  # Pick the answer that shows up the most!
+      })
+    }
+  )
+}
+
+# Let's make up some fake data: two groups, one cloud near (0,0), the other near (4,4)
+set.seed(0)
+Xc <- c(lapply(1:80, function(i) c(rnorm(1, 0, 1), rnorm(1, 0, 1))),
+        lapply(1:80, function(i) c(rnorm(1, 4, 1), rnorm(1, 4, 1))))
+yc <- c(rep(0, 80), rep(1, 80))  # First 80 are group 0, next 80 group 1
+
+# See how the learning curve works for our dummy KNN model on these groups.
+curve <- learning_curve(function(X, y) make_knn(5, X, y), Xc, yc, accuracy)
+cat(sprintf("%8s%12s%10s\n", "train_n", "train_err", "val_err"))
+for (row in curve) cat(sprintf("%8d%12.3f%10.3f\n", row["n"], row["train_err"], row["val_err"]))
+```
+
+---
+
+## 20.11 Regularization
+
+Regularization, for dummies: It's like telling your model "Hey, don't get too fancy!"
+
+Sometimes a model can "memorize" the data too much, making weird, complicated rules.
+Regularization fixes this by adding a penalty for being too complicated. Here are the most common kinds:
+
+- **L1 Regularization (Lasso):** Think of this as being cheap with features! It tries to make most weights zero, so the model uses only the really important ones (like picking the few best ingredients for a recipe).
+  $$J_{reg} = J + \lambda \sum_j |w_j|\qquad$$
+
+- **L2 Regularization (Ridge):** This one just wants all weights to stay small, but doesn't make them zero. It likes smooth, gentle solutions.
+  $$J_{reg} = J + \lambda \sum_j w_j^2$$
+
+- **ElasticNet:** Like a combo meal: you get both sparsity and smoothness! It mixes L1 and L2 together.
+  $$J_{reg} = J + \lambda_1 \sum_j |w_j| + \lambda_2 \sum_j w_j^2$$
+
+The strength of regularization — how much we punish complexity — is set by a number called $\lambda$.
+You can treat $\lambda$ like a knob to turn: try different values to see what works best, using cross-validation.
+
+---
+
+## 20.12 Robust Evaluation: Baselines & Confidence Intervals
+
+A single number is not a result. Two habits make evaluation trustworthy:
+
+1. **Always beat a baseline.** A "dummy" model that predicts the majority class (classification) or the mean (regression) is the bar every real model must clear. If you can't beat it, your model has learned nothing.
+2. **Report uncertainty.** A **bootstrap** confidence interval — resampling the test predictions with replacement — tells you whether a metric difference is real or noise.
+
+```{r}
+# Dummies Guide: Simple Baseline Models & Confidence Intervals
+
+# MajorityClassifier: Always predicts the most common class in the training data.
+make_majority_classifier <- function(X, y) {
+  tab <- table(y)
+  majority <- names(tab)[which.max(tab)]  # Find which value occurs most in y
+  # Predict the majority class for every input, no matter what X is.
+  list(predict = function(Xs) rep(majority, length(Xs)))
+}
+
+# MeanRegressor: Always predicts the average of the training labels (for regression!)
+make_mean_regressor <- function(X, y) {
+  mean_y <- mean(y)  # Calculate the mean of y and always predict that
+  list(predict = function(Xs) rep(mean_y, length(Xs)))  # ignoring X
+}
+
+# Bootstrap Confidence Interval:
+# Dummy explanation:
+# - Want to know how much your metric (like accuracy) could change if your test data were
+#   slightly different?
+# - Bootstrap = repeatedly pick-with-replacement from your data, compute the metric, and see
+#   how much it wiggles.
+# - This function does that n_boot times and gives you the average and the range (CI).
+bootstrap_ci <- function(y_true, y_pred, metric_fn, n_boot = 1000, alpha = 0.05, seed = 42) {
+  set.seed(seed)
+  n <- length(y_true)
+  stats <- numeric(n_boot)
+  for (i in 1:n_boot) {
+    idx <- sample(n, n, replace = TRUE)  # A random sample (with replacement!) of indexes
+    stats[i] <- metric_fn(y_true[idx], y_pred[idx])
+  }
+  stats <- sort(stats)
+  # Get the lower and upper ends of the range ("confidence interval")
+  lo <- stats[min(n_boot, floor((alpha / 2) * n_boot) + 1)]
+  hi <- stats[min(n_boot, floor((1 - alpha / 2) * n_boot) + 1)]
+  list(mean = mean(stats), lo = lo, hi = hi)
+}
+
+# Demo: let's see it in action!
+set.seed(2)
+# Make up some true values: 0 or 1, randomly
+yt <- sample(c(0, 1), 300, replace = TRUE)
+# Model predictions: 80% correct, 20% wrong (flip the value)
+yp <- sapply(yt, function(t) if (runif(1) > 0.2) t else 1 - t)
+# Baseline: always predict the most common class (should be about 50/50)
+base <- make_majority_classifier(NULL, yt)$predict(yt)
+cat(sprintf("Model accuracy   : %.3f\n", accuracy(yt, as.numeric(yp))))
+cat(sprintf("Baseline accuracy: %.3f\n", accuracy(yt, as.numeric(base))))
+# Now use bootstrap to get a 95% confidence interval for model accuracy
+ci <- bootstrap_ci(yt, yp, accuracy)
+cat(sprintf("Model 95%% CI     : [%.3f, %.3f]  (mean %.3f)\n", ci$lo, ci$hi, ci$mean))
+```
+
+---
+
+## 20.13 Hyperparameter Tuning
+
+**Hyperparameter tuning** means searching for the best "settings" for your model—like the number of neighbors in k-NN, or tree depth in a decision tree. These settings (called "hyperparameters") aren't learned by the model; you have to set them!
+
+There are two popular ways to do this:
+
+- **Grid search:** Imagine making a big table that lists every possible combination of settings you want to try (like trying out every combination of 3, 5, or 7 neighbors *and* every weighting method). Grid search tests *every* one of them. It's thorough but can be slow if you have many choices.
+
+- **Random search:** Instead of trying every possible combo (which quickly gets out of hand!), you just pick random combinations a set number of times. This often finds a good answer much faster—especially when only a few settings really matter for your model.
+
+Both grid search and random search use *cross-validation* to check each set of settings. This means splitting up your data several times ("folds"), testing each combination multiple ways, and averaging the results. This helps make sure you're not just picking something that happened to work well on a particular random split, but something that will work well in general.
+
+```{r}
+# This code is for "hyperparameter tuning" - that's a fancy way of saying:
+# Let's try different settings/options for our model, to see which ones work best!
+#
+# We'll look at two main ways to do that: "grid search" (trying all combos),
+# and "random search" (just trying some random combos).
+
+# Try EVERY possible combination of settings (hyperparameters) from param_grid.
+# For each combo, train & test the model with cross-validation to see how well it works.
+grid_search <- function(model_fn, X, y, param_grid, k = 5, metric_fn = NULL) {
+  grid <- expand.grid(param_grid, KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)  # all combos!
+  best_score <- -Inf; best_params <- NULL  # start with very bad score!
+  for (i in 1:nrow(grid)) {  # Try each parameter combo (like k=3, k=5, etc)
+    params <- as.list(grid[i, , drop = FALSE])  # make a named list: list(k = 3)
+    # Run cross-validation: how well does this setting do?
+    scores <- k_fold_cv(function(Xt, yt) do.call(model_fn, c(list(Xt, yt), params)), X, y, k, metric_fn)
+    m <- mean(scores)  # average score
+    if (m > best_score) { best_score <- m; best_params <- params }  # is this the best so far?
+  }
+  list(best_params = best_params, best_score = best_score)  # Tell us the winner!
+}
+
+# Instead of trying all combinations, just try a bunch of RANDOM choices.
+# Usually much faster! Sometimes finds just as good answers :-)
+random_search <- function(model_fn, X, y, param_distributions, n_iter = 10, k = 5,
+                           metric_fn = NULL, seed = 42) {
+  set.seed(seed)
+  best_score <- -Inf; best_params <- NULL
+  for (i in 1:n_iter) {
+    # Pick random choices for each parameter, like: list(k = 7)
+    params <- lapply(param_distributions, function(vals) sample(vals, 1))
+    # Test performance with CV
+    scores <- k_fold_cv(function(Xt, yt) do.call(model_fn, c(list(Xt, yt), params)), X, y, k, metric_fn)
+    m <- mean(scores)
+    if (m > best_score) { best_score <- m; best_params <- params }
+  }
+  list(best_params = best_params, best_score = best_score)  # Best random combo
+}
+
+# --- DEMO FOR DUMMIES: let's tune k for k-NN! ---
+knn_fit <- function(X, y, k = 3) make_knn(k, X, y)  # builds our k-NN model with chosen k
+
+# Do a grid search: test every k in [1,3,5,7,9] using 4-fold cross-validation
+gs <- grid_search(knn_fit, Xc, yc, list(k = c(1, 3, 5, 7, 9)), k = 4, metric_fn = accuracy)
+cat(sprintf("Grid search  best: k=%s  CV accuracy=%.3f\n", gs$best_params$k, gs$best_score))
+
+# Do a random search: try 5 random k values from the list
+rs <- random_search(knn_fit, Xc, yc, list(k = c(1, 3, 5, 7, 9, 11, 13)), n_iter = 5, k = 4, metric_fn = accuracy)
+cat(sprintf("Random search best: k=%s  CV accuracy=%.3f\n", rs$best_params$k, rs$best_score))
+
+# In summary: Both methods help us find the best settings for our model.
+# Grid tries all combos (slow, but thorough); Random tries a few (fast, often good enough!).
+```
+
+---
+
+## 20.14 Choosing the Right Metric by Model Type
+
+| Your model outputs… | Task | Start with | Also consider |
+|---------------------|------|-----------|---------------|
+| A class label | Balanced classification | Accuracy | Macro-F1, confusion matrix |
+| A class label | Imbalanced classification | Macro / weighted F1 | MCC, Cohen's κ, balanced accuracy |
+| A probability | Binary, ranking quality | ROC-AUC | PR-AUC (if positives rare) |
+| A probability | Well-calibrated risk | Log-loss / Brier | Calibration curve |
+| Several labels at once | Multi-label | Hamming loss | Subset accuracy, micro-F1 |
+| A continuous number | Regression | RMSE + R² | MAE (outliers), MAPE (relative) |
+| A skewed positive number | Regression (prices, counts) | MSLE | sMAPE |
+| A ranked list | Recommendation / search | NDCG@k | MAP, MRR, Precision@k |
+| Cluster assignments | Unsupervised, no labels | Silhouette | Davies–Bouldin |
+| Cluster assignments | Unsupervised, labels known | Adjusted Rand Index | Purity, NMI |
+
+**Rule of thumb:** match the metric to the *decision* the model drives and the *cost* of each error type — not to whichever number looks best.
+
+---
+
+## 20.15 ML Best Practices Checklist
+
+- [ ] Exploratory Data Analysis (EDA) before modeling
+- [ ] Handle missing values and outliers
+- [ ] Feature normalization / standardization
+- [ ] Establish a **baseline** model first (majority / mean)
+- [ ] Use cross-validation, not a single train/test split
+- [ ] Use **stratified** folds for classification
+- [ ] Never peek at the test set during development
+- [ ] Check for **data leakage** (fit scalers/encoders on train only, inside each CV fold)
+- [ ] Choose the metric that matches the model type and error costs
+- [ ] Report **uncertainty** (std across folds, or a bootstrap CI)
+- [ ] Analyze errors (confusion matrix, residuals, calibration)
+- [ ] Document experiments with hyperparameters and results
+
+---
+
+## Summary
+
+| Topic | Key Tool / Concept |
+|-------|--------------------|
+| Bias–variance | Underfitting vs overfitting, learning curves |
+| Honest estimates | Stratified & nested cross-validation, held-out test set |
+| Classification | Accuracy, F1 (macro/micro/weighted), κ, MCC |
+| Probabilistic | ROC-AUC, PR-AUC, log-loss, Brier, calibration |
+| Multi-label | Hamming loss, subset accuracy, top-k |
+| Regression | RMSE, R², MAE, MAPE, sMAPE, MSLE |
+| Ranking / recsys | Precision@k, MAP, NDCG, MRR |
+| Clustering | Silhouette, adjusted Rand index, purity |
+| Trust | Baselines, bootstrap confidence intervals |
+| Tuning | Grid & random search with cross-validation |
+
+---
+
+**← Previous:** [Chapter 19: Generative Models](chapter-19-reinforcement-learning.qmd)
+**← Back to Start:** [Home](../index.qmd)
+
+---
+
+*Congratulations on completing the tutorial! 🎉
+You now have the mathematical and coding foundations to implement, train, and **evaluate** every major ML algorithm — across classification, regression, ranking, and unsupervised learning — from scratch.*

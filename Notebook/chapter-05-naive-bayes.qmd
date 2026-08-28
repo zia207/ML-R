@@ -1,0 +1,373 @@
+---
+title: "Chapter 05: Naive Bayes"
+subtitle: "Bayes' Theorem, Gaussian & Multinomial Naive Bayes, and Laplace smoothing — from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 05: Naive Bayes
+
+> **Level**: Beginner–Intermediate | **Estimated Time**: 3 hours
+
+---
+
+## 5.1 Overview
+
+Naive Bayes is a **probabilistic classifier** based on Bayes' Theorem.
+It asks: *"Given these features, which class is most probable?"*
+
+The "naive" part: it assumes all features are **conditionally independent** given the class, an unrealistic but surprisingly effective assumption.
+
+---
+
+## 5.2 Bayes' Theorem
+
+Imagine you're trying to guess which team someone supports based on the shirt they're wearing. Bayes' Theorem is like a rule that helps you figure out: "Given what I see, what's the most likely team?"
+
+The big formula looks like this:
+
+$$P(y \mid \mathbf{x}) = \frac{P(\mathbf{x} \mid y) \cdot P(y)}{P(\mathbf{x})}$$
+
+But what does that mean in plain English?
+- $P(y \mid \mathbf{x})$: How likely is it that it's team $y$ if I see features $\mathbf{x}$? (This is what we really want to know)
+- $P(\mathbf{x} \mid y)$: If I already know it's team $y$, how likely am I to see these features? (Like: If they're a fan, how likely are they to wear a red shirt?)
+- $P(y)$: How common is team $y$ in general? (Do a lot of people support this team?)
+- $P(\mathbf{x})$: How common is it to see these features at all? (How common is it to wear a red shirt, no matter the team?)
+
+The last term ($P(\mathbf{x})$) is just a normalizing thing — for comparing which team is most likely, we can ignore it.
+
+**How does the classifier pick a class?**
+
+It just asks: for each team, what's the total score (probability) if I combine all the clues/features? The team with the highest score wins.
+
+In symbols:
+
+$$\hat{y} = \arg\max_y \left[ P(y) \cdot \prod_j P(x_j \mid y) \right]$$
+
+(Translation: For every class $y$, multiply how common $y$ is by how likely all the features $x_j$ are if you were in $y$. Pick the biggest!)
+
+To make the math easier (because multiplying a lot of small numbers can make computers confused), we often use logs:
+
+$$\hat{y} = \arg\max_y \left[ \log P(y) + \sum_j \log P(x_j \mid y) \right]$$
+
+(Now you're just adding numbers instead of multiplying.)
+
+---
+
+## 5.3 Variants of Naive Bayes
+
+There are several "flavors" of Naive Bayes, each designed for different types of data. They all use the same basic Bayes' rule, but make different assumptions about how the features behave.
+
+- **Gaussian Naive Bayes:**
+  - *Assumption:* Each feature $x_j$ is normally distributed (follows a bell curve) within each class.
+  - *When to use:* When your features are continuous (e.g., age, height, pixel intensity).
+
+- **Bernoulli Naive Bayes:**
+  - *Assumption:* Each feature $x_j$ is binary (can only be 0 or 1) within each class.
+  - *When to use:* When your data consists of binary features, such as whether a word appears in a document or not.
+
+- **Multinomial Naive Bayes:**
+  - *Assumption:* Features represent counts (non-negative integers), such as the number of times each word appears.
+  - *When to use:* Especially good for document classification where features are word counts or frequencies.
+
+In summary:
+- Use **Gaussian NB** for real-valued features,
+- **Bernoulli NB** for binary features,
+- or **Multinomial NB** for count data.
+They all work under the "naive" assumption of feature independence, but their probability calculations are tailored to the nature of your input data.
+
+---
+
+## 5.4 Gaussian Naive Bayes
+
+Imagine you have numbers (like ages, heights, or exam scores) as features. Gaussian Naive Bayes pretends that, for each class, these numbers form a classic "bell curve" (like how most people are close to average height, and only a few are really tall or really short).
+
+For each class and each feature, it figures out:
+- What is the *average* value for this feature in this class? (That's called the "mean" $\mu$.)
+- How much do the values tend to vary around that average? (That's called the "variance" $\sigma^2$.)
+
+The formula below just says, "Given a value, how likely is it to appear if we're in class $c$?" (You don't have to worry too much about the math! It just turns the feature value, mean, and variance into a probability, using the standard bell curve formula.)
+
+$$P(x_j \mid y=c) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\!\left(-\frac{(x_j - \mu)^2}{2\sigma^2}\right)$$
+
+**Explanation:**
+This equation gives the probability of seeing a certain feature value $x_j$, assuming we know the class is $c$.
+- $\mu$ is the average (mean) value of feature $j$ in class $c$.
+- $\sigma^2$ is how much that feature varies (its variance) in class $c$.
+- The formula is just the "bell curve" (Gaussian/Normal distribution) probability formula.
+- It assigns higher probability when $x_j$ is close to the average, and lower probability when it's far from the average.
+This lets Naive Bayes decide, for a given class, how "typical" a feature value is.
+
+**In short:**
+- For every class, and for each number-feature, remember the average and how spread out it is.
+- When classifying something new, ask: "For each class, if I plugged this new value into the bell curve for this class, how likely would it be?" Combine all the results, and pick the class with the best total "score."
+
+---
+
+## 5.5 From-Scratch R Implementation
+
+```{r}
+# naive_bayes.R
+
+GaussianNaiveBayes <- setRefClass(
+  "GaussianNaiveBayes",
+  fields = list(var_smoothing = "numeric", class_priors = "list",
+                means = "list", variances = "list", classes = "ANY"),
+  methods = list(
+    initialize = function(var_smoothing = 1e-9, ...) {
+      var_smoothing <<- var_smoothing
+      class_priors <<- list(); means <<- list(); variances <<- list(); classes <<- c()
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      n <- nrow(X)
+      classes <<- sort(unique(y))
+      for (c in classes) {
+        key <- as.character(c)
+        X_c <- X[y == c, , drop = FALSE]   # Samples belonging to class c
+        n_c <- nrow(X_c)
+
+        class_priors[[key]] <<- log(n_c / n)    # Prior: P(y=c)
+
+        mu <- colMeans(X_c)                                            # Per-feature mean
+        va <- colSums(sweep(X_c, 2, mu, "-")^2) / n_c + var_smoothing  # Per-feature variance
+        means[[key]]     <<- mu
+        variances[[key]] <<- va
+      }
+      invisible(.self)
+    },
+
+    log_gaussian = function(x, mu, var_) {
+      # Log probability density of x under N(mu, var).
+      -0.5 * log(2 * pi * var_) - (x - mu)^2 / (2 * var_)
+    },
+
+    log_likelihood = function(x, c) {
+      # Sum of log P(xj | y=c) over all features j.
+      key <- as.character(c)
+      sum(log_gaussian(x, means[[key]], variances[[key]]))
+    },
+
+    predict_log_proba = function(X) {
+      # Return log posterior for each class for each sample.
+      lapply(seq_len(nrow(X)), function(i) {
+        x <- X[i, ]
+        sapply(classes, function(c) class_priors[[as.character(c)]] + log_likelihood(x, c))
+      })
+    },
+
+    predict = function(X) {
+      log_probs <- predict_log_proba(X)
+      sapply(log_probs, function(lp) classes[which.max(lp)])
+    }
+  )
+)
+
+
+# ── Multinomial Naive Bayes (for text) ─────────────────────────────────────
+
+MultinomialNaiveBayes <- setRefClass(
+  "MultinomialNaiveBayes",
+  fields = list(alpha = "numeric", class_priors = "list",
+                feature_log_probs = "list", classes = "ANY"),
+  methods = list(
+    initialize = function(alpha = 1.0, ...) {
+      alpha <<- alpha   # Laplace smoothing parameter
+      class_priors <<- list(); feature_log_probs <<- list(); classes <<- c()
+      callSuper(...)
+    },
+
+    fit = function(X, y) {
+      # X: matrix of feature count vectors (rows = documents). y: class labels.
+      n <- nrow(X)
+      n_features <- ncol(X)
+      classes <<- sort(unique(y))
+
+      for (c in classes) {
+        key <- as.character(c)
+        X_c <- X[y == c, , drop = FALSE]
+        class_priors[[key]] <<- log(nrow(X_c) / n)
+
+        # Total count of each feature in class c
+        feature_counts <- colSums(X_c)
+        total_count <- sum(feature_counts) + alpha * n_features
+
+        feature_log_probs[[key]] <<- log((feature_counts + alpha) / total_count)
+      }
+      invisible(.self)
+    },
+
+    predict = function(X) {
+      sapply(seq_len(nrow(X)), function(i) {
+        xi <- X[i, ]
+        scores <- sapply(classes, function(c) {
+          key <- as.character(c)
+          class_priors[[key]] + sum(xi * feature_log_probs[[key]])
+        })
+        classes[which.max(scores)]
+      })
+    }
+  )
+)
+
+
+# ── Simple Text Vectorizer ───────────────────────────────────────────────────
+
+BagOfWords <- setRefClass(
+  "BagOfWords",
+  fields = list(vocab = "list"),
+  methods = list(
+    initialize = function(...) { vocab <<- list(); callSuper(...) },
+
+    fit = function(documents) {
+      words <- sort(unique(unlist(strsplit(tolower(documents), "\\s+"))))
+      vocab <<- setNames(as.list(seq_along(words)), words)
+      invisible(.self)
+    },
+
+    transform = function(documents) {
+      n_vocab <- length(vocab)
+      vocab_names <- names(vocab)
+      mat <- t(vapply(documents, function(doc) {
+        vec <- rep(0L, n_vocab)
+        toks <- strsplit(tolower(doc), "\\s+")[[1]]
+        for (word in toks) {
+          idx <- match(word, vocab_names)
+          if (!is.na(idx)) vec[idx] <- vec[idx] + 1L
+        }
+        vec
+      }, integer(n_vocab)))
+      rownames(mat) <- NULL
+      mat
+    },
+
+    fit_transform = function(documents) { fit(documents); transform(documents) }
+  )
+)
+
+
+# ── Demo: Spam Detection ─────────────────────────────────────────────────────
+
+# ── Gaussian NB on Iris-like data ──
+cat("=== Gaussian Naive Bayes ===\n")
+X_train <- rbind(
+  c(5.1, 3.5), c(4.9, 3.0), c(4.7, 3.2),   # class 0
+  c(7.0, 3.2), c(6.4, 3.2), c(6.9, 3.1),   # class 1
+  c(6.3, 3.3), c(5.8, 2.7), c(7.1, 3.0)    # class 2
+)
+y_train <- c(0, 0, 0, 1, 1, 1, 2, 2, 2)
+
+gnb <- GaussianNaiveBayes$new()
+gnb$fit(X_train, y_train)
+X_test <- rbind(c(5.0, 3.4), c(6.7, 3.1), c(6.0, 2.9))
+cat("Predictions:", gnb$predict(X_test), "\n")   # expect 0 1 2
+
+# ── Multinomial NB on text ──
+cat("\n=== Multinomial Naive Bayes (Text) ===\n")
+train_docs <- c(
+  "free money win prize lottery",
+  "click here to claim your reward",
+  "buy cheap pills online now",
+  "meeting tomorrow at 9am",
+  "please review the attached report",
+  "quarterly results attached for review"
+)
+y_text <- c("spam", "spam", "spam", "ham", "ham", "ham")
+
+bow <- BagOfWords$new()
+X_text_train <- bow$fit_transform(train_docs)
+
+mnb <- MultinomialNaiveBayes$new(alpha = 1.0)
+mnb$fit(X_text_train, y_text)
+
+test_docs <- c("free reward click here", "please find attached report")
+X_text_test <- bow$transform(test_docs)
+cat("Predictions:", mnb$predict(X_text_test), "\n")
+# Expected: spam ham
+```
+
+---
+
+## 5.6 Laplace Smoothing (Dummies Explanation)
+
+Let's say our spam filter never saw the word "banana" in any spam email it learned from. If a new email contains "banana," the math would say there's a 0% chance it's spam, just because "banana" never showed up in training. That's not good! One missing word can ruin our whole prediction.
+
+**Laplace Smoothing** is a simple trick to fix this: We just pretend every possible word showed up at least once in each class! In other words, we add a tiny "fake" count ($\alpha$) to every word, even if we never actually saw it.
+
+The formula looks like this:
+
+$$
+P(x_j \mid y=c) = \frac{\text{count}(x_j, c) + \alpha}{\text{total words in } c + \alpha \times (\text{number of words})}
+$$
+
+If we set $\alpha=1$, it's called "add-one smoothing:" Every word gets one bonus point in all categories, making sure nothing ever gets a probability of zero.
+
+---
+
+```{r}
+# Example: Laplace Smoothing by hand
+
+# Suppose we have the following word counts for two classes:
+spam_counts <- c(free = 3, win = 2, money = 1)
+ham_counts  <- c(meeting = 2, report = 2, money = 1)
+vocab <- sort(union(names(spam_counts), names(ham_counts)))   # All words seen
+
+# Without Laplace smoothing:
+word_prob_no_smoothing <- function(word, counts, total) {
+  c_val <- if (word %in% names(counts)) counts[[word]] else 0
+  c_val / total
+}
+
+total_spam <- sum(spam_counts)
+total_ham  <- sum(ham_counts)
+cat("Without smoothing:\n")
+for (w in vocab) {
+  cat(sprintf("P(%s|spam) = %.2f\n", w, word_prob_no_smoothing(w, spam_counts, total_spam)))
+  cat(sprintf("P(%s|ham)  = %.2f\n", w, word_prob_no_smoothing(w, ham_counts, total_ham)))
+}
+
+# With Laplace (add-1) smoothing:
+word_prob_laplace <- function(word, counts, total, V, alpha = 1) {
+  c_val <- if (word %in% names(counts)) counts[[word]] else 0
+  (c_val + alpha) / (total + alpha * V)
+}
+
+V <- length(vocab)
+cat("\nWith Laplace (add-1) smoothing:\n")
+for (w in vocab) {
+  cat(sprintf("P(%s|spam) = %.2f\n", w, word_prob_laplace(w, spam_counts, total_spam, V)))
+  cat(sprintf("P(%s|ham)  = %.2f\n", w, word_prob_laplace(w, ham_counts, total_ham, V)))
+}
+```
+
+---
+
+## ✅ Chapter Summary
+
+| Concept | Key Idea |
+|---------|---------|
+| Bayes' Theorem | $P(y \mid \mathbf{x}) \propto P(\mathbf{x} \mid y) \cdot P(y)$ |
+| Naive assumption | Features are conditionally independent given class |
+| Gaussian NB | Models continuous features as Normal distributions |
+| Multinomial NB | Models discrete counts (great for text) |
+| Laplace smoothing | Prevents zero probabilities in unseen events |
+
+---
+
+## 📝 Exercises
+
+1. Prove that $\arg\max$ of $\log P(y \mid \mathbf{x})$ is the same as $\arg\max$ of $P(y \mid \mathbf{x})$.
+2. Implement **Bernoulli Naive Bayes** for binary features (presence/absence of words).
+3. Add **TF-IDF** weighting to the `BagOfWords` vectorizer.
+4. Why might Naive Bayes outperform logistic regression on small datasets despite its strong independence assumption?
+
+---
+
+**← Previous:** [Chapter 04: KNN](chapter-04-knn.qmd)
+**→ Next:** [Chapter 06: Decision Trees](chapter-06-decision-trees.qmd)

@@ -1,0 +1,594 @@
+---
+title: "Chapter 06: Decision Trees"
+subtitle: "Gini, entropy, information gain, CART, pruning, and tree visualization — from scratch"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 06: Decision Trees
+
+> **Level**: Intermediate | **Estimated Time**: 4–5 hours
+
+---
+
+## 6.1 Overview
+
+Imagine a game of 20 Questions: you ask yes/no questions to figure something out.
+A decision tree works in a similar way! It's like a flowchart or a set of rules where:
+- Each question (called a "node") checks something simple about the data. For example: "Is the person's age over 30?"
+- Depending on the answer (yes or no), you follow a different path (called a "branch").
+- When you can't ask any more questions, you reach a "leaf," which gives you the answer (like the predicted class or value).
+
+Decision trees are easy to understand — you can follow the questions, one by one, to see exactly how the decision is made.
+
+---
+
+## 6.2 Key Concepts: Impurity Measures
+
+When building a decision tree, at each step we basically ask: "Which question can best separate our data into groups that look as much as possible like just one class?"
+
+To decide if our split is good, we check how mixed up the groups are after the split. If a group has only one type of thing (like all apples or all oranges), it's "pure." If it's a total mix, it's not so great. We call this "mixed-up-ness" the **impurity**.
+
+### Entropy (Information Theory)
+
+Think of entropy as a measure of "messiness" in a group:
+- If everyone in a group is the same (like all apples), entropy is 0 ("perfectly pure").
+- If the group is a perfect mix (like half apples, half oranges), entropy is 1 ("super messy" for 2 classes).
+
+The formula looks scary, but don't worry! All it's doing is checking:
+- What percent belongs to each class (call this "p" for probability)
+- Multiplies "p" by the log of "p" (logarithm just compresses big numbers, don't stress!)
+- Adds this up for all classes, and flips the sign (because impurity is positive).
+
+So, in short:
+- Entropy = 0 means all the same (no confusion).
+- Higher entropy means more mixed up (harder to tell classes apart).
+
+$$H(S) = -\sum_c p_c \log_2(p_c)$$
+
+Or just remember: "Higher entropy = more messy group!"
+
+### Gini Impurity (used in CART)
+
+Think of Gini impurity as a way to measure how "mixed up" a group is.
+- If everyone in the group is the same (all apples), Gini impurity is 0 (super pure).
+- If the group is half one thing and half another (like 50% apples, 50% oranges), Gini impurity is 0.5 (for two classes-super messy).
+
+The formula is:
+$$\text{Gini}(S) = 1 - \sum_c p_c^2$$
+
+(Don't worry if that looks scary! All it does is add up the probabilities ("p") of each class, squares them, and subtracts from 1.)
+
+Just remember:
+- Gini = 0 means group is all the same (as pure as it gets!)
+- Gini = closer to 0.5 (for two classes) means group is a total mix.
+
+### Information Gain
+
+Imagine you have a messy box of fruit, and you want to split it into cleaner boxes (less mixed up!).
+Information gain is just a clever way to ask:
+"If I split my group using this question (feature), how much less messy do my boxes get?"
+
+The formula (don't panic):
+$$\text{Information Gain} = \text{How messy it was before} - \text{Average messiness after the split}$$
+
+- If the split cleans things up a lot, info gain is big (that's good!).
+- If the split doesn't help, info gain is small or zero (not so good).
+
+So: Try each possible split, and pick the split that makes your fruit groups the LEAST messy—that's the one with the **biggest information gain**.
+
+---
+
+## 6.3 The CART Algorithm
+
+**C**lassification **A**nd **R**egression **T**rees:
+
+```
+function BuildTree(X, y, depth):
+    if stopping_condition_met:
+        return Leaf(majority_class(y))
+
+    best_feature, best_threshold = find_best_split(X, y)
+    left_X, left_y   = samples where x[feature] ≤ threshold
+    right_X, right_y = samples where x[feature] >  threshold
+
+    return Node(
+        feature    = best_feature,
+        threshold  = best_threshold,
+        left       = BuildTree(left_X, left_y, depth+1),
+        right      = BuildTree(right_X, right_y, depth+1)
+    )
+```
+
+**Stopping conditions:**
+- Maximum depth reached
+- Minimum samples to split (< min_samples_split)
+- Node is already pure
+
+---
+
+## 6.4 From-Scratch R Implementation
+
+```{r}
+# decision_tree.R
+
+# ── EASY DECISION TREE CODE: EXPLAINED FOR BEGINNERS ──
+#
+# WHAT IS IMPURITY?
+# Impurity just means "how mixed up" the data is at a decision tree node.
+# - If all labels are the same (e.g. all apples or all oranges), impurity is zero (very "pure").
+# - If it's a jumble (e.g. half apples, half oranges), impurity is high.
+
+gini <- function(y) {
+  # Gini impurity for a vector of labels y.
+  # Think: "How likely are you to pick two RANDOM samples of DIFFERENT class?"
+  # Returns 0 if all are the same, 0.5 if two classes are perfectly mixed.
+  n <- length(y)
+  if (n == 0) return(0.0)
+  counts <- table(y)
+  1.0 - sum((counts / n)^2)   # (More mixed = closer to 0.5)
+}
+
+entropy <- function(y) {
+  # Entropy: Another way to measure "messiness"/"uncertainty".
+  # Returns 0 if all identical. Higher is more mixed. Uses logarithms.
+  n <- length(y)
+  if (n == 0) return(0.0)
+  counts <- table(y)
+  p <- counts / n
+  p <- p[p > 0]
+  -sum(p * log2(p))
+}
+
+information_gain <- function(y, y_left, y_right, criterion = "gini") {
+  # How much better does a split make things?
+  # Info gain = impurity BEFORE split - (weighted impurity AFTER split)
+  impurity_fn <- if (criterion == "gini") gini else entropy
+  n <- length(y); n_l <- length(y_left); n_r <- length(y_right)
+  impurity_fn(y) - (n_l / n) * impurity_fn(y_left) - (n_r / n) * impurity_fn(y_right)
+}
+
+# ── TREE STRUCTURE (Node) ──
+# Represents a spot in the tree ("node").
+#   - Internal nodes decide where to split.
+#   - Leaf nodes make the actual prediction.
+# Fields:
+#   feature_idx: which feature to look at?
+#   threshold:   value to split at (e.g. is x >= 2.5?)
+#   left/right:  children nodes, or NULL if leaf
+#   is_leaf:     TRUE/FALSE
+#   prediction:  prediction to make if at a leaf (most common class, or average value)
+#   n_samples:   how many samples at this node
+Node <- setRefClass(
+  "Node",
+  fields = list(feature_idx = "ANY", threshold = "ANY", left = "ANY", right = "ANY",
+                is_leaf = "logical", prediction = "ANY", impurity = "numeric", n_samples = "numeric"),
+  methods = list(
+    initialize = function(...) {
+      feature_idx <<- NULL; threshold <<- NULL; left <<- NULL; right <<- NULL
+      is_leaf <<- FALSE; prediction <<- NULL; impurity <<- 0.0; n_samples <<- 0
+      callSuper(...)
+    }
+  )
+)
+
+# ── HELPER FUNCTIONS ──
+
+accuracy_score <- function(y_true, y_pred) mean(y_true == y_pred)   # What percent did we get right?
+mse_score <- function(y_true, y_pred) mean((y_true - y_pred)^2)     # Average squared difference (regression)
+
+majority_class <- function(y) {
+  # Most frequent label, preserving y's original type (numeric or character).
+  tbl <- table(y)
+  best <- names(tbl)[which.max(tbl)]
+  if (is.numeric(y)) as.numeric(best) else best
+}
+
+gather_leaf_indices <- function(node, part_idxs, X) {
+  # Map validation samples down to whichever leaf they land on, starting from
+  # the tree's root — mirrors the from-scratch Python helper exactly.
+  if (node$is_leaf) return(part_idxs)
+  left_part  <- part_idxs[X[part_idxs, node$feature_idx] <= node$threshold]
+  right_part <- part_idxs[X[part_idxs, node$feature_idx] >  node$threshold]
+  res <- integer(0)
+  if (!is.null(node$left))  res <- c(res, gather_leaf_indices(node$left, left_part, X))
+  if (!is.null(node$right)) res <- c(res, gather_leaf_indices(node$right, right_part, X))
+  res
+}
+
+# ── DECISION TREE CLASSIFIER (for categories) ──
+# Uses a tree to separate data (apples vs oranges, etc).
+# Key parts:
+#   $fit()        : Train the tree.
+#   $predict()    : Predict labels for new data.
+#   $print_tree() : Show the tree as text.
+#   $prune()      : Shrink the tree to avoid "memorizing" (overfitting).
+
+DecisionTreeClassifier <- setRefClass(
+  "DecisionTreeClassifier",
+  fields = list(max_depth = "ANY", min_samples_split = "numeric",
+                min_samples_leaf = "numeric", criterion = "character",
+                root = "ANY", n_features = "ANY"),
+  methods = list(
+    initialize = function(max_depth = NULL, min_samples_split = 2,
+                           min_samples_leaf = 1, criterion = "gini", ...) {
+      max_depth <<- max_depth                       # Don't grow beyond this depth (NULL = no limit)
+      min_samples_split <<- min_samples_split        # Don't split if too few samples here
+      min_samples_leaf <<- min_samples_leaf          # Each leaf needs at least this many samples
+      criterion <<- criterion                        # Which impurity? ('gini' or 'entropy')
+      root <<- NULL; n_features <<- NULL
+      callSuper(...)
+    },
+
+    best_split = function(X, y) {
+      # Try EVERY possible split for EVERY feature. Pick the best ("least messy").
+      best_gain <- -Inf; best_feature <- NULL; best_threshold <- NULL
+      for (feature_idx in seq_len(ncol(X))) {
+        values <- sort(unique(X[, feature_idx]))
+        if (length(values) < 2) next
+        thresholds <- (values[-length(values)] + values[-1]) / 2   # midpoint between adjacent values
+        for (threshold in thresholds) {
+          left_mask <- X[, feature_idx] <= threshold
+          y_left <- y[left_mask]; y_right <- y[!left_mask]
+          if (length(y_left) < min_samples_leaf || length(y_right) < min_samples_leaf) next
+          gain <- information_gain(y, y_left, y_right, criterion)
+          if (gain > best_gain) {
+            best_gain <- gain; best_feature <- feature_idx; best_threshold <- threshold
+          }
+        }
+      }
+      list(feature = best_feature, threshold = best_threshold, gain = best_gain)
+    },
+
+    build_tree = function(X, y, depth) {
+      # Build tree recursively (splits further and further until can't anymore).
+      # Base cases (stop growing): all same label, too few samples, or max depth reached.
+      node <- Node$new()
+      node$n_samples <- length(y)
+      node$prediction <- majority_class(y)
+
+      if (length(unique(y)) == 1 ||
+          length(y) < min_samples_split ||
+          (!is.null(max_depth) && depth >= max_depth)) {
+        node$is_leaf <- TRUE
+        return(node)
+      }
+
+      split <- best_split(X, y)
+      if (is.null(split$feature)) {
+        node$is_leaf <- TRUE
+        return(node)
+      }
+
+      left_mask <- X[, split$feature] <= split$threshold
+      node$feature_idx <- split$feature
+      node$threshold <- split$threshold
+      node$left  <- build_tree(X[left_mask, , drop = FALSE],  y[left_mask],  depth + 1)
+      node$right <- build_tree(X[!left_mask, , drop = FALSE], y[!left_mask], depth + 1)
+
+      node
+    },
+
+    fit = function(X, y) {
+      # Grow the tree using your feature data X and target labels y.
+      n_features <<- ncol(X)
+      root <<- build_tree(X, y, depth = 0)
+      invisible(.self)
+    },
+
+    traverse_one = function(x, node) {
+      # For a single data point x, walk down the tree to predict.
+      if (node$is_leaf) return(node$prediction)
+      if (x[node$feature_idx] <= node$threshold) traverse_one(x, node$left) else traverse_one(x, node$right)
+    },
+
+    predict = function(X) {
+      # Predict labels for a whole batch of samples.
+      sapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], root))
+    },
+
+    print_tree = function(node = NULL, depth = 0, feature_names = NULL) {
+      # Print the tree as text, visualizing each split and showing each leaf prediction.
+      if (is.null(node)) node <- root
+      indent <- strrep("    ", depth)
+      if (node$is_leaf) {
+        cat(sprintf("%s-> Predict: %s  (n=%d)\n", indent, node$prediction, node$n_samples))
+      } else {
+        fname <- if (!is.null(feature_names)) feature_names[node$feature_idx] else sprintf("x[%d]", node$feature_idx)
+        cat(sprintf("%sIf %s <= %.3f:\n", indent, fname, node$threshold))
+        print_tree(node$left, depth + 1, feature_names)
+        cat(sprintf("%sElse:\n", indent))
+        print_tree(node$right, depth + 1, feature_names)
+      }
+    },
+
+    # ── PRUNING ──
+    prune = function(X_val, y_val, metric = "accuracy") {
+      # Prune the tree to avoid "memorizing" (overfitting), bottom-up:
+      # if collapsing a split into one leaf does not make validation score
+      # worse, keep it collapsed; otherwise restore the split.
+      prune_node <- function(node) {
+        if (node$is_leaf) return(invisible(NULL))
+
+        if (!is.null(node$left))  prune_node(node$left)
+        if (!is.null(node$right)) prune_node(node$right)
+
+        # Only consider pruning if both children are leaves (so we can "collapse" them)
+        if (!(!is.null(node$left) && !is.null(node$right) && node$left$is_leaf && node$right$is_leaf)) {
+          return(invisible(NULL))
+        }
+
+        backup_left <- node$left; backup_right <- node$right
+        was_leaf <- node$is_leaf
+        node$left <- NULL; node$right <- NULL
+        node$is_leaf <- TRUE
+
+        idxs <- gather_leaf_indices(root, seq_len(nrow(X_val)), X_val)
+        y_sub <- y_val[idxs]
+        if (length(y_sub) > 0) node$prediction <- majority_class(y_sub)
+
+        y_pred_pruned <- predict(X_val)
+        pruned_score <- if (metric == "accuracy") accuracy_score(y_val, y_pred_pruned) else
+          stop("Unknown scoring metric for classification.")
+
+        # Hold on, let's compare to original
+        node$left <- backup_left; node$right <- backup_right
+        node$is_leaf <- was_leaf
+        y_pred_orig <- predict(X_val)
+        orig_score <- accuracy_score(y_val, y_pred_orig)
+
+        # If pruning did NOT hurt accuracy, keep pruned; otherwise, restore
+        if (pruned_score >= orig_score) {
+          node$left <- NULL; node$right <- NULL
+          node$is_leaf <- TRUE
+          if (length(y_sub) > 0) node$prediction <- majority_class(y_sub)
+        }
+      }
+      prune_node(root)
+      invisible(.self)
+    }
+  )
+)
+
+# ── DECISION TREE REGRESSOR (for predicting numbers) ──
+
+mse_impurity <- function(y) {
+  # For regression, we want numbers in a group to be as close as possible.
+  # MSE impurity is "average squared difference from average": lower is better!
+  if (length(y) == 0) return(0.0)
+  m <- mean(y)
+  mean((y - m)^2)
+}
+
+DecisionTreeRegressor <- setRefClass(
+  "DecisionTreeRegressor",
+  fields = list(max_depth = "ANY", min_samples_split = "numeric",
+                min_samples_leaf = "numeric", root = "ANY"),
+  methods = list(
+    initialize = function(max_depth = NULL, min_samples_split = 2, min_samples_leaf = 1, ...) {
+      max_depth <<- max_depth
+      min_samples_split <<- min_samples_split
+      min_samples_leaf <<- min_samples_leaf
+      root <<- NULL
+      callSuper(...)
+    },
+
+    best_split = function(X, y) {
+      # Try all splits: which division makes numbers in each group closest together?
+      best_reduction <- -Inf; best_feature <- NULL; best_threshold <- NULL
+      parent_mse <- mse_impurity(y)
+      n <- length(y)
+      for (feat in seq_len(ncol(X))) {
+        values <- sort(unique(X[, feat]))
+        if (length(values) < 2) next
+        thresholds <- (values[-length(values)] + values[-1]) / 2
+        for (thr in thresholds) {
+          left_mask <- X[, feat] <= thr
+          yl <- y[left_mask]; yr <- y[!left_mask]
+          if (length(yl) < min_samples_leaf || length(yr) < min_samples_leaf) next
+          reduction <- parent_mse - (length(yl) / n) * mse_impurity(yl) - (length(yr) / n) * mse_impurity(yr)
+          if (reduction > best_reduction) {
+            best_reduction <- reduction; best_feature <- feat; best_threshold <- thr
+          }
+        }
+      }
+      list(feature = best_feature, threshold = best_threshold)
+    },
+
+    build = function(X, y, depth) {
+      # Build regression tree recursively. If we can't split, leaf = mean value of this group.
+      node <- Node$new()
+      node$n_samples <- length(y)
+      node$prediction <- mean(y)
+      if (length(y) < min_samples_split || (!is.null(max_depth) && depth >= max_depth)) {
+        node$is_leaf <- TRUE
+        return(node)
+      }
+      split <- best_split(X, y)
+      if (is.null(split$feature)) {
+        node$is_leaf <- TRUE
+        return(node)
+      }
+      left_mask <- X[, split$feature] <= split$threshold
+      node$feature_idx <- split$feature; node$threshold <- split$threshold
+      node$left  <- build(X[left_mask, , drop = FALSE],  y[left_mask],  depth + 1)
+      node$right <- build(X[!left_mask, , drop = FALSE], y[!left_mask], depth + 1)
+      node
+    },
+
+    fit = function(X, y) {
+      # Fit the tree using your feature data X and labels y (numbers).
+      root <<- build(X, y, 0)
+      invisible(.self)
+    },
+
+    traverse_one = function(x, node) {
+      # For a single data point x, walk down the tree until a leaf. Predict mean for that leaf.
+      if (node$is_leaf) return(node$prediction)
+      traverse_one(x, if (x[node$feature_idx] <= node$threshold) node$left else node$right)
+    },
+
+    predict = function(X) {
+      # Predict all values for batch of samples.
+      vapply(seq_len(nrow(X)), function(i) traverse_one(X[i, ], root), numeric(1))
+    },
+
+    # ── PRUNING FOR REGRESSION TREE ──
+    prune = function(X_val, y_val, metric = "mse") {
+      # Prune this regression tree to simplify it, but only if validation error (MSE) doesn't get worse!
+      prune_node <- function(node) {
+        if (node$is_leaf) return(invisible(NULL))
+
+        if (!is.null(node$left))  prune_node(node$left)
+        if (!is.null(node$right)) prune_node(node$right)
+
+        if (!(!is.null(node$left) && !is.null(node$right) && node$left$is_leaf && node$right$is_leaf)) {
+          return(invisible(NULL))
+        }
+
+        backup_left <- node$left; backup_right <- node$right
+        was_leaf <- node$is_leaf
+        node$left <- NULL; node$right <- NULL
+        node$is_leaf <- TRUE
+
+        # Prediction = average of true y's landing here
+        idxs <- gather_leaf_indices(root, seq_len(nrow(X_val)), X_val)
+        y_sub <- y_val[idxs]
+        if (length(y_sub) > 0) node$prediction <- mean(y_sub)
+
+        # Evaluate before/after pruning using MSE
+        y_pred_pruned <- predict(X_val)
+        pruned_score <- if (metric == "mse") mse_score(y_val, y_pred_pruned) else
+          stop("Unknown metric for regression pruning.")
+
+        node$left <- backup_left; node$right <- backup_right
+        node$is_leaf <- was_leaf
+        y_pred_orig <- predict(X_val)
+        orig_score <- mse_score(y_val, y_pred_orig)
+
+        # If merging (pruning) helped or had no effect, keep it
+        if (pruned_score <= orig_score) {
+          node$left <- NULL; node$right <- NULL
+          node$is_leaf <- TRUE
+          if (length(y_sub) > 0) node$prediction <- mean(y_sub)
+        }
+      }
+      prune_node(root)
+      invisible(.self)
+    }
+  )
+)
+
+# ── SUPER SIMPLE USAGE EXAMPLE ──
+
+# Let's see how our classifier does with XOR (which linear models can't learn, but trees can!)
+X_train <- rbind(c(0, 0), c(0, 1), c(1, 0), c(1, 1), c(0, 0), c(0, 1), c(1, 0), c(1, 1))
+y_train <- c(0, 1, 1, 0, 0, 1, 1, 0)
+
+tree <- DecisionTreeClassifier$new(max_depth = 3, criterion = "gini")
+tree$fit(X_train, y_train)
+
+# Prune the tree using validation set, just to clean it up
+X_val <- X_train; y_val <- y_train
+tree$prune(X_val, y_val)
+
+cat("Decision Tree Structure:\n")
+tree$print_tree(feature_names = c("x1", "x2"))
+
+preds <- tree$predict(rbind(c(0, 0), c(0, 1), c(1, 0), c(1, 1)))
+cat("\nXOR Predictions:", preds, "\n")   # Should match y_train
+
+# REGRESSION EXAMPLE: Try to predict y = x^2
+X_reg <- matrix(seq(0, 0.9, by = 0.1), ncol = 1)
+y_reg <- X_reg[, 1]^2
+reg_tree <- DecisionTreeRegressor$new(max_depth = 4)
+reg_tree$fit(X_reg, y_reg)
+
+# Prune regression tree for good measure
+reg_tree$prune(X_reg, y_reg)
+
+cat("\nRegression (x^2):\n")
+for (xi in c(0.25, 0.5, 0.75)) {
+  pred <- reg_tree$predict(matrix(xi, ncol = 1))
+  cat(sprintf("  f(%.2f) = %.3f  (true: %.3f)\n", xi, pred, xi^2))
+}
+```
+
+### Visualizing the Decision Tree
+
+```{r}
+# Recursively plot the decision tree using base R graphics.
+#   node: Current tree node.
+#   feature_names: Vector of feature names for labeling (optional).
+#   depth: Depth level (internal use).
+#   x, y: Coordinates for this node.
+#   dx, dy: Horizontal/vertical spread scaling.
+#   parent_coords: Coordinates of the parent node.
+plot_tree <- function(node, feature_names = NULL, depth = 0, x = 0.5, y = 1.0,
+                       dx = 0.2, dy = 0.1, parent_coords = NULL, new_plot = TRUE) {
+  if (new_plot) {
+    plot(NULL, xlim = c(0, 1), ylim = c(0.55, 1.05), axes = FALSE, xlab = "", ylab = "")
+    plot_tree(node, feature_names, depth, x, y, dx, dy, NULL, FALSE)
+    return(invisible(NULL))
+  }
+
+  # Draw edge from parent
+  if (!is.null(parent_coords)) {
+    segments(parent_coords[1], parent_coords[2], x, y, col = "gray40")
+  }
+
+  # Draw node (internal or leaf)
+  if (node$is_leaf) {
+    label <- sprintf("Leaf\npred=%s", format(node$prediction, digits = 3))
+    box_col <- "lightgreen"
+  } else {
+    fname <- if (!is.null(feature_names)) feature_names[node$feature_idx] else sprintf("X[%d]", node$feature_idx)
+    label <- sprintf("%s <= %.2f", fname, node$threshold)
+    box_col <- "lightblue"
+  }
+  points(x, y, pch = 22, cex = 9, bg = box_col, col = "black")
+  text(x, y, label, cex = 0.6)
+
+  # Draw children
+  if (!node$is_leaf) {
+    hshift <- dx / (2^depth)
+    plot_tree(node$left,  feature_names, depth + 1, x - hshift, y - dy, dx, dy, c(x, y), FALSE)
+    plot_tree(node$right, feature_names, depth + 1, x + hshift, y - dy, dx, dy, c(x, y), FALSE)
+  }
+}
+
+# ── Demo ───────────────────────────────────────────────────────────────────
+plot_tree(tree$root, feature_names = c("x1", "x2"))
+```
+
+---
+
+## ✅ Chapter Summary
+
+| Concept | Formula/Rule |
+|---------|-------------|
+| Gini impurity | $1 - \sum_c p_c^2$ |
+| Entropy | $-\sum_c p_c \log_2 p_c$ |
+| Information gain | $H(\text{parent}) - \text{weighted avg}\ H(\text{children})$ |
+| Splitting rule | Choose feature/threshold maximizing IG |
+| Stopping | Max depth, min samples, pure node |
+
+---
+
+## 📝 Exercises
+
+1. Draw a decision tree by hand for a simple AND/OR gate.
+2. Prove that Gini = 0 when a node is pure.
+3. Implement **cost-complexity pruning** (reduce tree size using a complexity parameter $\alpha$).
+4. Visualize information gain vs threshold for a single feature split.
+
+---
+
+**← Previous:** [Chapter 05: Naive Bayes](chapter-05-naive-bayes.qmd)
+
+**→ Next:** [Chapter 07: Support Vector Machines](chapter-07-svm.qmd)

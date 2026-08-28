@@ -1,0 +1,1328 @@
+---
+title: "Chapter 15: Long Short-Term Memory (LSTM) Networks"
+subtitle: "From-scratch LSTM and GRU cells with real backpropagation-through-time, trained on synthetic and real rice-price data"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 15: Long Short-Term Memory (LSTM) Networks
+
+> **Level**: Advanced &nbsp;|&nbsp; **Estimated Time**: 6–8 hours &nbsp;|&nbsp; **Prerequisites**: Chapter 11 (Neural Networks), Chapter 14 (RNNs)
+
+---
+
+## What you will learn
+
+This chapter is built in four parts. You can read Part A on its own for the theory, or run the whole thing end‑to‑end.
+
+| Part | Content |
+|------|---------|
+| **A — Theory for dummies** | Why plain RNNs forget, how the LSTM's *cell‑state highway* and *gates* fix it, the math translated into plain English, and **hand‑drawn architecture diagrams** for the LSTM and every major variant (Peephole, GRU, BiLSTM, Stacked, Encoder–Decoder). |
+| **B — From scratch (R)** | A real LSTM with **forward pass *and* backpropagation‑through‑time** written from nothing but base R. It genuinely *trains* on a signal and forecasts it. |
+| **C — Full pipeline from scratch (simulated data)** | Reuse the Part B engine to **train / validate / test / forecast** in pure R, then compare a from‑scratch **LSTM vs GRU** on the same synthetic series. |
+| **D — Real data (rice prices)** | The same **from‑scratch** LSTM on a monthly **rice‑price** series with oil & fertiliser covariates, using the standard `series_to_supervised` framing (no torch/keras) with **Training / Validation / Test / Forecast** RMSE. |
+
+Every code cell is explained line‑by‑line in the text around it.
+
+---
+
+# Part A:  LSTM Theory
+
+## 15.1 Overview
+
+An LSTM is a smarter kind of RNN, built to fix the forgetfulness problem I mentioned. "LSTM" stands for Long Short-Term Memory, and the name is the whole idea: it can hold onto important information for a long time instead of letting it fade after a few steps.
+
+Here's the intuition. A plain RNN has one memory that gets completely overwritten at every step — so old information washes out fast. An LSTM adds a second, protected memory line (called the cell state) that runs straight through, like a conveyor belt. Information can ride along that belt untouched for many steps. The clever part is a set of gates — little valves that decide what gets added to the belt, what gets wiped off it, and what gets read out of it.
+
+Think of it like keeping notes while reading a long book. The conveyor belt is your notebook. At each page you make three small decisions: cross out notes that no longer matter, jot down new important facts, and glance at the relevant notes to answer whatever you're thinking about right now. Those three decisions are the three gates.
+
+A **Recurrent Neural Network** (Chapter 14) reads a sequence one step at a time and keeps a single "memory" vector $\mathbf{h}_t$ that it rewrites at every step:
+
+$$\mathbf{h}_t = \tanh(\mathbf{W}\,[\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b})$$
+
+**The dummy version:** imagine whispering a message down a long line of people. Each person re‑says it in their own words ($\tanh$ squashes it a little every time). After 50 people the original message is mush. That "re‑squashing at every step" is mathematically the **vanishing‑gradient problem** — when the network learns, the correction signal has to travel *backwards* through all those $\tanh$ squashes and gets multiplied down to almost zero. So an RNN simply **cannot learn long‑range dependencies**.
+
+## 15.2 The LSTM fix: add a memory *highway*
+
+The LSTM (Hochreiter & Schmidhuber, 1997) keeps the ordinary hidden state $\mathbf{h}_t$ **and adds a second line**, the **cell state** $\mathbf{C}_t$. Think of $\mathbf{C}_t$ as a conveyor belt running straight across the top of the network. Information can ride the belt for hundreds of steps **almost untouched** — the only things allowed to change it are simple, learnable *valves* called **gates**.
+
+There are three gates, each a little neural layer that outputs numbers between 0 and 1 (a $\sigma$ / sigmoid), acting like a **dimmer switch**:
+
+| Gate | Symbol | Dummy meaning | "0 means…" | "1 means…" |
+|------|--------|---------------|-----------|-----------|
+| **Forget** | $\mathbf{f}_t$ | how much old memory to keep | erase it | keep all of it |
+| **Input** | $\mathbf{i}_t$ | how much new info to write | write nothing | write it all |
+| **Output** | $\mathbf{o}_t$ | how much memory to reveal now | stay silent | speak fully |
+
+Because the belt is updated by **addition** (not repeated multiplication/squashing), the learning signal can flow back across many steps without vanishing. That single design choice is the whole magic.
+
+Let's set up our tools and *draw* the difference.
+
+```{r}
+# --- Setup: set random seed, and define a consistent plotting style ---
+SEED <- 42
+set.seed(SEED)
+
+par(mgp = c(2.2, 0.7, 0), las = 1)
+cat("R", R.version.string, "\n")
+```
+
+### Drawing Toolkits
+Below three helpers are the only drawing primitives we need:
+- `draw_box()` draws a **rectangle** with a centred label (used for cells and gates).
+- `draw_op()` draws a **circle** for a pointwise operation — `×` (element‑wise multiply) or `+` (add).
+- `draw_arrow()` draws a **directed arrow** between two points.
+
+Colours are fixed in the `Cpal` list so the green **cell‑state highway**, yellow **gates**, and red **operations** stay consistent across every figure.
+
+```{r}
+# ── Simple drawing kit: these are small helper functions for making our neural network diagrams.
+#    You can think of these as LEGO pieces that draw _boxes_ (with text), _circles_ (for math ops),
+#    and _arrows_ (to show connections). We also set standard colors so things always look the same.
+
+# This list just stores colors for things in our diagrams:
+# - cell: blue boxes for cells/memory
+# - gate: yellow boxes for gates
+# - op: red circles for math operations like add and multiply
+# - state: green lines for memory highways
+# - line: grayish lines for arrows/edges
+# - act: purple for activation boxes (rarely used)
+# - txt: text color (dark blue)
+Cpal <- list(
+  cell = "#E8F0FE", gate = "#FDE68A", op = "#FCA5A5", state = "#A7F3D0",
+  line = "#334155", act = "#C4B5FD", txt = "#1E293B"
+)
+
+draw_box <- function(x, y, w, h, label, fc, cex = 0.9, bold = FALSE) {
+  # Draws a rectangle ("box") with bottom-left corner at (x, y), width w, height h.
+  rect(x, y, x + w, y + h, col = fc, border = Cpal$line, lwd = 1.5)
+  text(x + w / 2, y + h / 2, label, cex = cex, font = if (bold) 2 else 1, col = Cpal$txt)
+}
+
+draw_op <- function(x, y, sym, r = 0.16, fc = NULL) {
+  # Draws a small circle (used for things like "x" or "+" operations).
+  symbols(x, y, circles = r, inches = FALSE, add = TRUE,
+          bg = if (is.null(fc)) Cpal$op else fc, fg = Cpal$line, lwd = 1.5)
+  text(x, y, sym, cex = 1.0, font = 2)
+}
+
+draw_arrow <- function(x0, y0, x1, y1, color = NULL, lw = 1.8) {
+  # Draws an arrow from (x0,y0) to (x1,y1).
+  arrows(x0, y0, x1, y1, length = 0.09, angle = 22,
+         col = if (is.null(color)) Cpal$line else color, lwd = lw)
+}
+
+cat("drawing toolkit ready\n")
+```
+
+### Diagram 1: Vanilla RNN
+
+```{r, fig.width=11, fig.height=6}
+# ── Diagram 1: Vanilla RNN (one fading memory) vs LSTM (extra C highway) ──
+
+# The purpose of this code is to make two simple diagrams showing the difference between a normal
+# (vanilla) RNN and an LSTM. Both diagrams show a sequence of "cells" passing information forward;
+# the diagrams help explain why LSTMs remember things better.
+
+par(mfrow = c(2, 1), mar = c(1, 1, 3, 1))
+
+# === First Diagram: Vanilla RNN (top plot) ===
+plot(NA, xlim = c(0, 11), ylim = c(0, 3), axes = FALSE, xlab = "", ylab = "",
+     main = "Vanilla RNN — one memory line, re-squashed at every step", font.main = 2)
+for (k in 0:3) {
+  x <- 1 + k * 2.6
+  draw_box(x, 1, 1.3, 1, "RNN\ncell", Cpal$cell, bold = TRUE)
+  draw_arrow(x - 0.7, 1.5, x, 1.5)
+  if (k < 3) draw_arrow(x + 1.3, 1.5, x + 1.9, 1.5, color = "#DC2626")  # memory fades
+  text(x + 0.65, 0.5, bquote(x[.(k + 1)]))
+  draw_arrow(x + 0.65, 0.75, x + 0.65, 1.0)
+}
+text(10.3, 1.95, "gradient\nfades", col = "#DC2626", cex = 0.8)
+
+# === Second Diagram: LSTM (bottom plot) ===
+plot(NA, xlim = c(0, 11), ylim = c(0, 3), axes = FALSE, xlab = "", ylab = "",
+     main = expression(bold("LSTM — a cell-state 'highway' " * C[t] * " carries memory almost untouched")))
+for (k in 0:3) {
+  x <- 1 + k * 2.6
+  draw_box(x, 0.9, 1.3, 1.1, "LSTM\ncell", Cpal$cell, bold = TRUE)
+  draw_arrow(x - 0.7, 1.15, x, 1.15)
+  if (k < 3) draw_arrow(x + 1.3, 1.15, x + 1.9, 1.15)
+  draw_arrow(x - 0.7, 2.4, x, 2.4, color = "#059669", lw = 3)
+  if (k < 3) draw_arrow(x + 1.3, 2.4, x + 1.9, 2.4, color = "#059669", lw = 3)
+  text(x + 0.65, 0.35, bquote(x[.(k + 1)]))
+  draw_arrow(x + 0.65, 0.55, x + 0.65, 0.9)
+}
+text(0.15, 2.4, "C", col = "#059669", font = 2)
+text(0.15, 1.15, "h", font = 2)
+par(mfrow = c(1, 1))
+```
+
+**Reading the picture.** In the RNN (top) there is a *single* red memory link; the learning signal has to squeeze through every cell and fades. In the LSTM (bottom) the thick green line $C$ is the highway: it runs across the top and is only lightly edited at each cell, so memory — and gradients — survive.
+
+## 15.3 The math, one gate at a time
+
+At each step $t$ the cell receives the new input $\mathbf{x}_t$, the previous hidden state $\mathbf{h}_{t-1}$, and the previous belt value $\mathbf{C}_{t-1}$. It glues $\mathbf{x}_t$ and $\mathbf{h}_{t-1}$ together (written $[\mathbf{h}_{t-1}, \mathbf{x}_t]$) and computes:
+
+$$\mathbf{f}_t = \sigma(\mathbf{W}_f\,[\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_f) \qquad \textbf{Forget gate}$$
+> *"Looking at the new input and my last thought, what fraction of each memory slot should I keep?"* Output is between 0 (drop) and 1 (keep).
+
+$$\mathbf{i}_t = \sigma(\mathbf{W}_i\,[\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_i) \qquad \textbf{Input gate}$$
+> *"How much am I allowed to write into each memory slot right now?"*
+
+$$\tilde{\mathbf{g}}_t = \tanh(\mathbf{W}_g\,[\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_g) \qquad \textbf{Candidate}$$
+> *"Here is the actual new content I'm proposing to write"* (range $-1$ to $1$).
+
+$$\mathbf{C}_t = \mathbf{f}_t \odot \mathbf{C}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{g}}_t \qquad \textbf{Update the belt}$$
+> **The key line.** Keep a fraction $\mathbf{f}_t$ of the old belt, then *add* a fraction $\mathbf{i}_t$ of the new content. Notice it is an **addition** — that is why gradients don't vanish.
+
+$$\mathbf{o}_t = \sigma(\mathbf{W}_o\,[\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_o) \qquad \textbf{Output gate}$$
+> *"How much of the belt should I reveal as my answer this step?"*
+
+$$\mathbf{h}_t = \mathbf{o}_t \odot \tanh(\mathbf{C}_t) \qquad \textbf{Hidden state}$$
+> Squash the belt to $[-1,1]$ and let the output gate decide how much of it leaves the cell.
+
+**Symbols:** $\sigma$ = sigmoid (0→1 dimmer), $\tanh$ = squash to $[-1,1]$, $\odot$ = element‑wise multiply, $[\cdot,\cdot]$ = concatenate.
+
+### Diagram: Inside one LSTM Cell
+
+```{r, fig.width=11, fig.height=6}
+# ── Diagram 2: what happens INSIDE one LSTM cell ──
+par(mar = c(1, 1, 2, 1))
+plot(NA, xlim = c(0, 11), ylim = c(0, 7), axes = FALSE, xlab = "", ylab = "")
+rect(1.3, 1.0, 1.3 + 8.4, 1.0 + 4.6, border = Cpal$line, lwd = 2, lty = 2, col = "#F8FAFC")
+text(5.5, 5.9, "Inside one LSTM cell at time step t", cex = 1.1, font = 2)
+
+# top green highway C: multiply by forget, then add new content
+draw_arrow(0.2, 4.9, 3.5, 4.9, color = "#059669", lw = 3); draw_op(3.9, 4.9, "×")
+draw_arrow(4.06, 4.9, 6.0, 4.9, color = "#059669", lw = 3); draw_op(6.4, 4.9, "+", fc = Cpal$state)
+draw_arrow(6.56, 4.9, 10.6, 4.9, color = "#059669", lw = 3)
+text(0.2, 5.25, expression(C[t-1]), col = "#059669"); text(9.9, 5.25, expression(C[t]), col = "#059669")
+
+# bottom inputs h_{t-1}, x_t
+draw_arrow(0.2, 1.7, 2.0, 1.7); text(0.2, 2.0, expression(h[t-1]))
+text(0.2, 0.55, expression(x[t])); draw_arrow(0.45, 0.7, 2.0, 1.5)
+
+# gate boxes
+draw_box(2.1, 2.3, 1.0, 0.7, "σ\nforget f", Cpal$gate, cex = 0.7)
+draw_box(3.4, 2.3, 1.0, 0.7, "σ\ninput i", Cpal$gate, cex = 0.7)
+draw_box(4.7, 2.3, 1.0, 0.7, "tanh\ncand g~", Cpal$act, cex = 0.7)
+draw_box(7.6, 2.3, 1.0, 0.7, "σ\nout o", Cpal$gate, cex = 0.7)
+
+draw_arrow(2.6, 3.0, 3.9, 4.74)                       # forget -> x on highway
+draw_op(5.05, 3.7, "×")                           # i * g
+draw_arrow(3.9, 3.0, 5.05, 3.54); draw_arrow(5.2, 3.0, 5.05, 3.54)
+draw_arrow(5.05, 3.86, 6.4, 4.74)                      # -> + on highway
+
+draw_op(8.1, 3.7, "×")                            # o * tanh(C)
+rect(8.9, 4.55, 8.9 + 0.9, 4.55 + 0.7, col = Cpal$act, border = Cpal$line, lwd = 1.3)
+text(9.35, 4.9, "tanh", cex = 0.8)
+draw_arrow(8.9, 4.9, 8.25, 3.86); draw_arrow(8.1, 3.0, 8.1, 3.54)
+draw_arrow(8.1, 3.86, 8.1, 1.7); draw_arrow(8.1, 1.7, 10.6, 1.7)
+text(9.9, 2.0, expression(h[t]))
+
+lines(c(2.0, 2.0), c(1.5, 3.4), col = Cpal$line, lwd = 1.2, lty = 3)   # input bus
+for (gx in c(2.6, 3.9, 5.2, 8.1)) lines(c(2.0, gx), c(3.4, 3.0), col = Cpal$line, lwd = 0.8, lty = 3)
+```
+
+**Trace the flow.** The green belt $C_{t-1}$ enters top‑left, gets **multiplied by the forget gate** (`×`), then has the new content **added** (`+`) to become $C_t$. New content is the input gate times the candidate ($i \odot \tilde g$). To produce the answer $h_t$, the belt is squashed by $\tanh$ and **multiplied by the output gate**. The dotted lines show that all four gates see the same input bus $[\mathbf{h}_{t-1}, \mathbf{x}_t]$.
+
+## 15.4 How many parameters?
+
+For hidden size $H$ and input size $D$ each gate has a weight matrix of shape $(H,\,H+D)$ plus a bias of size $H$. There are **4 gates**, so:
+
+$$\#\text{params} = 4\,\big[H(H+D) + H\big] = 4H(H+D+1)$$
+
+A GRU has 3 such blocks instead of 4, and a Stacked/Bidirectional model multiplies this by the number of layers/directions. We will print exact counts from our own parameter arrays later.
+
+## 15.5 The variants
+
+### (a) Peephole connections
+Let the gates also *peek* at the belt $\mathbf{C}_{t-1}$ itself, not just $\mathbf{h}_{t-1}$:
+$$\mathbf{f}_t = \sigma(\mathbf{W}_f\,[\mathbf{C}_{t-1}, \mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_f)$$
+> the dimmer switches get to look at the conveyor belt directly. Helps with precise timing tasks.
+
+### (b) GRU — Gated Recurrent Unit (the lightweight cousin)
+Merges the cell and hidden state and uses only **two** gates: **update** $z$ and **reset** $r$.
+$$\mathbf{z}_t = \sigma(\mathbf{W}_z[\mathbf{h}_{t-1},\mathbf{x}_t]),\quad \mathbf{r}_t = \sigma(\mathbf{W}_r[\mathbf{h}_{t-1},\mathbf{x}_t])$$
+$$\tilde{\mathbf{h}}_t = \tanh(\mathbf{W}[\mathbf{r}_t\odot\mathbf{h}_{t-1},\mathbf{x}_t]),\quad \mathbf{h}_t = (1-\mathbf{z}_t)\odot\mathbf{h}_{t-1} + \mathbf{z}_t\odot\tilde{\mathbf{h}}_t$$
+> one knob ($z$) blends old vs new memory; another ($r$) decides how much old memory to use when proposing new content. **Fewer parameters, faster, often just as good.**
+
+### (c) Bidirectional LSTM (BiLSTM)
+Run one LSTM **forward** and another **backward**, then glue their hidden states together.
+$$\mathbf{h}_t = [\,\overrightarrow{\mathbf{h}}_t,\ \overleftarrow{\mathbf{h}}_t\,]$$
+> read the sentence left‑to‑right *and* right‑to‑left so each word is understood with full context. Great for classification/tagging where the **whole sequence is known** — but **not** for real‑time forecasting (you can't see the future).
+
+### (d) Stacked (deep) LSTM
+Feed the hidden‑state sequence of layer 1 as the input to layer 2, and so on.
+> layer 1 learns simple patterns, layer 2 learns patterns‑of‑patterns. More power, more compute, needs more data.
+
+### (e) Encoder–Decoder (seq2seq)
+One LSTM **encodes** the input sequence into a context vector; a second LSTM **decodes** it into an output sequence.
+> the encoder "reads and summarises", the decoder "writes". This is the backbone of classic machine translation and multi‑step forecasting.
+
+### Diagram 3: the four structural variants side by side
+
+```{r, fig.width=13, fig.height=8}
+# ── Diagram 3: the four structural variants side by side ──
+draw_gru <- function() {
+  plot(NA, xlim = c(0, 9), ylim = c(0, 5), axes = FALSE, xlab = "", ylab = "",
+       main = "GRU cell — 2 gates, no separate cell state", font.main = 2, cex.main = 1.0)
+  rect(0.8, 0.7, 0.8 + 7.4, 0.7 + 3.2, border = Cpal$line, lwd = 2, lty = 2, col = "#F8FAFC")
+  draw_arrow(0.1, 3.3, 3.5, 3.3); text(0.1, 3.55, expression(h[t-1]), cex = 0.8)
+  draw_box(2.0, 1.3, 1.0, 0.7, "σ\nreset r", Cpal$gate, cex = 0.65)
+  draw_box(3.3, 1.3, 1.0, 0.7, "σ\nupd. z", Cpal$gate, cex = 0.65)
+  draw_box(4.7, 1.3, 1.1, 0.7, "tanh\ncand", Cpal$act, cex = 0.65)
+  draw_op(4.0, 3.3, "×"); draw_op(6.4, 3.3, "+"); draw_op(6.4, 2.2, "×")
+  draw_arrow(4.16, 3.3, 6.24, 3.3); draw_arrow(6.56, 3.3, 8.3, 3.3); text(7.7, 3.55, expression(h[t]), cex = 0.8)
+  draw_arrow(5.8, 1.65, 6.4, 2.04); draw_arrow(6.4, 2.36, 6.4, 3.14)
+  text(0.1, 0.9, expression(x[t]), cex = 0.8); draw_arrow(0.35, 1.05, 2.0, 1.3)
+}
+
+draw_bilstm <- function() {
+  plot(NA, xlim = c(0, 10), ylim = c(0, 4), axes = FALSE, xlab = "", ylab = "",
+       main = "Bidirectional LSTM — read both ways, then concat", font.main = 2, cex.main = 1.0)
+  for (k in 0:3) {
+    x <- 1 + k * 2.1
+    draw_box(x, 2.1, 1.1, 0.7, "LSTM →", Cpal$cell)
+    draw_box(x, 1.0, 1.1, 0.7, "← LSTM", Cpal$state)
+    text(x + 0.55, 0.55, bquote(x[.(k + 1)]), cex = 0.8)
+    if (k < 3) {
+      draw_arrow(x + 1.1, 2.45, x + 2.1, 2.45)
+      draw_arrow(x + 2.1, 1.35, x + 1.1, 1.35, color = "#059669")
+    }
+    draw_box(x, 3.0, 1.1, 0.55, "concat", Cpal$gate, cex = 0.7)
+    draw_arrow(x + 0.55, 2.8, x + 0.55, 3.0); draw_arrow(x + 0.55, 1.7, x + 0.2, 3.0)
+  }
+}
+
+draw_stacked <- function() {
+  plot(NA, xlim = c(0, 10), ylim = c(0, 4), axes = FALSE, xlab = "", ylab = "",
+       main = "Stacked LSTM — layer 2 reads layer 1", font.main = 2, cex.main = 1.0)
+  for (k in 0:3) {
+    x <- 1 + k * 2.1
+    draw_box(x, 0.9, 1.1, 0.7, "LSTM_1", Cpal$cell)
+    draw_box(x, 2.1, 1.1, 0.7, "LSTM_2", Cpal$state)
+    draw_arrow(x + 0.55, 1.6, x + 0.55, 2.1); text(x + 0.55, 0.45, bquote(x[.(k + 1)]), cex = 0.8)
+    if (k < 3) {
+      draw_arrow(x + 1.1, 1.25, x + 2.1, 1.25)
+      draw_arrow(x + 1.1, 2.45, x + 2.1, 2.45)
+    }
+  }
+}
+
+draw_seq2seq <- function() {
+  plot(NA, xlim = c(0, 10), ylim = c(0, 3.4), axes = FALSE, xlab = "", ylab = "",
+       main = "Encoder–Decoder (seq2seq)", font.main = 2, cex.main = 1.0)
+  for (k in 0:2) {
+    x <- 0.6 + k * 1.5
+    draw_box(x, 1.2, 1.1, 0.7, "Enc", Cpal$cell)
+    text(x + 0.55, 0.75, bquote(x[.(k + 1)]), cex = 0.8)
+    if (k < 2) draw_arrow(x + 1.1, 1.55, x + 1.5, 1.55)
+  }
+  draw_arrow(5.0, 1.55, 5.7, 1.55, color = "#DC2626", lw = 2.5)
+  text(5.35, 1.85, "context", col = "#DC2626", cex = 0.7)
+  for (k in 0:2) {
+    x <- 5.8 + k * 1.4
+    draw_box(x, 1.2, 1.05, 0.7, "Dec", Cpal$state)
+    text(x + 0.52, 2.4, bquote(hat(y)[.(k + 1)]), cex = 0.8); draw_arrow(x + 0.52, 1.9, x + 0.52, 2.2)
+    if (k < 2) draw_arrow(x + 1.05, 1.55, x + 1.4, 1.55)
+  }
+}
+
+par(mfrow = c(2, 2), mar = c(1, 1, 2, 1))
+draw_gru(); draw_bilstm(); draw_stacked(); draw_seq2seq()
+par(mfrow = c(1, 1))
+```
+
+### 15.6 Cheat‑sheet: which cell should I use?
+
+| Property | Vanilla RNN | **LSTM** | GRU |
+|----------|-------------|----------|-----|
+| Long‑range memory | Poor | Excellent | Good |
+| Parameters | Fewest | Most | Moderate |
+| Training speed | Fastest | Slowest | Medium |
+| Vanishing gradient | Severe | Largely solved | Largely solved |
+| Separate cell state | No | **Yes** | No (merged) |
+
+**Rule of thumb:** start with a GRU or a 1‑layer LSTM; reach for Stacked/BiLSTM only if a validation curve says you need it.
+
+---
+
+# Part B: An LSTM from scratch in R (that actually trains)
+
+Frameworks hide the mechanics. Here we implement the **forward pass** *and* **back‑propagation‑through‑time (BPTT)** using nothing but base R, and train it with **Adam** to forecast the next value of a noisy sine wave. This is the honest "from scratch" version - unlike a forward‑only demo, the weights really update and the loss really drops.
+
+```{r}
+# Let's build an LSTM (Long Short-Term Memory) neural network from scratch
+# using simple base-R math. It's meant to predict a number from a sequence of numbers,
+# learning "memory" over time. We'll skip the jargon and explain it as we go!
+
+sigmoid <- function(x) {
+  # squashes input to between 0 and 1 (like a smooth switch)
+  1.0 / (1.0 + exp(-x))
+}
+
+# A generic Adam optimiser step, shared by ScratchLSTM and ScratchGRU below (mirrors the
+# Python source's `step = ScratchLSTM.step` trick of reusing one implementation for both).
+adam_step <- function(obj, grads, lr = 0.01, b1 = 0.9, b2 = 0.999, eps = 1e-8) {
+  obj$t <- obj$t + 1
+  for (p in obj$params) {
+    g <- grads[[p]]
+    obj$m[[p]] <- b1 * obj$m[[p]] + (1 - b1) * g          # running average for momentum
+    obj$v[[p]] <- b2 * obj$v[[p]] + (1 - b2) * (g * g)    # running average for squared grads
+    mhat <- obj$m[[p]] / (1 - b1^obj$t)                   # bias correction for momentum
+    vhat <- obj$v[[p]] / (1 - b2^obj$t)                   # bias correction for squared grads
+    newval <- obj$field(p) - lr * mhat / (sqrt(vhat) + eps)  # the update!
+    obj$field(p, newval)
+  }
+}
+
+# An LSTM (Long Short-Term Memory) model made with just base R, with every step spelled out.
+# This network learns to look at sequences of numbers and predict the next number.
+#
+# How does it work? Think of LSTM as a repeating loop with:
+#   - Gates (like switches) that decide what to remember and what to forget
+#   - A "belt" (cell state) that carries memory forward in time
+ScratchLSTM <- setRefClass(
+  "ScratchLSTM",
+  fields = list(W = "matrix", b = "numeric", Wy = "matrix", by = "numeric",
+                H = "numeric", D = "numeric", params = "character",
+                m = "list", v = "list", t = "numeric"),
+  methods = list(
+    initialize = function(input_size = 1, hidden_size = 1, seed = 42, ...) {
+      set.seed(seed)
+      D <<- input_size; H <<- hidden_size
+      k <- 1.0 / sqrt(H)  # initialize weights small so learning is stable
+
+      # All the gates (input, forget, cell update, output) use the same big weight matrix!
+      W <<- matrix(runif(4 * H * (D + H), -k, k), nrow = 4 * H, ncol = D + H)
+      bvec <- rep(0.0, 4 * H)
+      bvec[(H + 1):(2 * H)] <- 1.0    # set forget gate bias to 1, helps remembering at first
+      b <<- bvec
+
+      Wy <<- matrix(runif(H, -k, k), nrow = 1, ncol = H)  # converts hidden to output
+      by <<- 0.0
+
+      params <<- c("W", "b", "Wy", "by")
+      init_adam()   # preps memory for the Adam optimizer (a fancy way to update weights)
+      callSuper(...)
+    },
+    init_adam = function() {
+      # This sets up parameters for the Adam optimizer (basically: momentum and caching for
+      # smoother learning)
+      m <<- setNames(lapply(params, function(p) { z <- field(p); z[] <- 0; z }), params)
+      v <<- setNames(lapply(params, function(p) { z <- field(p); z[] <- 0; z }), params)
+      t <<- 0
+    },
+    forward = function(x) {
+      # Think of this as sending the input sequence through the LSTM, step by step.
+      # x: matrix (T, D) -- a sequence with T steps, each with D numbers.
+      # Returns the prediction and a "cache" of everything we did, so we can work backwards later.
+      h <- rep(0.0, H)  # hidden state (the memory that gets revealed at each step)
+      cc <- rep(0.0, H) # cell state, the "belt" that carries long-term memory
+      Tn <- nrow(x)
+      cache <- vector("list", Tn)
+      for (tt in 1:Tn) {
+        z <- c(h, x[tt, ])            # join hidden memory and input
+        a <- as.numeric(W %*% z) + b  # math: compute pre-activations for all 4 gates
+
+        # Now split up these activations:
+        i <- sigmoid(a[1:H])              # input gate: should we remember this new info?
+        f <- sigmoid(a[(H + 1):(2 * H)])  # forget gate: should we forget what we remembered so far?
+        g <- tanh(a[(2 * H + 1):(3 * H)]) # cell update: new info to add (with input gate's permission)
+        o <- sigmoid(a[(3 * H + 1):(4 * H)])  # output gate: how much of the memory belt to reveal
+
+        # Update memory belt: forget old stuff and add new stuff (with the switches' permission)
+        cc <- f * cc + i * g
+
+        # Output: take memory belt, squash it, and filter by output switch
+        tc <- tanh(cc)
+        h <- o * tc
+
+        # Store everything: needed for learning updates
+        cache[[tt]] <- list(z = z, i = i, f = f, g = g, o = o, c = cc, tc = tc, h = h)
+      }
+
+      # At the end, make a prediction using the last hidden state
+      yhat <- as.numeric(Wy %*% h + by)
+      list(yhat = yhat, cache = cache, x = x)
+    },
+    backward = function(pack, dy) {
+      # Work backwards through all steps! This computes how to tweak weights for better predictions.
+      # pack: everything we remembered in forward()
+      # dy: how much changing the output changes the loss (for MSE, it's 2*error)
+      # Returns: list of gradients, one for each parameter
+      cache <- pack$cache; x <- pack$x
+      Tn <- length(cache)
+      dW <- matrix(0, nrow = nrow(W), ncol = ncol(W))
+      db <- rep(0.0, length(b))
+      dWy <- matrix(0, nrow = nrow(Wy), ncol = ncol(Wy))
+      dby <- 0.0
+
+      # Output layer's gradients (easy)
+      hT <- cache[[Tn]]$h
+      dWy <- dWy + dy * matrix(hT, nrow = 1)
+      dby <- dby + dy
+
+      dh_next <- as.numeric(base::t(Wy) * dy)  # how changing hidden state changes output
+      dc_next <- rep(0.0, H)                   # how changing cell state changes output
+
+      # Go backward, step by step, through the sequence
+      for (tt in Tn:1) {
+        ci <- cache[[tt]]
+        c_prev <- if (tt > 1) cache[[tt - 1]]$c else rep(0.0, H)
+
+        dh <- dh_next                                  # gradient from the future
+        do_ <- dh * ci$tc                               # output gate's part
+        dc <- dh * ci$o * (1 - ci$tc^2) + dc_next        # flow through tanh, accumulate future grads
+        di <- dc * ci$g                                 # input gate's part
+        dg <- dc * ci$i                                 # cell update's part
+        df <- dc * c_prev                               # forget gate's part
+        dc_prev <- dc * ci$f                             # carry the belt gradient backwards
+
+        # Now: How do you tweak activations to get those effects?
+        dai <- di * ci$i * (1 - ci$i)
+        daf <- df * ci$f * (1 - ci$f)
+        dag <- dg * (1 - ci$g^2)
+        dao <- do_ * ci$o * (1 - ci$o)
+        da <- c(dai, daf, dag, dao)
+
+        # Regular base-R math for the gradients
+        dW <- dW + outer(da, ci$z)
+        db <- db + da
+        dz <- as.numeric(base::t(W) %*% da)
+        dh_next <- dz[1:H]
+        dc_next <- dc_prev
+      }
+
+      # Clamp gradients to keep learning stable (avoid huge numbers!)
+      dW <- pmin(pmax(dW, -5), 5)
+      db <- pmin(pmax(db, -5), 5)
+      dWy <- pmin(pmax(dWy, -5), 5)
+      dby <- pmin(pmax(dby, -5), 5)
+      list(W = dW, b = db, Wy = dWy, by = dby)
+    },
+    step = function(grads, lr = 0.01, b1 = 0.9, b2 = 0.999, eps = 1e-8) {
+      # Actually update weights, using the Adam optimizer -- a smart way of adjusting the step size.
+      adam_step(.self, grads, lr, b1, b2, eps)
+    }
+  )
+)
+
+cat("ScratchLSTM defined\n")
+```
+
+### Train the LSTM  Model
+
+```{r}
+# --- "Explain for dummies": Training the Scratch LSTM on a wiggly (noisy) sine wave ---
+
+# 1. Make a wiggly sine wave with noise, like a drunk snake!
+set.seed(0)  # always get the same random numbers each run
+Tn_b <- 200  # how long is our snake?
+series_b <- sin((0:(Tn_b - 1)) * 0.2) + 0.1 * rnorm(Tn_b)  # sine shape, plus random noise
+
+LOOK <- 12  # how much "history" will we use to guess the next value?
+
+# 2. Chop the snake into overlapping windows for the LSTM to look at
+X_b <- matrix(0, nrow = Tn_b - LOOK, ncol = LOOK)  # shape: (num_examples, LOOK); 1 feature per step
+for (i in 0:(Tn_b - LOOK - 1)) X_b[i + 1, ] <- series_b[(i + 1):(i + LOOK)]
+y_b <- series_b[(LOOK + 1):Tn_b]  # the real "next" value after each window
+
+N_TRAIN <- 150  # how many will we train on?
+
+# 3. Build our hand-made LSTM!
+model_b <- ScratchLSTM$new(input_size = 1, hidden_size = 16, seed = 1)
+
+history_b <- c()
+for (epoch in 1:30) {  # do 30 rounds (epochs) through our data
+  # Shuffle the order (for fun and to help learning)
+  order_ <- sample(N_TRAIN)
+  sq_err <- 0.0  # will keep track of squared errors
+
+  for (j in order_) {  # go through each window
+    xj <- matrix(X_b[j, ], ncol = 1)   # reshape this window to (LOOK, 1) for forward()
+    res <- model_b$forward(xj)         # guess the next value!
+    err <- res$yhat - y_b[j]           # how far off was the guess?
+    sq_err <- sq_err + err^2           # add up the squared error
+    # Update the LSTM to make it less wrong next time (MSE loss gradient is 2*err)
+    model_b$step(model_b$backward(list(cache = res$cache, x = res$x), 2 * err), lr = 0.01)
+  }
+  # How well did we do this round (on average)?
+  history_b <- c(history_b, sq_err / N_TRAIN)
+  if (epoch %% 5 == 0) cat(sprintf("epoch %2d   train MSE = %.4f\n", epoch, history_b[length(history_b)]))
+}
+
+# 4. Did our LSTM learn the drunk snake?
+# Let's see how it does on fresh data it didn't get to see ("held-out tail")
+preds_b <- sapply((N_TRAIN + 1):length(y_b), function(j) {
+  xj <- matrix(X_b[j, ], ncol = 1)
+  model_b$forward(xj)$yhat
+})
+actual_b <- y_b[(N_TRAIN + 1):length(y_b)]
+rmse_b <- sqrt(mean((preds_b - actual_b)^2))
+cat(sprintf("\nHeld-out RMSE = %.4f  (noise std was 0.10)\n", rmse_b))
+```
+
+### Visualization Training Loss
+
+```{r, fig.width=12, fig.height=4}
+# ── Visualise: the loss really drops, and the forecast tracks the signal ──
+par(mfrow = c(1, 2))
+plot(history_b, type = "o", pch = 16, cex = 0.6, col = "steelblue",
+     main = "Scratch LSTM — training loss", xlab = "epoch", ylab = "MSE")
+idx_b <- (N_TRAIN + 1):length(y_b)
+plot(idx_b, actual_b, type = "l", lwd = 2, col = "black",
+     main = "Scratch LSTM — held-out forecast", xlab = "t", ylab = "",
+     ylim = range(c(actual_b, preds_b)))
+lines(idx_b, preds_b, lty = 2, lwd = 2, col = "tomato")
+legend("topright", legend = c("actual", "forecast"), col = c("black", "tomato"), lty = c(1, 2), lwd = 2, bty = "n")
+par(mfrow = c(1, 1))
+```
+
+The loss falls and the dashed forecast hugs the true signal — proof that our hand‑written BPTT is correct. We now reuse this exact from‑scratch engine to build the full forecasting pipeline in Parts C and D — still no torch or keras.
+
+---
+
+# Part C: The full pipeline **from scratch** (simulated data)
+
+No torch, no keras — we reuse the `ScratchLSTM` engine from Part B and add a small **GRU built the same way**, then run the complete **train → validate → test → forecast** workflow in pure R.
+
+### The four ingredients of any sequence-forecasting job
+1. **Windowing** — turn one long series into many `(lookback → next value)` examples.
+2. **Chronological split** — train on the past, validate on the middle, test on the most recent slice. *Never shuffle time.*
+3. **Scaling fit on the training part only** — so the model never "sees" test statistics.
+4. **A training loop** with validation-based **early stopping**.
+
+First we add a `ScratchGRU` (its gates and back-prop derived by hand, like the LSTM) plus a tiny R toolkit: a min-max scaler, a training harness, and metrics.
+
+```{r}
+# This class is a super basic version of a GRU neural network — a type of machine learning model
+# that works well with time series or sequences (like songs, weather, or stock prices).
+# It's written entirely from scratch using only base R, so you learn how it works under the hood.
+
+# A basic GRU (Gated Recurrent Unit) for regression tasks made in base R.
+# Just like ScratchLSTM, but even simpler. Three key methods:
+#   - forward(x): Runs a prediction through the mini brain, returns output and details for training.
+#   - backward(cache, dy): Figures out how wrong the prediction was and how to nudge the weights to fix it.
+#   - step(grads): Actually changes the "brain" weights using Adam optimizer math.
+ScratchGRU <- setRefClass(
+  "ScratchGRU",
+  fields = list(Wz = "matrix", Wr = "matrix", Wh = "matrix", bz = "numeric", br = "numeric", bh = "numeric",
+                Wy = "matrix", by = "numeric", H = "numeric", D = "numeric", params = "character",
+                m = "list", v = "list", t = "numeric"),
+  methods = list(
+    initialize = function(input_size = 1, hidden_size = 1, seed = 42, ...) {
+      # input_size: How many numbers come in at once (e.g., features per timestep)
+      # hidden_size: How big is the hidden memory chunk? (bigger = more capacity)
+      set.seed(seed)
+      D <<- input_size; H <<- hidden_size
+      k <- 1 / sqrt(H)
+      Z <- D + H  # The total size once we stick input and memory together
+      # Each "gate" and output gets its own weight grid ("W...") and bias ("b...")
+      Wz <<- matrix(runif(H * Z, -k, k), nrow = H, ncol = Z)  # "Update" gate weights
+      Wr <<- matrix(runif(H * Z, -k, k), nrow = H, ncol = Z)  # "Reset" gate weights
+      Wh <<- matrix(runif(H * Z, -k, k), nrow = H, ncol = Z)  # For the candidate new memory
+      bz <<- rep(0.0, H); br <<- rep(0.0, H); bh <<- rep(0.0, H)
+      Wy <<- matrix(runif(H, -k, k), nrow = 1, ncol = H)      # Final output weights
+      by <<- 0.0
+      H <<- H; D <<- D
+      params <<- c("Wz", "Wr", "Wh", "bz", "br", "bh", "Wy", "by")
+      init_adam()  # Set up Adam optimizer's running averages
+      callSuper(...)
+    },
+    init_adam = function() {
+      # For each parameter, keep Adam optimizer book-keeping arrays
+      m <<- setNames(lapply(params, function(p) { z <- field(p); z[] <- 0; z }), params)
+      v <<- setNames(lapply(params, function(p) { z <- field(p); z[] <- 0; z }), params)
+      t <<- 0
+    },
+    forward = function(x) {
+      # "x" is a matrix: (window length, input features)
+      Tn <- nrow(x)
+      h <- rep(0.0, H)  # Start with empty hidden memory
+      cache <- vector("list", Tn)  # We'll record what happens at each step for learning later
+      for (tt in 1:Tn) {
+        xt <- x[tt, ]                     # Input at time t
+        hx <- c(h, xt)                    # Stick hidden and input together
+
+        # "z" decides: how much old memory vs new info do we use?
+        z <- sigmoid(as.numeric(Wz %*% hx) + bz)
+        # "r" decides: how much of old memory to RESET to zero before new info
+        r <- sigmoid(as.numeric(Wr %*% hx) + br)
+        rhx <- c(r * h, xt)                # Old hidden memory, reset version
+        # Propose new memory: "candidate"
+        hc <- tanh(as.numeric(Wh %*% rhx) + bh)
+        # Blend old and new: (1-z) * old + z * new
+        h_new <- (1 - z) * h + z * hc
+        # Save everything needed for backprop/training
+        cache[[tt]] <- list(hprev = h, xt = xt, hx = hx, z = z, r = r, rhx = rhx, hc = hc, h_new = h_new)
+        h <- h_new
+      }
+      # Final output neuron uses last hidden state (after all steps)
+      output <- as.numeric(Wy %*% h + by)
+      list(yhat = output, cache = cache, x = x)
+    },
+    backward = function(pack, dy) {
+      # This method helps the model learn: "watched what happened, and if the output is off
+      # by dy, how do we fix the weights?"
+      cache <- pack$cache
+      Tn <- length(cache)
+      # Setup where to store all our "nudges" for each parameter
+      g <- setNames(lapply(params, function(p) { z <- field(p); z[] <- 0; z }), params)
+      # Start from end: last output influences the loss
+      hT <- cache[[Tn]]$h_new  # Last hidden state
+      g$Wy <- g$Wy + dy * matrix(hT, nrow = 1)
+      g$by <- g$by + dy
+      # "dh" is how much we wish to change h, start with last step's error
+      dh <- as.numeric(base::t(Wy) * dy)
+      # Go backwards through time (Backprop Through Time)
+      for (tt in Tn:1) {
+        ci <- cache[[tt]]
+        # Calculate how to nudge each gate and parameter
+        dz <- dh * (ci$hc - ci$hprev)
+        dhc <- dh * ci$z
+        dhprev <- dh * (1 - ci$z)
+        da_h <- dhc * (1 - ci$hc^2)  # Derivative of tanh
+        g$Wh <- g$Wh + outer(da_h, ci$rhx)
+        g$bh <- g$bh + da_h
+        drhx <- as.numeric(base::t(Wh) %*% da_h)
+        d_rh <- drhx[1:H]
+        dr <- d_rh * ci$hprev
+        dhprev <- dhprev + d_rh * ci$r
+        da_z <- dz * ci$z * (1 - ci$z)     # Derivative of sigmoid
+        da_r <- dr * ci$r * (1 - ci$r)
+        g$Wz <- g$Wz + outer(da_z, ci$hx)
+        g$bz <- g$bz + da_z
+        g$Wr <- g$Wr + outer(da_r, ci$hx)
+        g$br <- g$br + da_r
+        dhprev <- dhprev + (as.numeric(base::t(Wz) %*% da_z))[1:H] + (as.numeric(base::t(Wr) %*% da_r))[1:H]
+        dh <- dhprev
+      }
+      # Prevent run-away gradients by clipping big updates
+      for (p in params) g[[p]] <- pmin(pmax(g[[p]], -5), 5)
+      g
+    },
+    # step() below plugs into the same shared Adam implementation used by ScratchLSTM
+    # (mirrors the Python source's `step = ScratchLSTM.step` line)
+    step = function(grads, lr = 0.01, b1 = 0.9, b2 = 0.999, eps = 1e-8) {
+      adam_step(.self, grads, lr, b1, b2, eps)
+    }
+  )
+)
+
+cat("ScratchGRU ready\n")
+```
+
+### Helper Functions
+
+This section defines a minimal base-R toolkit for time series modeling. It implements a custom MinMax scaler for feature normalization, a function to create rolling window datasets, checkpointing utilities to save/restore model parameters, a per-sample SGD training loop with validation and early stopping, and evaluation metrics (RMSE, MAE, MAPE, R^2, parameter count). These tools are designed for educational scratch LSTM/GRU implementations and provide all essential components for training and assessing models without deep learning libraries.
+
+- **`MinMax`** reproduces `sklearn`'s scaler in a few lines, including the `inverse_transform` we need to read predictions back in real units.
+- **`make_windows`** turns the series into `(lookback → next value)` supervised examples.
+- **`fit_model`** is the Part B training idea wrapped in a reusable function: per-sample updates, a **validation pass each epoch**, **early stopping**, and it restores the **best** weights seen.
+- **`predict_model`** and the **metrics** (`rmse_`, `mae_`, `mape_`, `r2_`) are plain base R — no external ML library touches the model.
+
+```{r}
+# -- Tiny base-R toolkit: min-max scaler, windowing, training loop, metrics --
+
+# Simple from-scratch min-max scaler that scales to [0,1] per feature (column-wise).
+# Has inverse_transform for denormalizing outputs.
+MinMax <- setRefClass(
+  "MinMax",
+  fields = list(mn = "numeric", rng = "numeric"),
+  methods = list(
+    fit = function(A) {
+      A <- as.matrix(A); storage.mode(A) <- "double"
+      mn <<- apply(A, 2, min)
+      mx <- apply(A, 2, max)
+      d <- mx - mn
+      d[d == 0] <- 1.0   # Avoid division by zero if column is constant
+      rng <<- d
+      invisible(.self)
+    },
+    transform = function(A) {
+      A <- as.matrix(A); storage.mode(A) <- "double"
+      sweep(sweep(A, 2, mn, "-"), 2, rng, "/")
+    },
+    fit_transform = function(A) {
+      fit(A)
+      transform(A)
+    },
+    inverse_transform = function(A) {
+      A <- as.matrix(A); storage.mode(A) <- "double"
+      sweep(sweep(A, 2, rng, "*"), 2, mn, "+")
+    }
+  )
+)
+
+# Slices time series data into rolling windows suitable for supervised learning.
+# - arr: input matrix of shape (T, num_features)
+# - lookback: number of timesteps in the input window
+# - target_col: column (1-indexed) to use as prediction target
+# Returns: list(X = array(num_samples, lookback, num_features), y = vector of targets)
+make_windows <- function(arr, lookback, target_col = 1) {
+  arr <- as.matrix(arr)
+  n <- nrow(arr) - lookback
+  X <- array(0, dim = c(n, lookback, ncol(arr)))
+  y <- numeric(n)
+  for (i in 0:(n - 1)) {
+    X[i + 1, , ] <- arr[(i + 1):(i + lookback), , drop = FALSE]
+    y[i + 1] <- arr[i + lookback + 1, target_col]
+  }
+  list(X = X, y = y)
+}
+
+# Snapshot model parameters as a named list (for checkpointing best model)
+snap_model <- function(m) setNames(lapply(m$params, function(p) m$field(p)), m$params)
+
+# Restore parameter snapshot from a named list into the model
+restore_model <- function(m, s) for (p in names(s)) m$field(p, s[[p]])
+
+# Reshape one row of a 3D windows array back to a (timesteps, features) matrix
+# (R silently drops size-1 dimensions when indexing, so we restore them explicitly).
+extract_step <- function(X3, j) {
+  xj <- X3[j, , ]
+  if (is.null(dim(xj))) dim(xj) <- c(dim(X3)[2], dim(X3)[3])
+  xj
+}
+
+# Training loop for time series models using per-sample stochastic gradient descent.
+# - model: expects methods $forward, $backward, $step
+# - Xtr, ytr: training data (windows, labels)
+# - Xva, yva: validation data
+# - epochs: max passes over train set
+# - lr: learning rate (assumed used inside the model)
+# - patience: epochs to wait for val loss improvement before early stopping
+# Returns: list(hist = list(train=..., val=...), epochs_run = ...)
+fit_model <- function(model, Xtr, ytr, Xva, yva, epochs = 40, lr = 0.01, patience = 8,
+                       seed = 0, verbose = FALSE) {
+  set.seed(seed)
+  hist_ <- list(train = numeric(0), val = numeric(0))
+  best <- Inf              # best validation loss seen so far
+  best_snap <- NULL        # checkpoint (weights) with best val loss
+  wait <- 0                # epochs since last improvement
+  ntr <- dim(Xtr)[1]; nva <- dim(Xva)[1]
+  ep_ran <- 0
+
+  for (ep in 1:epochs) {
+    tr <- 0.0
+    # Shuffle train samples each epoch
+    for (j in sample(ntr)) {
+      xj <- extract_step(Xtr, j)
+      res <- model$forward(xj)
+      e <- res$yhat - ytr[j]
+      tr <- tr + e * e
+      # propagate error backward, call optimizer update (dL/dyhat = e for squared loss)
+      model$step(model$backward(list(cache = res$cache, x = res$x), e))
+    }
+    # Compute validation MSE
+    va <- mean(sapply(1:nva, function(j) (model$forward(extract_step(Xva, j))$yhat - yva[j])^2))
+    tr <- tr / ntr
+    hist_$train <- c(hist_$train, tr)
+    hist_$val <- c(hist_$val, va)
+    ep_ran <- ep
+    # Early stopping: Check for improvement
+    if (va < best - 1e-9) {
+      best <- va
+      best_snap <- snap_model(model)
+      wait <- 0
+    } else {
+      wait <- wait + 1
+      if (wait >= patience) break
+    }
+    if (verbose && (ep %% 5 == 0)) cat(sprintf("  epoch %3d  train %.4f  val %.4f\n", ep, tr, va))
+  }
+  # Restore best weights found
+  if (!is.null(best_snap)) restore_model(model, best_snap)
+  list(hist = hist_, epochs_run = ep_ran)
+}
+
+# Runs model$forward for each sample in X. Returns vector of predictions (length=dim(X)[1]).
+predict_model <- function(model, X) {
+  n <- dim(X)[1]
+  sapply(1:n, function(j) model$forward(extract_step(X, j))$yhat)
+}
+
+# Evaluation metrics
+rmse_ <- function(a, b) sqrt(mean((a - b)^2))
+mae_  <- function(a, b) mean(abs(a - b))
+mape_ <- function(a, b) mean(abs((a - b) / a)) * 100
+r2_   <- function(a, b) { ss <- sum((a - b)^2); tot <- sum((a - mean(a))^2); 1 - ss / tot }
+
+# Returns the total number of trainable parameters in a model.
+n_params <- function(m) sum(sapply(m$params, function(p) length(m$field(p))))
+
+cat("scratch toolkit ready\n")
+```
+
+### Simulated Data
+
+```{r, fig.width=11, fig.height=3.5}
+# -- Simulated series: linear trend + two seasonal cycles + noise --
+set.seed(SEED)
+Tn <- 600; tt <- 0:(Tn - 1)
+sim <- matrix(
+  10 + 0.02 * tt                          # slow upward trend
+  + 3.0 * sin(2 * pi * tt / 50)           # long 50-step cycle
+  + 1.5 * sin(2 * pi * tt / 12)           # short 12-step cycle
+  + rnorm(Tn) * 0.6,
+  ncol = 1
+)
+
+n <- nrow(sim); i_tr <- floor(n * 0.70); i_va <- floor(n * 0.85)   # 70 / 15 / 15 in time
+plot(sim[, 1], type = "l", lwd = 1, xlab = "", ylab = "",
+     main = "Simulated series with chronological train / val / test split")
+rect(0, par("usr")[3], i_tr, par("usr")[4], col = adjustcolor("green", alpha.f = 0.06), border = NA)
+rect(i_tr, par("usr")[3], i_va, par("usr")[4], col = adjustcolor("orange", alpha.f = 0.10), border = NA)
+rect(i_va, par("usr")[3], n, par("usr")[4], col = adjustcolor("red", alpha.f = 0.10), border = NA)
+lines(sim[, 1], lwd = 1)
+legend("topleft", legend = c("train", "val", "test"),
+       fill = adjustcolor(c("green", "orange", "red"), alpha.f = 0.3), bty = "n")
+```
+
+### Training
+
+```{r}
+# We want to teach an LSTM model to predict a time series. Let's break down each step:
+
+LOOK <- 24  # The model will look at the previous 24 time steps to make its prediction.
+
+# Scale (normalize) the data using only the training set,
+# so testing/validation data doesn't "leak info" from the future.
+x_scaler <- MinMax$new()$fit(sim[1:i_tr, , drop = FALSE])       # inputs: fit using ONLY training data
+y_scaler <- MinMax$new()$fit(sim[1:i_tr, 1, drop = FALSE])      # targets: same
+sim_s <- x_scaler$transform(sim)                                # ALL data scaled to [0, 1]
+
+# Make sliding windows: for every point, grab the previous 24 points as input, and the next
+# one as the label.
+win <- make_windows(sim_s, LOOK)
+X <- win$X; yv <- win$y
+
+ends <- LOOK + seq_len(dim(X)[1])           # the "end time" index for each window (1-indexed)
+# Define which samples are for training, validation, and testing (based on end time)
+tr <- ends <= i_tr
+va <- (ends > i_tr) & (ends <= i_va)
+te <- ends > i_va
+
+cat(sprintf("train windows %d | val %d | test %d\n", sum(tr), sum(va), sum(te)))
+
+# Build a new LSTM neural network from scratch!
+lstm <- ScratchLSTM$new(input_size = 1, hidden_size = 16, seed = 1)
+
+# Train the model: give it the train and validation data, let it learn up to 40 rounds
+# (epochs), stop early if validation doesn't improve for a while (patience)
+fit_out <- fit_model(
+  lstm,
+  X[tr, , , drop = FALSE], yv[tr],   # training data
+  X[va, , , drop = FALSE], yv[va],   # validation data
+  epochs = 40, lr = 0.01,            # up to 40 epochs, learning speed 0.01
+  patience = 8,                      # stop if no improvement for 8 epochs
+  verbose = TRUE
+)
+hist_c <- fit_out$hist; epochs_run <- fit_out$epochs_run
+
+cat(sprintf("stopped after %d epochs | parameters: %d\n", epochs_run, n_params(lstm)))
+```
+
+### Prediction and un-scale prediction
+
+```{r}
+# -- Un-scale predictions, score the test set, plot curves + forecast --
+
+# Evaluates the model by making predictions, un-normalizing (inverse transforming) them,
+# and computing various metrics.
+score <- function(model, Xa, ya) {
+  p <- predict_model(model, Xa)
+
+  # "Un-scale" (inverse transform) both predictions and true values so they're in original units
+  pr <- as.numeric(y_scaler$inverse_transform(matrix(p, ncol = 1)))    # predicted values, unscaled
+  tru <- as.numeric(y_scaler$inverse_transform(matrix(ya, ncol = 1)))  # true values, unscaled
+
+  # Compute and return common regression metrics
+  list(metrics = c(RMSE = rmse_(tru, pr), MAE = mae_(tru, pr), MAPE = mape_(tru, pr), R2 = r2_(tru, pr)),
+       pred = pr, true = tru)
+}
+
+# Evaluate the LSTM model on the test set
+sc <- score(lstm, X[te, , , drop = FALSE], yv[te])
+metrics <- sc$metrics; pred <- sc$pred; true <- sc$true
+cat("TEST:", paste(sprintf("%s=%.3f", names(metrics), metrics), collapse = "  "), "\n")
+```
+
+### Visualization
+
+```{r, fig.width=12, fig.height=4}
+par(mfrow = c(1, 2))
+plot(hist_c$train, type = "l", col = "steelblue", xlab = "epoch", ylab = "MSE",
+     main = "Learning curves", ylim = range(c(hist_c$train, hist_c$val)))
+lines(hist_c$val, col = "tomato")
+legend("topright", legend = c("train", "val"), col = c("steelblue", "tomato"), lty = 1, bty = "n")
+
+plot(true, type = "l", lwd = 2, xlab = "test step", ylab = "",
+     main = sprintf("Test forecast  (R2=%.3f)", metrics["R2"]), ylim = range(c(true, pred)))
+lines(pred, lty = 2, lwd = 2, col = "tomato")
+legend("topright", legend = c("actual", "LSTM forecast"), col = c("black", "tomato"), lty = c(1, 2), lwd = 2, bty = "n")
+par(mfrow = c(1, 1))
+```
+
+The validation curve flattens while the train curve keeps dropping — early stopping picks the sweet spot. The from-scratch LSTM explains most of the test variance.
+
+### One-step vs multi-step forecasting
+In previous evaluations, each prediction at time step *t* was generated using the true observed values from previous time steps as input—this approach is known as **one-step (teacher forcing) forecasting**. Here, the model always receives the actual past data, minimizing error accumulation.
+
+However, in real-world forecasting, we often want to predict multiple steps into the future, and the true future observations are unavailable. Instead, we must use the model's own predictions as input for subsequent steps. This approach is called **multi-step (recursive) forecasting**. At each time step, the model feeds its most recent forecast back into itself to predict the next value. While this enables forecasting entire sequences into the future, it can also lead to compounding errors, since mistakes at one step propagate forward.
+
+```{r, fig.width=11, fig.height=3.8}
+# -- Recursive multi-step forecast over the whole test horizon --
+# We want to predict all steps in the test set, but at each step, will only use the past window
+# (of length LOOK) consisting of values already observed or recursively predicted. This mimics
+# the real-world forecasting scenario, where future true values aren't available.
+
+# 1. Start by initializing the 'window' to the last sequence seen before the test period.
+window_ <- sim_s[(i_va - LOOK + 1):i_va, , drop = FALSE]  # last known window before forecast horizon
+
+future <- c()  # This will collect all future predictions, step by step
+
+# 2. For each step in the test horizon:
+for (step in 1:(n - i_va)) {
+  # a. Make a forecast for the next step using the current window
+  nxt <- lstm$forward(window_)$yhat  # predict the next point (still scaled)
+  # b. Save the forecasted value
+  future <- c(future, nxt)
+  # c. Update window: drop the oldest value, append the new prediction to the window
+  window_ <- rbind(window_[-1, , drop = FALSE], matrix(nxt, ncol = 1))
+}
+
+# 3. Once all recursive predictions are complete, inverse-transform them to original scale
+future <- as.numeric(y_scaler$inverse_transform(matrix(future, ncol = 1)))
+# Actual future values for comparison
+actual_f <- sim[(i_va + 1):n, 1]
+
+# 4. Plotting for visualization
+hist_range <- (i_va - 59):i_va
+plot(hist_range, sim[hist_range, 1], type = "l", col = "gray50",
+     xlim = c(i_va - 60, n), ylim = range(c(sim[hist_range, 1], actual_f, future)),
+     xlab = "", ylab = "", main = "Multi-step (recursive) forecast")
+lines((i_va + 1):n, actual_f, lwd = 2, col = "black")
+lines((i_va + 1):n, future, lty = 2, lwd = 2, col = "tomato")
+abline(v = i_va, lty = 3)
+legend("topleft", legend = c("history", "actual future", "recursive forecast"),
+       col = c("gray50", "black", "tomato"), lty = c(1, 1, 2), lwd = c(1, 2, 2), bty = "n")
+
+# 5. Compute and print the RMSE of the recursive (multi-step) forecast
+cat("recursive RMSE:", round(rmse_(actual_f, future), 3), "\n")
+```
+
+### LSTM vs GRU on identical data
+In this section, we compare two types of recurrent neural networks—an LSTM (Long Short-Term Memory) cell and a GRU (Gated Recurrent Unit) cell—on exactly the same dataset using identical training protocols. Both models are custom implementations ("ours"), and are trained using the same infrastructure: identical random seed (to ensure comparable weight initialization), identical data splits, hyperparameters (such as learning rate, number of hidden units, optimizer, training epochs, and early stopping criteria), and evaluation metrics.
+
+This setup allows for a fair, apples-to-apples comparison of how LSTM and GRU architectures perform under controlled conditions, isolating the effect of the cell design itself rather than any differences in preprocessing or experiment configuration. Such a comparison helps determine if either architecture has a practical advantage on this task, or if both perform similarly.
+
+(Note: More advanced architectures like bidirectional LSTM (BiLSTM) or stacked/multi-layer LSTMs, which are introduced in Part A, are not included here but are natural extensions you can explore as exercises.)
+
+```{r, fig.width=6.5, fig.height=3.3}
+# -- Bake-off: our ScratchLSTM vs our ScratchGRU --
+# This code performs a direct comparison ("bake-off") between two custom RNN cell types
+# —ScratchLSTM and ScratchGRU— using exactly the same settings.
+
+rows <- list()
+
+# Loop over the two model classes: first ScratchLSTM, then ScratchGRU
+model_specs <- list(list(name = "ScratchLSTM", Model = ScratchLSTM),
+                     list(name = "ScratchGRU",  Model = ScratchGRU))
+for (spec in model_specs) {
+  # Instantiate the model with 1 input, 16 hidden units, and a fixed random seed for fair comparison
+  mdl <- spec$Model$new(input_size = 1, hidden_size = 16, seed = 1)
+  # Train the model on the training set, validate on the validation set, using early stopping (patience=8)
+  fo <- fit_model(mdl, X[tr, , , drop = FALSE], yv[tr], X[va, , , drop = FALSE], yv[va],
+                   epochs = 40, lr = 0.01, patience = 8)
+  # Evaluate the trained model on the test set
+  sc2 <- score(mdl, X[te, , , drop = FALSE], yv[te])
+  # Record model name and key metrics for comparison
+  rows[[length(rows) + 1]] <- data.frame(
+    Model = spec$name, RMSE = sc2$metrics["RMSE"], MAE = sc2$metrics["MAE"],
+    `MAPE%` = sc2$metrics["MAPE"], R2 = sc2$metrics["R2"],
+    Params = n_params(mdl), Epochs = fo$epochs_run, check.names = FALSE
+  )
+}
+
+# Aggregate results into a data frame for pretty printing
+compare <- do.call(rbind, rows)
+rownames(compare) <- NULL
+compare$RMSE <- round(compare$RMSE, 3); compare$MAE <- round(compare$MAE, 3)
+compare$`MAPE%` <- round(compare$`MAPE%`, 2); compare$R2 <- round(compare$R2, 3)
+
+# Print the performance metrics of both models
+print(compare, row.names = FALSE)
+
+# Plot the test RMSEs of both models in a bar chart for a visual comparison
+bp <- barplot(compare$RMSE, names.arg = compare$Model, col = c("#2563EB", "#059669"),
+              ylab = "Test RMSE", main = "Lower is better",
+              ylim = c(0, max(compare$RMSE) * 1.2))
+text(bp, compare$RMSE, sprintf("%.2f", compare$RMSE), pos = 3)
+```
+
+On this smooth synthetic series the two cells land close together — typical in practice. The **GRU reaches similar accuracy with fewer parameters**. Model choice should be settled on a **validation set**, not by reputation.
+
+---
+
+# Part D: Real data - monthly rice prices
+
+Now the honest part. We load `rice_price.csv` — monthly world rice prices (1990–2019) alongside crude oil, several fertilisers (DAP, MP, Rock Phosphate, TSP, Urea) and the VIX volatility index. Real economic series are **much harder** than clean simulations, and we'll see exactly why.
+
+```{r}
+# ── Load and inspect the rice-price data ──
+# Repo file: ../Data/rice_price.csv (relative to Notebook/)
+PATH <- "../Data/rice_price.csv"
+if (!file.exists(PATH)) PATH <- "Data/rice_price.csv"
+
+df <- read.csv(PATH, stringsAsFactors = FALSE)
+df$Date <- as.Date(paste0(df$Date, "-01"), format = "%Y-%m-%d")
+df <- df[order(df$Date), ]
+rownames(df) <- NULL
+cat(sprintf("%d rows, %d cols  months from %s to %s\n",
+            nrow(df), ncol(df), min(df$Date), max(df$Date)))
+head(df)
+```
+
+```{r, fig.width=11, fig.height=6}
+# ── EDA: the price path and its co-movers ──
+par(mfrow = c(2, 1), mar = c(3, 4, 2, 1))
+plot(df$Date, df$Rice_price, type = "l", col = "#2563EB", xlab = "", ylab = "price",
+     main = "Rice price (USD/tonne) — note the 2008 spike")
+covariates <- c("Crude_Oil", "Urea", "DAP", "VIX_Index")
+cov_cols <- c("#2563EB", "#059669", "#DC2626", "#7C3AED")
+plot(df$Date, df[[covariates[1]]], type = "l", col = cov_cols[1], xlab = "", ylab = "",
+     main = "Selected covariates", ylim = range(sapply(covariates, function(cn) range(df[[cn]]))))
+for (k in 2:length(covariates)) lines(df$Date, df[[covariates[k]]], col = cov_cols[k])
+legend("topleft", legend = covariates, col = cov_cols, lty = 1, ncol = 4, cex = 0.7, bty = "n")
+par(mfrow = c(1, 1))
+
+s <- summary(df$Rice_price)
+cat(sprintf("min=%.1f mean=%.1f max=%.1f std=%.1f\n",
+            s["Min."], s["Mean"], s["Max."], sd(df$Rice_price)))
+```
+
+Two facts jump out and shape the modelling choice:
+1. **A huge 2008 spike to ~900** dwarfs the rest of the series and sits inside the training window.
+2. The **most recent months form a calm band around ~400** — a mild **regime shift** between the early training era and the recent test era. Real economic series look like this, and we won't hide it.
+
+---
+
+## 15.6.1 The standard multivariate framing: `series_to_supervised` + min-max scaling
+
+We follow the widely-used recipe for multivariate LSTM forecasting (Brownlee's *"time series to supervised learning"* pattern), but the model is our **from-scratch `ScratchLSTM` — no torch, Keras, or TensorFlow**:
+
+- Scale all 8 columns to $[0,1]$ with our own **`MinMax`** scaler.
+- Reframe so the **8 features at time $t\!-\!1$** (rice price + 7 factors) are the inputs $X$, and the **rice price at time $t$** is the target $y$. This is a **one-lag, many-to-one** setup with `timesteps = 1`.
+- Split **by fixed row counts** into `train / val / test` and a final **6-month forecast** hold-out.
+- Train `ScratchLSTM(8 → 32 → 1)` with the harness from Part C, then report **Training / Validation / Test / Forecast RMSE** separately, un-scaling with the classic *"concatenate the other columns back, invert, keep column 0"* trick.
+
+```{r}
+# -- Frame a time series as a supervised-learning table (lag features) --
+
+# Convert a time series (or a sequence of multivariate observations) into a supervised
+# learning data frame. This function creates lagged features for modeling: past observations
+# as inputs (X) and future observations as outputs (y).
+#
+# Parameters:
+#   data   : matrix of shape (n_samples, n_features). The original time series data.
+#   n_in   : number of lag (input) time steps to include (e.g., n_in=1 creates features for t-1).
+#   n_out  : number of future (output) time steps to predict (e.g., n_out=1 predicts t).
+#   dropnan: whether to drop rows with any NA values (resulting from shifting operations).
+#
+# Returns: data frame where columns correspond to lagged inputs (t-n ... t-1) and forecast
+# outputs (t ... t+n).
+series_to_supervised <- function(data, n_in = 1, n_out = 1, dropnan = TRUE) {
+  data <- as.matrix(data)
+  n_vars <- ncol(data)
+  n <- nrow(data)
+  cols <- list()
+  names_ <- c()
+
+  # Create lagged input (X) sequences: for each lag i (from n_in to 1)
+  for (i in n_in:1) {
+    shifted <- rbind(matrix(NA, nrow = i, ncol = n_vars), data[1:(n - i), , drop = FALSE])
+    cols[[length(cols) + 1]] <- shifted
+    names_ <- c(names_, paste0("var", 1:n_vars, "(t-", i, ")"))
+  }
+
+  # Create output (y) sequences: current and future steps (from t to t+n_out-1)
+  for (i in 0:(n_out - 1)) {
+    shifted <- if (i == 0) data else rbind(data[(i + 1):n, , drop = FALSE], matrix(NA, nrow = i, ncol = n_vars))
+    cols[[length(cols) + 1]] <- shifted
+    label <- if (i == 0) paste0("var", 1:n_vars, "(t)") else paste0("var", 1:n_vars, "(t+", i, ")")
+    names_ <- c(names_, label)
+  }
+
+  # Combine all columns and assign names
+  agg <- do.call(cbind, cols)
+  colnames(agg) <- names_
+  agg <- as.data.frame(agg)
+
+  # Optionally drop rows with any NA values (from shifting)
+  if (dropnan) agg <- agg[stats::complete.cases(agg), ]
+  agg
+}
+
+cat("series_to_supervised ready\n")
+```
+
+```{r}
+# -- Scale to [0,1] with our MinMax, reframe, keep the columns we predict from/to --
+cols_use <- c("Rice_price", "Crude_Oil", "DAP", "MP", "Rock_Phosphate", "TSP", "Urea", "VIX_Index")
+values <- as.matrix(df[, cols_use])            # rice price MUST be column 1
+storage.mode(values) <- "double"
+n_feat <- ncol(values)                          # 8 features
+
+scaler <- MinMax$new()                          # our from-scratch scaler (Part C)
+scaled <- scaler$fit_transform(values)
+
+reframed <- series_to_supervised(scaled, 1, 1)
+# drop var2(t)..var8(t): predict ONLY rice price at time t, from all 8 factors at t-1
+drop_idx <- (n_feat + 2):(2 * n_feat)
+reframed <- reframed[, -drop_idx]
+cat("reframed shape:", nrow(reframed), ncol(reframed), " (8 inputs + 1 target)\n")
+head(reframed)
+```
+
+### Data Splits
+
+```{r}
+# -- Fixed row-count splits: train / val / test + a 6-month forecast hold-out --
+data_mat <- as.matrix(reframed)
+n <- nrow(data_mat); N_FORECAST <- 6             # last 6 months = pure forecast test
+train <- data_mat[1:260, ]                       # 260 train
+val   <- data_mat[261:300, ]                     # 40  validation
+test  <- data_mat[301:(n - N_FORECAST), ]        # remaining months = test
+pred  <- data_mat[(n - N_FORECAST + 1):n, ]      # final 6 months = forecast
+
+split_xy <- function(a) list(X = a[, 1:(ncol(a) - 1), drop = FALSE], y = a[, ncol(a)])
+tr_s <- split_xy(train); va_s <- split_xy(val); te_s <- split_xy(test); pr_s <- split_xy(pred)
+
+# reshape inputs to 3D [samples, timesteps=1, features] (ScratchLSTM reads (T, F) per sample)
+to3d <- function(A) array(A, dim = c(nrow(A), 1, ncol(A)))
+train_X <- to3d(tr_s$X); val_X <- to3d(va_s$X); test_X <- to3d(te_s$X); pred_X <- to3d(pr_s$X)
+train_y <- tr_s$y; val_y <- va_s$y; test_y <- te_s$y; pred_y <- pr_s$y
+cat("train", dim(train_X), "val", dim(val_X), "test", dim(test_X), "forecast", dim(pred_X), "\n")
+```
+
+### Training
+
+```{r}
+# -- Train our ScratchLSTM (8 -> 32 -> 1) with the Part C harness --
+model_d <- ScratchLSTM$new(input_size = n_feat, hidden_size = 32, seed = 42)
+fit_d <- fit_model(model_d, train_X, train_y, val_X, val_y,
+                    epochs = 120, lr = 0.01, patience = 15, seed = 0)
+history_d <- fit_d$hist; ep_d <- fit_d$epochs_run
+cat(sprintf("trained %d epochs | parameters: %d\n", ep_d, n_params(model_d)))
+```
+
+### Plot Training and Validation Loss
+
+```{r, fig.width=9, fig.height=3.6}
+# -- Plot training vs validation loss (the classic log-loss curve) --
+plot(history_d$train, type = "l", col = "steelblue", xlab = "epoch", ylab = "MSE (scaled)",
+     main = "Rice-price ScratchLSTM - MSE loss per epoch",
+     ylim = range(c(history_d$train, history_d$val)))
+lines(history_d$val, col = "tomato")
+legend("topright", legend = c("train", "val"), col = c("steelblue", "tomato"), lty = 1, bty = "n")
+```
+
+### Evaluating each split — the inverse-scaling trick
+Predictions come out on the $[0,1]$ scale. To read them in USD/tonne we **glue each prediction back next to the other 7 (t-1) columns**, run `scaler$inverse_transform`, and keep column 1 (rice price). Because min-max scaling inverts each column independently, the filler columns don't affect the recovered price — they only make the array the right shape.
+
+```{r}
+# -- One helper reproduces Training / Validation / Test / Forecast RMSE --
+rmse_report <- function(X3, y, name) {
+  yhat <- predict_model(model_d, X3)                             # scaled prediction
+  X2 <- matrix(X3, nrow = dim(X3)[1], ncol = dim(X3)[3])          # (samples, features)
+  inv_yhat <- scaler$inverse_transform(cbind(yhat, X2[, -1, drop = FALSE]))[, 1]
+  inv_y    <- scaler$inverse_transform(cbind(y,    X2[, -1, drop = FALSE]))[, 1]
+  cat(sprintf("%s RMSE: %.3f\n", name, rmse_(inv_y, inv_yhat)))
+  list(inv_y = inv_y, inv_yhat = inv_yhat)
+}
+
+invisible(rmse_report(train_X, train_y, "Training"))
+invisible(rmse_report(val_X,   val_y,   "Validation"))
+r_test <- rmse_report(test_X,  test_y,  "Test")
+r_pred <- rmse_report(pred_X,  pred_y,  "Forecast")
+inv_y_test <- r_test$inv_y; inv_yhat_test <- r_test$inv_yhat
+inv_y_pred <- r_pred$inv_y; inv_yhat_pred <- r_pred$inv_yhat
+
+# honest reference point: the naive "next = last" persistence baseline on the test slice
+persist <- df$Rice_price[300:(n - N_FORECAST - 1)]
+cat(sprintf("\n(persistence baseline on test RMSE: %.3f)\n", rmse_(inv_y_test, persist)))
+```
+
+### Visualization Prediction
+
+```{r, fig.width=13, fig.height=4}
+# -- Visualise test predictions and the 6-month forecast --
+test_dates <- df$Date[302:(302 + length(inv_y_test) - 1)]     # target dates for the test block
+pred_dates <- df$Date[(n - N_FORECAST + 2):nrow(df)]           # last 6 target dates
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+plot(test_dates, inv_y_test, type = "l", lwd = 2, xlab = "", ylab = "",
+     main = "Test set - one-step-ahead", ylim = range(c(inv_y_test, inv_yhat_test)))
+lines(test_dates, inv_yhat_test, lty = 2, lwd = 2, col = "tomato")
+legend("topright", legend = c("actual", "ScratchLSTM"), col = c("black", "tomato"), lty = c(1, 2), lwd = 2, bty = "n")
+
+plot(pred_dates, inv_y_pred, type = "o", pch = 16, lwd = 2, xlab = "", ylab = "",
+     main = "Final 6-month forecast", ylim = range(c(inv_y_pred, inv_yhat_pred)))
+lines(pred_dates, inv_yhat_pred, type = "o", pch = 15, lty = 2, lwd = 2, col = "tomato")
+legend("topright", legend = c("actual", "ScratchLSTM forecast"), col = c("black", "tomato"), lty = c(1, 2), lwd = 2, pch = c(16, 15), bty = "n")
+par(mfrow = c(1, 1))
+```
+
+### What Part D teaches
+- **The professional multivariate pipeline** — `series_to_supervised` framing, min-max scaling, fixed splits, and the concatenate-and-invert un-scaling — works with a **hand-written R LSTM**; no deep-learning framework is required.
+- We report **Training, Validation, Test and Forecast RMSE separately**, so over-fitting and regime shift are both visible.
+- **Always sanity-check against persistence** ("next ≈ last"): for near-random-walk prices it is a stiff baseline, and comparing to it tells you whether the LSTM is truly adding value.
+- To push further: increase the lag window (`n_in > 1`), predict **log-returns** instead of levels to tame the 2008-era regime shift, or forecast several months ahead with `n_out > 1`.
+
+---
+
+## 15.7 Applications
+
+| Task | Typical architecture |
+|------|----------------------|
+| Text / music generation | Stacked LSTM with softmax output |
+| Machine translation | Encoder–Decoder (seq2seq) |
+| Named‑entity recognition, POS tagging | BiLSTM (+ CRF) |
+| Time‑series & demand forecasting | LSTM/GRU with a regression head |
+| Speech recognition | BiLSTM + CTC loss |
+| Anomaly detection | LSTM autoencoder |
+
+## 15.8 Exercises
+
+1. **Forget‑bias ablation.** Set the forget‑gate bias to `0` in `ScratchLSTM` and retrain. Does the loss drop more slowly?
+2. **Stacked LSTM from scratch.** Chain two `ScratchLSTM` cells (layer 2 reads layer 1's hidden sequence) and back-prop through both. Does depth help on the rice data?
+3. **Lookback sweep.** For the rice model, try `LOOK ∈ {3, 6, 12, 24}`. Plot test RMSE vs lookback.
+4. **Log‑returns target.** Feed $\log p_t - \log p_{t-1}$ as the target instead of the raw level and reconstruct the price. Does it beat forecasting levels?
+5. **Direct multi‑horizon.** Modify `make_windows` with `horizon=3` and train a model that predicts three months ahead in one shot; compare to the recursive forecast.
+6. **Feature importance.** Drop covariates one at a time from the multivariate model and see which (if any) actually helps.
+
+##  Summary
+
+| Concept | Key idea |
+|---------|----------|
+| Vanishing gradient | Plain RNNs re‑squash one memory line and forget |
+| Cell state $C_t$ | A near‑untouched *highway* for long‑term memory |
+| Forget / Input / Output gates | Learnable 0–1 dimmers that edit the belt |
+| Additive update | $C_t = f\odot C_{t-1} + i\odot\tilde g$ keeps gradients alive |
+| GRU | Simpler 2‑gate cell, fewer params, often as good |
+| BiLSTM / Stacked / seq2seq | Read both ways / go deep / encode‑then‑decode |
+| Forecasting pipeline | Window → chronological split → scale on train → early‑stop |
+| Real‑data honesty | Difference non‑stationary series; always beat persistence |
+
+---
+
+**← Previous:** [Chapter 14: RNNs](chapter-14-rnn.qmd)
+**→ Next:** [Chapter 16: Graph Neural Networks](chapter-16-gnn.qmd)

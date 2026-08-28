@@ -1,0 +1,201 @@
+---
+title: "Chapter 01: Introduction to Machine Learning"
+subtitle: "What ML is, the major paradigms, and your first baseline model"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 01: Introduction to Machine Learning
+
+> **Level**: Beginner | **Estimated Time**: 1–2 hours
+
+---
+
+## 1.1 What is Machine Learning?
+
+**Machine Learning** is the science of giving computers the ability to learn patterns from data without being explicitly programmed for each rule.
+
+> Traditional programming: `Data + Rules → Output`
+> Machine learning:       `Data + Output → Rules`
+
+### A Simple Analogy
+Imagine teaching a child to recognize cats. You don't hand them a rulebook ("4 legs, pointy ears, whiskers…"). Instead, you show them thousands of examples. Eventually they *learn* the pattern. ML works the same way.
+
+---
+
+## 1.2 The Three Major Types of ML
+
+### 1. Supervised Learning
+The algorithm learns from **labeled data** (input → known output pairs).
+
+- **Regression**: Predict a continuous value (e.g., house price, temperature)
+- **Classification**: Predict a category (e.g., spam/not-spam, cat/dog)
+
+Examples: Linear Regression, Logistic Regression, SVM, Neural Networks
+
+### 2. Unsupervised Learning
+The algorithm finds **hidden structure** in unlabeled data.
+
+- **Clustering**: Group similar items together
+- **Dimensionality Reduction**: Compress data while keeping important information
+
+Examples: K-Means, PCA, Autoencoders
+
+### 3. Reinforcement Learning
+An **agent** learns by interacting with an environment, receiving **rewards** or **penalties**.
+
+Examples: Game-playing AI, robotics, recommendation systems
+
+---
+
+## 1.3 The Machine Learning Workflow
+
+```
+1. Define the Problem
+        ↓
+2. Collect & Explore Data
+        ↓
+3. Preprocess & Clean Data
+        ↓
+4. Choose a Model
+        ↓
+5. Train the Model
+        ↓
+6. Evaluate the Model
+        ↓
+7. Tune / Improve
+        ↓
+8. Deploy & Monitor
+```
+
+---
+
+## 1.4 Key Terminology
+
+| Term | Meaning |
+|------|---------|
+| **Feature (x)** | An input variable / column in your dataset |
+| **Target (y)** | The output variable you want to predict |
+| **Sample** | One row in the dataset (one observation) |
+| **Model** | The mathematical function mapping x → y |
+| **Training** | The process of fitting the model to data |
+| **Parameters ($\theta$)** | The internal values the model learns (weights, biases) |
+| **Hyperparameters** | Settings you choose before training (learning rate, depth) |
+| **Loss / Cost** | How wrong the model's predictions are |
+| **Overfitting** | Model memorizes training data, fails on new data |
+| **Underfitting** | Model is too simple to capture the pattern |
+| **Generalization** | The model's ability to perform well on unseen data |
+
+---
+
+## 1.5 Mathematical Notation Used in This Tutorial
+
+| Symbol | Meaning |
+|--------|---------|
+| $n$ | Number of training samples |
+| $p$ | Number of features |
+| $x_i$ | Feature vector of the i-th sample |
+| $y_i$ | True label of the i-th sample |
+| $\hat{y}_i$ | Predicted label for the i-th sample |
+| $\theta$ or $\mathbf{w}$ | Weight/parameter vector |
+| $b$ or $w_0$ | Bias term |
+| $J(\theta)$ | Cost function (to be minimized) |
+| $\partial J / \partial \theta$ | Partial derivative of cost w.r.t. parameter |
+| $\alpha$ | Learning rate (step size in gradient descent) |
+
+---
+
+## 1.6 The Bias–Variance Tradeoff
+
+Every ML model balances two sources of error:
+
+- **Bias**: Error from overly simplistic assumptions → *underfitting*
+- **Variance**: Error from sensitivity to small fluctuations in training data → *overfitting*
+
+$$\text{Total Error} = \text{Bias}^2 + \text{Variance} + \text{Irreducible Noise}$$
+
+The goal is to find the "sweet spot" — a model complex enough to capture the pattern, but not so complex it memorizes noise.
+
+---
+
+## 1.7 A Taste of ML: Your First "Model" From Scratch
+
+Even the simplest possible model is technically ML — predicting the mean!
+
+```{r}
+# The dumbest possible ML model: predict the mean
+# (This is actually called a "baseline model")
+
+mean_predictor_train <- function(y_train) {
+  # 'Train': just compute the mean of all targets.
+  sum(y_train) / length(y_train)
+}
+
+mean_predictor_predict <- function(model, X_test) {
+  # 'Predict': return the same mean for every input.
+  rep(model, length(X_test))
+}
+
+mean_absolute_error <- function(y_true, y_pred) {
+  # Average absolute difference between truth and prediction.
+  n <- length(y_true)
+  sum(abs(y_true - y_pred)) / n
+}
+
+# ── Demo ──────────────────────────────────────────────────────────────────
+house_prices_train <- c(150, 200, 250, 320, 400, 180, 290)
+house_prices_test  <- c(210, 310, 170)
+
+mean_price <- mean_predictor_train(house_prices_train)
+cat(sprintf("Trained model (mean): $%.1fk\n", mean_price))
+
+predictions <- mean_predictor_predict(mean_price, house_prices_test)
+cat("Predictions:", predictions, "\n")
+
+mae <- mean_absolute_error(house_prices_test, predictions)
+cat(sprintf("Mean Absolute Error: $%.1fk\n", mae))
+# Output:
+# Trained model (mean): $255.7k
+# Predictions: 255.7 255.7 255.7
+# Mean Absolute Error: $61.9k
+```
+
+**Expected Output:**
+```
+Trained model (mean): $255.7k
+Predictions: [255.7, 255.7, 255.7]
+Mean Absolute Error: $61.9k
+```
+
+This baseline tells us our **minimum** performance bar. Any real ML model must beat this to be useful.
+
+---
+
+## Chapter Summary
+
+- ML learns patterns from data rather than following hand-coded rules
+- Three main paradigms: Supervised, Unsupervised, Reinforcement
+- Every ML pipeline follows: Problem → Data → Model → Train → Evaluate → Deploy
+- Bias-variance tradeoff is the central challenge in building good models
+
+---
+
+##  Exercises
+
+1. Categorize each task as supervised/unsupervised/reinforcement learning:
+   - Grouping news articles by topic
+   - Predicting whether an email is spam
+   - Training a robot to walk
+   - Detecting credit card fraud
+2. Modify the `mean_predictor` to instead predict the **median**. Does MAE improve?
+3. Think of a real-world problem you'd like to solve with ML. Write down: the features, the target, and what type of ML it is.
+
+---
+
+**← Previous:** [Chapter 00: Prerequisites](chapter-00-prerequisites.qmd)
+**→ Next:** [Chapter 02: Linear Regression](chapter-02-linear-regression.qmd)

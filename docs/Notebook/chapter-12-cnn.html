@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Chapter 12: Convolutional Neural Networks (CNNs) – Machine Learning in R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../Notebook/chapter-13-cnn-advanced.html" rel="next">
+<link href="../Notebook/chapter-11-neural-networks.html" rel="prev">
+<link href="../Images/favicon.png" rel="icon" type="image/png">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-b13248f691110a3a988f32c964d6cd84.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-298d7a5bc0bdaa8e2d8fcf4df7d2d684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<style>
+  #quarto-document-content > header#title-block-header { display: none !important; }
+</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Machine Learning in R</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> <i class="bi bi-house" role="img" aria-label="Home">
+</i> 
+<span class="menu-text">Machine Learning in R</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/zia207/ML-R"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/zia-ahmed207"> <i class="bi bi-linkedin" role="img" aria-label="LinkedIn">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="mailto:zia207@gmail.com"> <i class="bi bi-mailbox" role="img" aria-label="Email">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-11-neural-networks.html"><strong>🔴 Advanced</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-12-cnn.html">Ch 12 · Convolutional Neural Networks</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-center sidebar-header">
+      <a href="../index.html" class="sidebar-logo-link">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo light-content py-0 d-lg-inline d-none">
+      <img src="../Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo dark-content py-0 d-lg-inline d-none">
+      </a>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>Machine Learning in R</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟢 Beginner</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-00-prerequisites.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 00 · Prerequisites &amp; Setup</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-01-intro-to-ml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 01 · Introduction to ML</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-02-linear-regression.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 02 · Linear Regression</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-03-glm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 03 · Generalized Linear Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-04-knn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 04 · K-Nearest Neighbors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-05-naive-bayes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 05 · Naive Bayes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟡 Intermediate</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-06-decision-trees.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 06 · Decision Trees</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-07-svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 07 · Support Vector Machines</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-08-ensemble-methods.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 08 · Ensemble Methods</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-09-kmeans.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 09 · K-Means Clustering</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-10-pca.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 10 · PCA</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>🔴 Advanced</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-11-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 11 · Neural Networks (MLP)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-12-cnn.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Ch 12 · Convolutional Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-13-cnn-advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 13 · CNNs — Advanced</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-14-rnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 14 · Recurrent Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-15-lstm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 15 · LSTM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-16-gnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 16 · Graph Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-17-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 17 · NLP</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-18-generative-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 18 · Generative Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-19-reinforcement-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 19 · Reinforcement Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>📊 Best Practices</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Notebook/chapter-20-model-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 20 · Model Evaluation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#chapter-12-convolutional-neural-networks-cnns" id="toc-chapter-12-convolutional-neural-networks-cnns" class="nav-link active" data-scroll-target="#chapter-12-convolutional-neural-networks-cnns">Chapter 12: Convolutional Neural Networks (CNNs)</a>
+  <ul class="collapse">
+  <li><a href="#overview" id="toc-overview" class="nav-link" data-scroll-target="#overview">12.1 Overview</a></li>
+  <li><a href="#the-big-idea-in-one-breath" id="toc-the-big-idea-in-one-breath" class="nav-link" data-scroll-target="#the-big-idea-in-one-breath">12.2 The big idea in one breath</a></li>
+  <li><a href="#an-image-is-just-a-grid-of-numbers" id="toc-an-image-is-just-a-grid-of-numbers" class="nav-link" data-scroll-target="#an-image-is-just-a-grid-of-numbers">12.3 An image is just a grid of numbers</a></li>
+  <li><a href="#the-one-piece-of-math-that-matters-convolution" id="toc-the-one-piece-of-math-that-matters-convolution" class="nav-link" data-scroll-target="#the-one-piece-of-math-that-matters-convolution">12.4 The one piece of math that matters: convolution</a>
+  <ul class="collapse">
+  <li><a href="#sizes-so-youre-not-confused-by-shapes" id="toc-sizes-so-youre-not-confused-by-shapes" class="nav-link" data-scroll-target="#sizes-so-youre-not-confused-by-shapes">Sizes (so you’re not confused by shapes):</a></li>
+  <li><a href="#the-cnns-magic-trick" id="toc-the-cnns-magic-trick" class="nav-link" data-scroll-target="#the-cnns-magic-trick">The CNN’s “magic trick”:</a></li>
+  <li><a href="#pooling" id="toc-pooling" class="nav-link" data-scroll-target="#pooling">12.5 Pooling</a></li>
+  <li><a href="#the-full-pipeline-step-by-step" id="toc-the-full-pipeline-step-by-step" class="nav-link" data-scroll-target="#the-full-pipeline-step-by-step">12.6 The full pipeline, step by step</a></li>
+  <li><a href="#why-stacking-layers-is-the-secret-sauce" id="toc-why-stacking-layers-is-the-secret-sauce" class="nav-link" data-scroll-target="#why-stacking-layers-is-the-secret-sauce">12.7 Why stacking layers is the secret sauce</a></li>
+  <li><a href="#the-three-helper-operations-explained-for-dummies" id="toc-the-three-helper-operations-explained-for-dummies" class="nav-link" data-scroll-target="#the-three-helper-operations-explained-for-dummies">12.8 The three helper operations (Explained for Dummies)</a></li>
+  <li><a href="#how-a-cnn-actually-learns" id="toc-how-a-cnn-actually-learns" class="nav-link" data-scroll-target="#how-a-cnn-actually-learns">12.9 How a CNN actually learns</a></li>
+  </ul></li>
+  <li><a href="#key-terms-cheat-sheet" id="toc-key-terms-cheat-sheet" class="nav-link" data-scroll-target="#key-terms-cheat-sheet">12.10 Key terms cheat sheet</a>
+  <ul class="collapse">
+  <li><a href="#the-whole-thing-in-one-sentence" id="toc-the-whole-thing-in-one-sentence" class="nav-link" data-scroll-target="#the-whole-thing-in-one-sentence">12.11 The whole thing in one sentence</a></li>
+  <li><a href="#where-cnns-show-up" id="toc-where-cnns-show-up" class="nav-link" data-scroll-target="#where-cnns-show-up">12.12. Where CNNs show up</a></li>
+  <li><a href="#from-scratch-r-implementation" id="toc-from-scratch-r-implementation" class="nav-link" data-scroll-target="#from-scratch-r-implementation">12.13 From-Scratch R Implementation</a></li>
+  </ul></li>
+  <li><a href="#cnn-on-mnist-dataset" id="toc-cnn-on-mnist-dataset" class="nav-link" data-scroll-target="#cnn-on-mnist-dataset">12.14 CNN on MNIST Dataset</a>
+  <ul class="collapse">
+  <li><a href="#data-preparation" id="toc-data-preparation" class="nav-link" data-scroll-target="#data-preparation">12.14.1 Data preparation</a></li>
+  <li><a href="#visualize-mnist-data" id="toc-visualize-mnist-data" class="nav-link" data-scroll-target="#visualize-mnist-data">12.14.2 Visualize MNIST data</a></li>
+  <li><a href="#train" id="toc-train" class="nav-link" data-scroll-target="#train">12.14.3 Train</a></li>
+  <li><a href="#training-and-validation-loss" id="toc-training-and-validation-loss" class="nav-link" data-scroll-target="#training-and-validation-loss">12.14.4 Training and validation loss</a></li>
+  <li><a href="#prediction-and-validation" id="toc-prediction-and-validation" class="nav-link" data-scroll-target="#prediction-and-validation">12.14.5 Prediction and validation</a></li>
+  </ul></li>
+  <li><a href="#key-cnn-concepts" id="toc-key-cnn-concepts" class="nav-link" data-scroll-target="#key-cnn-concepts">12.15 Key CNN Concepts</a></li>
+  <li><a href="#classic-architectures-reference" id="toc-classic-architectures-reference" class="nav-link" data-scroll-target="#classic-architectures-reference">12.16 Classic Architectures (Reference)</a></li>
+  <li><a href="#exercises" id="toc-exercises" class="nav-link" data-scroll-target="#exercises">Exercises</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-12-cnn.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Notebook/chapter-11-neural-networks.html"><strong>🔴 Advanced</strong></a></li><li class="breadcrumb-item"><a href="../Notebook/chapter-12-cnn.html">Ch 12 · Convolutional Neural Networks</a></li></ol></nav><h1 class="title display-7">Chapter 12: Convolutional Neural Networks (CNNs)</h1></header>
+
+<header id="title-block-header">
+
+<p class="subtitle lead">Convolution, pooling, and a from-scratch TinyCNN trained on real MNIST digits</p>
+
+</header>
+
+
+<div class="page-banner">
+<p><img src="../Images/banner_ml_r.png" class="img-fluid" alt="Machine Learning in R — From Scratch without Tears"></p>
+</div>
+<section id="chapter-12-convolutional-neural-networks-cnns" class="level1">
+<h1>Chapter 12: Convolutional Neural Networks (CNNs)</h1>
+<blockquote class="blockquote">
+<p><strong>Level</strong>: Advanced | <strong>Estimated Time</strong>: 6–8 hours</p>
+</blockquote>
+<hr>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">12.1 Overview</h2>
+<p>A CNN is a type of neural network built to understand images. The core idea: instead of looking at every pixel all at once, it scans the image in small patches and learns to recognize patterns — starting simple and building up to complex.</p>
+<p>Think of how you’d recognize a cat. You don’t consciously analyze all 2 million pixels. Your brain notices edges, then combines edges into shapes (ears, eyes), then combines shapes into “cat.” A CNN does exactly this, in layers.</p>
+<p>The three key pieces:</p>
+<p><strong>Convolution</strong> is the “scanning” step. A small filter (say 3×3 pixels) slides across the image looking for one specific pattern — maybe a diagonal edge. Wherever it finds that pattern, it lights up. Early filters catch simple things (edges, colors); deeper filters catch complex things (textures, then whole objects). The network <em>learns</em> what these filters should look for during training - nobody programs them by hand.</p>
+<p><strong>Pooling</strong> is the “zoom out/summarize” step. After convolution, the network shrinks the image down (e.g.&nbsp;keeps only the strongest signal in each little region). This makes it faster and, more importantly, means the network doesn’t care exactly <em>where</em> a feature is - a cat is a cat whether it’s in the top-left or center.</p>
+<p><strong>Fully connected layer</strong> is the “make a decision” step at the end. After all the scanning and summarizing, the accumulated evidence gets fed into a regular neural network that outputs the final answer: “85% cat, 10% dog, 5% fox.”</p>
+<p>The magic is the stacking: convolution → pooling → convolution → pooling → … → decision. Each round builds richer understanding on top of the last.</p>
+<p>The key intuition to walk away with: a CNN isn’t matching whole images against stored templates. It’s learning a hierarchy of reusable pattern-detectors — edges become shapes, shapes become parts, parts become objects — and it figures out what to look for on its own during training. That’s why the same trained network can spot a cat whether it’s big, small, off to one side, or partly hidden.</p>
+<hr>
+</section>
+<section id="the-big-idea-in-one-breath" class="level2">
+<h2 class="anchored" data-anchor-id="the-big-idea-in-one-breath">12.2 The big idea in one breath</h2>
+<p>A regular neural network looks at every pixel on its own and drowns in numbers. A <strong>CNN</strong> is a neural network built for images. Instead of staring at raw pixels, it hunts for <strong>local patterns</strong>, an edge here, a curve there, a texture over there, using a trick called <strong>convolution</strong>.</p>
+<p>Think of a tiny stencil (called a <strong>filter</strong> or <strong>kernel</strong>) sliding across the picture. At every spot it asks: <em>“Does my pattern show up right here?”</em> and answers with a single number.</p>
+<hr>
+</section>
+<section id="an-image-is-just-a-grid-of-numbers" class="level2">
+<h2 class="anchored" data-anchor-id="an-image-is-just-a-grid-of-numbers">12.3 An image is just a grid of numbers</h2>
+<p>A grayscale image is a grid where each cell is a pixel’s brightness (say 0 = black, 255 = white). A color image is the same thing three times over, one grid for red, one for green, one for blue, stacked together. That stack of numbers is <strong>all the CNN ever sees.</strong></p>
+<hr>
+</section>
+<section id="the-one-piece-of-math-that-matters-convolution" class="level2">
+<h2 class="anchored" data-anchor-id="the-one-piece-of-math-that-matters-convolution">12.4 The one piece of math that matters: convolution</h2>
+<p>Imagine you have a gray image that’s just a bunch of numbers lined up in a grid (each number = how bright each spot is).</p>
+<p>A <strong>convolution</strong> is just a way to look for patterns (like edges or corners) by sliding a tiny grid of numbers (called a “filter” or “kernel”) over your big grid and, at each spot, mixing the numbers together in a special way.</p>
+<p>Suppose your image is a grid <span class="math inline">\(I\)</span> (height <span class="math inline">\(H\)</span>, width <span class="math inline">\(W\)</span>), and your filter <span class="math inline">\(K\)</span> is a smaller grid (<span class="math inline">\(f \times f\)</span>):</p>
+<p><strong>The formula (don’t panic!):</strong></p>
+<p><span class="math display">\[
+(I * K)[i,j] = \sum_m \sum_n I[i+m, j+n] \cdot K[m, n]
+\]</span></p>
+<p>Lay the filter <span class="math inline">\(K\)</span> on top of the image patch that starts at <span class="math inline">\((i, j)\)</span>. For every spot in the filter, multiply the filter’s number by the image’s number underneath, then add up all those results. That gives you one new number for that spot!</p>
+<ul>
+<li>You keep sliding the filter across the image – left-right, top-bottom – repeating this.</li>
+<li>The result is a new grid (“feature map”) that shows where your filter “matched” the image.</li>
+</ul>
+<p>Here’s a 3x3 patch of an image and a 3x3 filter to spot vertical edges:</p>
+<pre><code>Image patch        Filter
+10  10   0         1   0  -1
+10  10   0    x    1   0  -1
+10  10   0         1   0  -1</code></pre>
+<p>Multiply and add EVERY matching pair:</p>
+<pre><code>(10×1) + (10×0) + (0×-1) = 10
+(10×1) + (10×0) + (0×-1) = 10
+(10×1) + (10×0) + (0×-1) = 10
+-------------------------------
+                       total = 30</code></pre>
+<p>So, at this spot, the result is <strong>30</strong>. This big number means “hey, there’s a vertical edge here!”</p>
+<p>You slide this filter around on the image and make a new grid of results. Big numbers show where this pattern happens a lot.</p>
+<section id="sizes-so-youre-not-confused-by-shapes" class="level3">
+<h3 class="anchored" data-anchor-id="sizes-so-youre-not-confused-by-shapes">Sizes (so you’re not confused by shapes):</h3>
+<ul>
+<li>With no padding: output grid is <span class="math inline">\((H - f + 1) \times (W - f + 1)\)</span></li>
+<li>With padding <span class="math inline">\(p\)</span>: <span class="math inline">\((H - f + 2p + 1) \times (W - f + 2p + 1)\)</span></li>
+<li>With stride <span class="math inline">\(s\)</span>: <span class="math inline">\(\left\lfloor \frac{H - f + 2p}{s} \right\rfloor + 1\)</span></li>
+</ul>
+</section>
+<section id="the-cnns-magic-trick" class="level3">
+<h3 class="anchored" data-anchor-id="the-cnns-magic-trick">The CNN’s “magic trick”:</h3>
+<p>You DON’T choose the filter numbers yourself! The network <strong>learns</strong> which numbers work best for the task, just by seeing tons of examples. This is what makes CNNs so powerful.</p>
+<p><strong>Bonus tip:</strong> “Parameter sharing” means you use the same filter/grid of numbers all over the image—it’s not a new set for every spot. That’s why CNNs use way fewer numbers than full neural networks, and can “see” patterns anywhere in the image!</p>
+<hr>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../Images/cnn_convolution.gif" class="img-fluid figure-img"></p>
+<figcaption>Convolution in action</figcaption>
+</figure>
+</div>
+</section>
+<section id="pooling" class="level3">
+<h3 class="anchored" data-anchor-id="pooling">12.5 Pooling</h3>
+<p>Pooling is just a way to make the picture (feature map) smaller and easier for the computer to work with.</p>
+<p>Imagine you have a big grid of numbers (from a picture after filters were applied). Pooling goes over this grid, looks at little blocks (for example, 2×2 squares), and replaces each block with just ONE number!</p>
+<p>There are two main types:</p>
+<ul>
+<li><strong>Max pooling:</strong> Keep only the biggest number in each little block.</li>
+<li><strong>Average pooling:</strong> Take all the numbers in the block, add them up, and divide by how many there are (just like getting the average in math class).</li>
+</ul>
+<p><strong>Equation for max pooling in a 2×2 block:</strong> <span class="math display">\[ \text{MaxPool}(X) = \max(X_{i,j}, X_{i,j+1}, X_{i+1,j}, X_{i+1,j+1}) \]</span></p>
+<p><strong>Equation for average pooling in a 2×2 block:</strong> <span class="math display">\[ \text{AvgPool}(X) = \frac{1}{4}(X_{i,j} + X_{i,j+1} + X_{i+1,j} + X_{i+1,j+1}) \]</span></p>
+<p>Usually, we use 2×2 max pooling with stride 2, which means we move the window 2 steps at a time — so the grid gets half as tall and half as wide.</p>
+</section>
+<section id="the-full-pipeline-step-by-step" class="level3">
+<h3 class="anchored" data-anchor-id="the-full-pipeline-step-by-step">12.6 The full pipeline, step by step</h3>
+<p>Follow one photo of a cat all the way through:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Step</th>
+<th>What happens</th>
+<th>Plain-English purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Input</strong></td>
+<td>Image becomes a grid (stack) of numbers</td>
+<td>The only thing the network sees</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Convolution</strong></td>
+<td>Slide learned filters, make feature maps</td>
+<td>Find patterns: edges, curves, colors</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>ReLU</strong></td>
+<td>Turn negatives into 0: <code>max(0, x)</code></td>
+<td>Keep the “found it” signals, drop the rest; lets it learn complex shapes</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>Pooling</strong></td>
+<td>Scan small blocks, keep the biggest value</td>
+<td>Shrink it; stop caring about exact pixel position</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Repeat 2–4</strong></td>
+<td>Stack these layers several times</td>
+<td>Edges → shapes → parts → whole objects</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><strong>Flatten</strong></td>
+<td>Unroll the final grids into one long list</td>
+<td>Prepare for an ordinary neural layer</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td><strong>Fully connected</strong></td>
+<td>Weighted sum of every feature</td>
+<td>The actual “voting” on what the image is</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td><strong>Output (softmax)</strong></td>
+<td>Turn votes into probabilities</td>
+<td>e.g.&nbsp;cat 92%, dog 8% → answer: <strong>cat</strong></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../Images/cnn_architecture.gif" class="img-fluid figure-img"></p>
+<figcaption>CNN Architecture</figcaption>
+</figure>
+</div>
+</section>
+<section id="why-stacking-layers-is-the-secret-sauce" class="level3">
+<h3 class="anchored" data-anchor-id="why-stacking-layers-is-the-secret-sauce">12.7 Why stacking layers is the secret sauce</h3>
+<p>Here’s the big idea: A CNN works so well because it does the SAME three steps (convolution → ReLU → pooling) OVER and OVER, each time learning more complex stuff.</p>
+<p>Imagine it like this:</p>
+<ul>
+<li><strong>Layer 1:</strong> Looks at the raw picture. It can only spot super basic things, like straight lines or colorful spots.</li>
+<li><strong>Layer 2:</strong> Looks at what Layer 1 found. Now it can put those basic things together into simple shapes, like triangles or eye-like blobs.</li>
+<li><strong>Layer 3:</strong> Takes the shapes from Layer 2 and puts them together to make bigger parts, like a cat’s face or a paw.</li>
+<li><strong>Layers even deeper:</strong> Combine those big parts to finally see the whole thing: “Oh hey, it’s definitely a CAT!”</li>
+</ul>
+<p>Each new layer has a “bigger imagination” than the one before. It goes from “I see a line” → “I see a shape” → “I see a face” → “I see a cat!”</p>
+<p>That’s why stacking layers is the magic: It lets the network go from basic doodles all the way up to recognizing whole objects. The more layers, the more complex things it can understand!</p>
+<hr>
+</section>
+<section id="the-three-helper-operations-explained-for-dummies" class="level3">
+<h3 class="anchored" data-anchor-id="the-three-helper-operations-explained-for-dummies">12.8 The three helper operations (Explained for Dummies)</h3>
+<p><strong>ReLU (activation):</strong> Think of this like a bouncer at a club. If a number is negative, it gets bounced out (changed to 0). If it’s positive, it goes inside (stays the same). So ReLU just means: “If it’s less than 0, make it 0. If it’s more than 0, keep it!” This helps the network notice interesting stuff and ignore boring (negative) signals.</p>
+<p><strong>Pooling (downsampling):</strong> Picture taking a big photo and shrinking it down by just keeping the most important bits. In max pooling, you look at little squares (like 2 by 2 blocks), and out of the four numbers inside, you keep ONLY the biggest one. This makes what the network sees smaller and simpler, kind of like making a thumbnail picture that still shows what’s important, even if the cat moved a little.</p>
+<p><strong>Fully connected layer (the decision):</strong> This is like a giant voting round. Imagine unrolling all the numbers the network found so far into a big list. Each number casts a vote (“I saw whiskers!” “I saw paws!”). These votes are given different weights (some things matter more than others), added together, and at the end, the network decides what the picture is most likely showing. That’s how it says, “I’m 92% sure it’s a cat, 8% sure it’s a dog.” (The softmax part just makes all those vote totals turn into nice percentages that add up to 100%.)</p>
+<hr>
+</section>
+<section id="how-a-cnn-actually-learns" class="level3">
+<h3 class="anchored" data-anchor-id="how-a-cnn-actually-learns">12.9 How a CNN actually learns</h3>
+<ol type="1">
+<li>Show it a labeled photo (you know it’s a cat).</li>
+<li>It makes a guess (say, “dog 70%”).</li>
+<li>Measure how wrong it was — the <strong>error</strong> (or “loss”).</li>
+<li>Nudge every filter and weight a tiny bit to reduce that error. This nudging is <strong>backpropagation + gradient descent</strong>.</li>
+<li>Repeat across millions of images.</li>
+</ol>
+<p>Over time, the filters organize themselves into edge-detectors, then shape-detectors, then object-detectors — <strong>all learned, none hand-programmed.</strong></p>
+<hr>
+</section>
+</section>
+<section id="key-terms-cheat-sheet" class="level2">
+<h2 class="anchored" data-anchor-id="key-terms-cheat-sheet">12.10 Key terms cheat sheet</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 75%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Term</th>
+<th>Dummy definition</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Filter / Kernel</strong></td>
+<td>A small grid of learned numbers that detects one pattern</td>
+</tr>
+<tr class="even">
+<td><strong>Feature map</strong></td>
+<td>The grid you get after sliding a filter over the image</td>
+</tr>
+<tr class="odd">
+<td><strong>Stride</strong></td>
+<td>How many pixels the filter jumps each slide (bigger = smaller output)</td>
+</tr>
+<tr class="even">
+<td><strong>Padding</strong></td>
+<td>Adding a border of zeros so filters can reach the edges</td>
+</tr>
+<tr class="odd">
+<td><strong>Channel</strong></td>
+<td>One “layer” of the image stack (e.g.&nbsp;the red channel)</td>
+</tr>
+<tr class="even">
+<td><strong>Epoch</strong></td>
+<td>One full pass through all the training images</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<section id="the-whole-thing-in-one-sentence" class="level3">
+<h3 class="anchored" data-anchor-id="the-whole-thing-in-one-sentence">12.11 The whole thing in one sentence</h3>
+<blockquote class="blockquote">
+<p><strong>The convolution / ReLU / pooling stack builds features from raw pixels, and the fully connected layer turns those features into a decision.</strong></p>
+</blockquote>
+</section>
+<section id="where-cnns-show-up" class="level3">
+<h3 class="anchored" data-anchor-id="where-cnns-show-up">12.12. Where CNNs show up</h3>
+<p>Image classification, face recognition, medical imaging (tumor detection), self-driving car vision, satellite and agricultural imagery, and even non-image grids like spectrograms for audio. Anywhere the data has a <strong>grid structure with local patterns</strong>, a CNN is a natural fit.</p>
+</section>
+<section id="from-scratch-r-implementation" class="level3">
+<h3 class="anchored" data-anchor-id="from-scratch-r-implementation">12.13 From-Scratch R Implementation</h3>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># cnn.R — 2D Convolution (grayscale)</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>conv2d <span class="ot">&lt;-</span> <span class="cf">function</span>(image, kernel, <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">0</span>) {</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 2D convolution (single channel). image: HxW matrix. kernel: fxf matrix.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns output feature map.</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  H <span class="ot">&lt;-</span> <span class="fu">nrow</span>(image); W <span class="ot">&lt;-</span> <span class="fu">ncol</span>(image)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  f <span class="ot">&lt;-</span> <span class="fu">nrow</span>(kernel)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (padding <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    padded <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, H <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> padding, W <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> padding)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    padded[(padding <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(padding <span class="sc">+</span> H), (padding <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(padding <span class="sc">+</span> W)] <span class="ot">&lt;-</span> image</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    padded <span class="ot">&lt;-</span> image</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  pH <span class="ot">&lt;-</span> <span class="fu">nrow</span>(padded); pW <span class="ot">&lt;-</span> <span class="fu">ncol</span>(padded)</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  out_H <span class="ot">&lt;-</span> (pH <span class="sc">-</span> f) <span class="sc">%/%</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  out_W <span class="ot">&lt;-</span> (pW <span class="sc">-</span> f) <span class="sc">%/%</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  output <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, out_H, out_W)</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(out_H)) {</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    ri <span class="ot">&lt;-</span> (i <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_len</span>(out_W)) {</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>      rj <span class="ot">&lt;-</span> (j <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>      patch <span class="ot">&lt;-</span> padded[ri<span class="sc">:</span>(ri <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>), rj<span class="sc">:</span>(rj <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>)]</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>      output[i, j] <span class="ot">&lt;-</span> <span class="fu">sum</span>(patch <span class="sc">*</span> kernel)</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>  output</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>max_pool2d <span class="ot">&lt;-</span> <span class="cf">function</span>(feature_map, <span class="at">pool_size =</span> <span class="dv">2</span>, <span class="at">stride =</span> <span class="dv">2</span>) {</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 2D max pooling.</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>  H <span class="ot">&lt;-</span> <span class="fu">nrow</span>(feature_map); W <span class="ot">&lt;-</span> <span class="fu">ncol</span>(feature_map)</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>  out_H <span class="ot">&lt;-</span> (H <span class="sc">-</span> pool_size) <span class="sc">%/%</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>  out_W <span class="ot">&lt;-</span> (W <span class="sc">-</span> pool_size) <span class="sc">%/%</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>  output <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, out_H, out_W)</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(out_H)) {</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    ri <span class="ot">&lt;-</span> (i <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_len</span>(out_W)) {</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>      rj <span class="ot">&lt;-</span> (j <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>      output[i, j] <span class="ot">&lt;-</span> <span class="fu">max</span>(feature_map[ri<span class="sc">:</span>(ri <span class="sc">+</span> pool_size <span class="sc">-</span> <span class="dv">1</span>), rj<span class="sc">:</span>(rj <span class="sc">+</span> pool_size <span class="sc">-</span> <span class="dv">1</span>)])</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>  output</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>relu_2d <span class="ot">&lt;-</span> <span class="cf">function</span>(feature_map) <span class="fu">pmax</span>(feature_map, <span class="fl">0.0</span>)   <span class="co"># matrix must come first, or pmax() drops dim!</span></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>flatten <span class="ot">&lt;-</span> <span class="cf">function</span>(feature_maps) {</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Flatten a list of 2D feature maps to a 1D vector (row-major, like the Python version).</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unlist</span>(<span class="fu">lapply</span>(feature_maps, <span class="cf">function</span>(fm) <span class="fu">as.numeric</span>(<span class="fu">t</span>(fm))))</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Edge Detection Demo ────────────────────────────────────────────────────</span></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>apply_filters <span class="ot">&lt;-</span> <span class="cf">function</span>(image, filters) {</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Apply multiple filters and return feature maps.</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">lapply</span>(filters, <span class="cf">function</span>(kernel) <span class="fu">conv2d</span>(image, kernel, <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">1</span>))</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Demo: Detect edges in a simple 5x5 "image" ───────────────────────────────</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a><span class="co"># 5x5 grayscale image (pixel values 0-1)</span></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>image <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(</span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>  <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>,</span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>  <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>,</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>  <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>,</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>  <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>,</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>  <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>), <span class="at">nrow =</span> <span class="dv">5</span>, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a><span class="co"># Sobel edge detection kernels</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>sobel_x <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="sc">-</span><span class="dv">2</span>, <span class="dv">0</span>, <span class="dv">2</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>), <span class="at">nrow =</span> <span class="dv">3</span>, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>sobel_y <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="sc">-</span><span class="dv">2</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">1</span>), <span class="at">nrow =</span> <span class="dv">3</span>, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>edge_x <span class="ot">&lt;-</span> <span class="fu">conv2d</span>(image, sobel_x, <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">1</span>)</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>edge_y <span class="ot">&lt;-</span> <span class="fu">conv2d</span>(image, sobel_y, <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">1</span>)</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Horizontal edge map (Sobel X):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(<span class="fu">nrow</span>(edge_x))) <span class="fu">cat</span>(<span class="fu">paste</span>(<span class="fu">sprintf</span>(<span class="st">"%5.1f"</span>, edge_x[i, ]), <span class="at">collapse =</span> <span class="st">" "</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Max Pooling (2x2) of edge_x:</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a>pooled <span class="ot">&lt;-</span> <span class="fu">max_pool2d</span>(edge_x)</span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(<span class="fu">nrow</span>(pooled))) <span class="fu">cat</span>(<span class="fu">paste</span>(<span class="fu">sprintf</span>(<span class="st">"%5.1f"</span>, pooled[i, ]), <span class="at">collapse =</span> <span class="st">" "</span>), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a><span class="co"># Flatten for FC layer</span></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a>flat <span class="ot">&lt;-</span> <span class="fu">flatten</span>(<span class="fu">list</span>(pooled))</span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Flattened: [%s]</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">paste</span>(<span class="fu">sprintf</span>(<span class="st">"%.1f"</span>, flat), <span class="at">collapse =</span> <span class="st">", "</span>)))</span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Ready for FC layer with %d inputs</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(flat)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="cnn-on-mnist-dataset" class="level2">
+<h2 class="anchored" data-anchor-id="cnn-on-mnist-dataset">12.14 CNN on MNIST Dataset</h2>
+<p>We now train a <strong>tiny CNN from scratch</strong> on handwritten digits (MNIST), reusing <code>conv2d()</code>, <code>max_pool2d()</code>, <code>relu_2d()</code>, and <code>flatten()</code> from above.</p>
+<p><strong>Rules for this section:</strong> only base R (no torch, keras, or similar deep learning libraries).</p>
+<p><strong>Pipeline:</strong></p>
+<ol type="1">
+<li><strong>Data preparation</strong> — parse the local MNIST IDX files, normalize pixels to <span class="math inline">\([0,1]\)</span>, one-hot labels, train/val/test split</li>
+<li><strong>Visualize</strong> — sample digit grid and class-count bar chart</li>
+<li><strong>Train</strong> — convolution → ReLU → max-pool → flatten → fully connected → softmax, with backprop + SGD</li>
+<li><strong>Loss curves</strong> — plot training and validation cross-entropy (and val accuracy) over epochs</li>
+<li><strong>Prediction</strong> — <code>argmax</code> over class probabilities</li>
+<li><strong>Validate</strong> — accuracy on a held-out validation set, then a final test set</li>
+</ol>
+<p>Because pure nested loops are slow, we train on a <strong>small stratified subset</strong> so the notebook finishes in a few minutes while still showing the full CNN learning loop.</p>
+<section id="data-preparation" class="level3">
+<h3 class="anchored" data-anchor-id="data-preparation">12.14.1 Data preparation</h3>
+<p>Parse the local MNIST IDX files, scale pixels to <span class="math inline">\([0, 1]\)</span>, and build a stratified train / validation / test subset.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── From-scratch CNN helpers for MNIST (Explained for Dummies!) ──────────────</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- Basic Functions for Neural Network Math ----</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>softmax_vec <span class="ot">&lt;-</span> <span class="cf">function</span>(logits) {</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Turns a vector of "scores" (any real numbers) into probabilities</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> <span class="fu">max</span>(logits)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  exps <span class="ot">&lt;-</span> <span class="fu">exp</span>(logits <span class="sc">-</span> m)   <span class="co"># for stability, avoid huge exponents</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  exps <span class="sc">/</span> <span class="fu">sum</span>(exps)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>cross_entropy <span class="ot">&lt;-</span> <span class="cf">function</span>(probs, y_onehot) {</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># How "bad" the predicted probabilities are, compared to the real answer.</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="sc">-</span><span class="fu">sum</span>(y_onehot <span class="sc">*</span> <span class="fu">log</span>(<span class="fu">pmax</span>(probs, <span class="fl">1e-12</span>)))</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>one_hot <span class="ot">&lt;-</span> <span class="cf">function</span>(label, <span class="at">n_classes =</span> <span class="dv">10</span>) {</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Make a vector like c(0,0,1,0,0) for label 2 (if 5 classes). label is 0-indexed.</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, n_classes)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  v[label <span class="sc">+</span> <span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="fl">1.0</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  v</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>accuracy_cnn <span class="ot">&lt;-</span> <span class="cf">function</span>(y_true, y_pred) <span class="fu">mean</span>(y_true <span class="sc">==</span> y_pred)</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- Fully Connected Layer ("FC Layer") ----</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>fc_forward <span class="ot">&lt;-</span> <span class="cf">function</span>(x, W, b) <span class="fu">as.numeric</span>(W <span class="sc">%*%</span> x) <span class="sc">+</span> b</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>fc_backward <span class="ot">&lt;-</span> <span class="cf">function</span>(dout, x, W) {</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>  dW <span class="ot">&lt;-</span> <span class="fu">outer</span>(dout, x)                  <span class="co"># how to tweak weights</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>  db <span class="ot">&lt;-</span> dout                            <span class="co"># how to tweak bias</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  dx <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">t</span>(W) <span class="sc">%*%</span> dout)       <span class="co"># how input affected result</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">dx =</span> dx, <span class="at">dW =</span> dW, <span class="at">db =</span> db)</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- "Backward" functions: how to go backwards through the CNN layers ----</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>conv2d_backward <span class="ot">&lt;-</span> <span class="cf">function</span>(d_out, image, kernel, <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">0</span>) {</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Computes: how to change the kernel/filter, and how much each input pixel mattered.</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>  H <span class="ot">&lt;-</span> <span class="fu">nrow</span>(image); W <span class="ot">&lt;-</span> <span class="fu">ncol</span>(image)</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>  f <span class="ot">&lt;-</span> <span class="fu">nrow</span>(kernel)</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (padding <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>    padded <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, H <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> padding, W <span class="sc">+</span> <span class="dv">2</span> <span class="sc">*</span> padding)</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>    padded[(padding <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(padding <span class="sc">+</span> H), (padding <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(padding <span class="sc">+</span> W)] <span class="ot">&lt;-</span> image</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>    padded <span class="ot">&lt;-</span> image</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>  d_kernel <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, f, f)</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>  d_padded <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, <span class="fu">nrow</span>(padded), <span class="fu">ncol</span>(padded))</span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>  out_H <span class="ot">&lt;-</span> <span class="fu">nrow</span>(d_out); out_W <span class="ot">&lt;-</span> <span class="fu">ncol</span>(d_out)</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(out_H)) {</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>    ri <span class="ot">&lt;-</span> (i <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_len</span>(out_W)) {</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>      rj <span class="ot">&lt;-</span> (j <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>      g <span class="ot">&lt;-</span> d_out[i, j]</span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>      patch <span class="ot">&lt;-</span> padded[ri<span class="sc">:</span>(ri <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>), rj<span class="sc">:</span>(rj <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>)]</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>      d_kernel <span class="ot">&lt;-</span> d_kernel <span class="sc">+</span> patch <span class="sc">*</span> g</span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>      d_padded[ri<span class="sc">:</span>(ri <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>), rj<span class="sc">:</span>(rj <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>)] <span class="ot">&lt;-</span> d_padded[ri<span class="sc">:</span>(ri <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>), rj<span class="sc">:</span>(rj <span class="sc">+</span> f <span class="sc">-</span> <span class="dv">1</span>)] <span class="sc">+</span> kernel <span class="sc">*</span> g</span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (padding <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>    d_image <span class="ot">&lt;-</span> d_padded[(padding <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(padding <span class="sc">+</span> H), (padding <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(padding <span class="sc">+</span> W)]</span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>    d_image <span class="ot">&lt;-</span> d_padded</span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">d_kernel =</span> d_kernel, <span class="at">d_image =</span> d_image)</span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>relu_2d_backward <span class="ot">&lt;-</span> <span class="cf">function</span>(d_out, pre_relu) {</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>  <span class="co"># If value before ReLU was negative (0 after ReLU), don't pass any gradient</span></span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>  d_out <span class="sc">*</span> (pre_relu <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>max_pool2d_forward_cache <span class="ot">&lt;-</span> <span class="cf">function</span>(feature_map, <span class="at">pool_size =</span> <span class="dv">2</span>, <span class="at">stride =</span> <span class="dv">2</span>) {</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Max pooling, but also remembers *where* each maximum came from (for learning).</span></span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a>  H <span class="ot">&lt;-</span> <span class="fu">nrow</span>(feature_map); W <span class="ot">&lt;-</span> <span class="fu">ncol</span>(feature_map)</span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>  out_H <span class="ot">&lt;-</span> (H <span class="sc">-</span> pool_size) <span class="sc">%/%</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>  out_W <span class="ot">&lt;-</span> (W <span class="sc">-</span> pool_size) <span class="sc">%/%</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>  output <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, out_H, out_W)</span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>  switch_r <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>L, out_H, out_W)</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>  switch_c <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>L, out_H, out_W)</span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(out_H)) {</span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>    ri <span class="ot">&lt;-</span> (i <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_len</span>(out_W)) {</span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>      rj <span class="ot">&lt;-</span> (j <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> stride <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>      block <span class="ot">&lt;-</span> feature_map[ri<span class="sc">:</span>(ri <span class="sc">+</span> pool_size <span class="sc">-</span> <span class="dv">1</span>), rj<span class="sc">:</span>(rj <span class="sc">+</span> pool_size <span class="sc">-</span> <span class="dv">1</span>)]</span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>      mi <span class="ot">&lt;-</span> <span class="fu">which</span>(block <span class="sc">==</span> <span class="fu">max</span>(block), <span class="at">arr.ind =</span> <span class="cn">TRUE</span>)[<span class="dv">1</span>, ]</span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a>      output[i, j] <span class="ot">&lt;-</span> block[mi[<span class="dv">1</span>], mi[<span class="dv">2</span>]]</span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>      switch_r[i, j] <span class="ot">&lt;-</span> ri <span class="sc">+</span> mi[<span class="dv">1</span>] <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>      switch_c[i, j] <span class="ot">&lt;-</span> rj <span class="sc">+</span> mi[<span class="dv">2</span>] <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">output =</span> output, <span class="at">switch_r =</span> switch_r, <span class="at">switch_c =</span> switch_c)</span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a>max_pool2d_backward <span class="ot">&lt;-</span> <span class="cf">function</span>(d_out, switch_r, switch_c, in_H, in_W) {</span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Only the pixel that was "max" gets to learn.</span></span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a>  d_in <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fl">0.0</span>, in_H, in_W)</span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(<span class="fu">nrow</span>(d_out))) {</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_len</span>(<span class="fu">ncol</span>(d_out))) {</span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a>      r <span class="ot">&lt;-</span> switch_r[i, j]; c <span class="ot">&lt;-</span> switch_c[i, j]</span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a>      d_in[r, c] <span class="ot">&lt;-</span> d_in[r, c] <span class="sc">+</span> d_out[i, j]</span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a>  d_in</span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>flatten_backward <span class="ot">&lt;-</span> <span class="cf">function</span>(d_flat, shapes) {</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Splits a big flat gradient vector back into little 2D grids (one per feature map).</span></span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a>  grads <span class="ot">&lt;-</span> <span class="fu">list</span>(); idx <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (s <span class="cf">in</span> shapes) {</span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a>    Hh <span class="ot">&lt;-</span> s[<span class="dv">1</span>]; Ww <span class="ot">&lt;-</span> s[<span class="dv">2</span>]; n <span class="ot">&lt;-</span> Hh <span class="sc">*</span> Ww</span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a>    chunk <span class="ot">&lt;-</span> d_flat[idx<span class="sc">:</span>(idx <span class="sc">+</span> n <span class="sc">-</span> <span class="dv">1</span>)]</span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a>    grads[[<span class="fu">length</span>(grads) <span class="sc">+</span> <span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">matrix</span>(chunk, <span class="at">nrow =</span> Hh, <span class="at">ncol =</span> Ww, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a>    idx <span class="ot">&lt;-</span> idx <span class="sc">+</span> n</span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a>  grads</span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- Tiny, simple Neural Net that can actually learn to recognize numbers ----</span></span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a><span class="co"># Very basic "convolutional neural network" for images that are 28x28 pixels.</span></span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a><span class="co"># Process:</span></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a><span class="co">#   1. Run the image through a few little "filters" (3x3 each), like looking for edges/curves.</span></span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a><span class="co">#   2. After filtering, set negatives to 0 (ReLU).</span></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a><span class="co">#   3. Shrink it down using max pooling (take biggest value from each little block).</span></span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a><span class="co">#   4. Flatten all those little numbers into a single long row.</span></span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a><span class="co">#   5. Run that through a regular neural network ("fully connected" layer).</span></span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a><span class="co">#   6. Use softmax to get probabilities for each digit (0-9).</span></span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a>TinyCNN <span class="ot">&lt;-</span> <span class="fu">setRefClass</span>(</span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a>  <span class="st">"TinyCNN"</span>,</span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a>  <span class="at">fields =</span> <span class="fu">list</span>(<span class="at">n_filters =</span> <span class="st">"numeric"</span>, <span class="at">n_classes =</span> <span class="st">"numeric"</span>, <span class="at">lr =</span> <span class="st">"numeric"</span>, <span class="at">n_flat =</span> <span class="st">"numeric"</span>,</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>                <span class="at">kernels =</span> <span class="st">"list"</span>, <span class="at">biases_c =</span> <span class="st">"numeric"</span>, <span class="at">W =</span> <span class="st">"matrix"</span>, <span class="at">b =</span> <span class="st">"numeric"</span>,</span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a>                <span class="at">cache_ =</span> <span class="st">"ANY"</span>),</span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(</span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a>    <span class="at">initialize =</span> <span class="cf">function</span>(<span class="at">n_filters =</span> <span class="dv">4</span>, <span class="at">n_classes =</span> <span class="dv">10</span>, <span class="at">lr =</span> <span class="fl">0.05</span>, <span class="at">seed =</span> <span class="dv">42</span>, ...) {</span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(seed)</span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a>      n_filters <span class="ot">&lt;&lt;-</span> n_filters; n_classes <span class="ot">&lt;&lt;-</span> n_classes; lr <span class="ot">&lt;&lt;-</span> lr</span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Initialize filters (3x3 "kernels") with some randomness, good for learning</span></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a>      scale_k <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fl">2.0</span> <span class="sc">/</span> <span class="fl">9.0</span>)   <span class="co"># standard trick to not explode gradients</span></span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a>      kernels <span class="ot">&lt;&lt;-</span> <span class="fu">lapply</span>(<span class="fu">seq_len</span>(n_filters), <span class="cf">function</span>(k) <span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">9</span>, <span class="dv">0</span>, scale_k), <span class="dv">3</span>, <span class="dv">3</span>))</span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a>      biases_c <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, n_filters)</span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a>      <span class="co"># After pooling, each filter's output is 14x14 (image is shrunk),</span></span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a>      <span class="co"># so we need to connect all those to each output digit:</span></span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a>      n_flat <span class="ot">&lt;&lt;-</span> <span class="dv">14</span> <span class="sc">*</span> <span class="dv">14</span> <span class="sc">*</span> n_filters</span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a>      scale_w <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fl">2.0</span> <span class="sc">/</span> n_flat)</span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a>      W <span class="ot">&lt;&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(n_classes <span class="sc">*</span> n_flat, <span class="dv">0</span>, scale_w), <span class="at">nrow =</span> n_classes, <span class="at">ncol =</span> n_flat)</span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a>      b <span class="ot">&lt;&lt;-</span> <span class="fu">rep</span>(<span class="fl">0.0</span>, n_classes)</span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a>      cache_ <span class="ot">&lt;&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true" tabindex="-1"></a>      <span class="fu">callSuper</span>(...)</span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true" tabindex="-1"></a>    <span class="at">forward =</span> <span class="cf">function</span>(image) {</span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Run an image through the layers, saving steps for learning/backprop</span></span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true" tabindex="-1"></a>      pre_relus <span class="ot">&lt;-</span> <span class="fu">list</span>(); post_relus <span class="ot">&lt;-</span> <span class="fu">list</span>(); pools <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true" tabindex="-1"></a>      switch_rs <span class="ot">&lt;-</span> <span class="fu">list</span>(); switch_cs <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (k <span class="cf">in</span> <span class="fu">seq_len</span>(n_filters)) {</span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true" tabindex="-1"></a>        conv <span class="ot">&lt;-</span> <span class="fu">conv2d</span>(image, kernels[[k]], <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">1</span>) <span class="sc">+</span> biases_c[k]</span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true" tabindex="-1"></a>        pre_relus[[k]] <span class="ot">&lt;-</span> conv</span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true" tabindex="-1"></a>        act <span class="ot">&lt;-</span> <span class="fu">relu_2d</span>(conv)               <span class="co"># set all negatives to zero</span></span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true" tabindex="-1"></a>        post_relus[[k]] <span class="ot">&lt;-</span> act</span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true" tabindex="-1"></a>        pc <span class="ot">&lt;-</span> <span class="fu">max_pool2d_forward_cache</span>(act, <span class="at">pool_size =</span> <span class="dv">2</span>, <span class="at">stride =</span> <span class="dv">2</span>)</span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true" tabindex="-1"></a>        pools[[k]] <span class="ot">&lt;-</span> pc<span class="sc">$</span>output</span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true" tabindex="-1"></a>        switch_rs[[k]] <span class="ot">&lt;-</span> pc<span class="sc">$</span>switch_r</span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true" tabindex="-1"></a>        switch_cs[[k]] <span class="ot">&lt;-</span> pc<span class="sc">$</span>switch_c</span>
+<span id="cb4-174"><a href="#cb4-174" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb4-175"><a href="#cb4-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true" tabindex="-1"></a>      flat <span class="ot">&lt;-</span> <span class="fu">flatten</span>(pools)                       <span class="co"># flatten into one big vector</span></span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true" tabindex="-1"></a>      logits <span class="ot">&lt;-</span> <span class="fu">fc_forward</span>(flat, W, b)              <span class="co"># matrix multiply into output "logits"</span></span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true" tabindex="-1"></a>      probs <span class="ot">&lt;-</span> <span class="fu">softmax_vec</span>(logits)                  <span class="co"># convert logits into probabilities</span></span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true" tabindex="-1"></a>      cache_ <span class="ot">&lt;&lt;-</span> <span class="fu">list</span>(<span class="at">image =</span> image, <span class="at">pre_relus =</span> pre_relus, <span class="at">post_relus =</span> post_relus,</span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true" tabindex="-1"></a>                       <span class="at">pools =</span> pools, <span class="at">switch_rs =</span> switch_rs, <span class="at">switch_cs =</span> switch_cs,</span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true" tabindex="-1"></a>                       <span class="at">flat =</span> flat, <span class="at">probs =</span> probs)</span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true" tabindex="-1"></a>      probs</span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true" tabindex="-1"></a>    <span class="at">backward =</span> <span class="cf">function</span>(y_onehot) {</span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true" tabindex="-1"></a>      c_ <span class="ot">&lt;-</span> cache_</span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Figure out how wrong we were: softmax + cross-entropy</span></span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true" tabindex="-1"></a>      d_logits <span class="ot">&lt;-</span> c_<span class="sc">$</span>probs <span class="sc">-</span> y_onehot</span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true" tabindex="-1"></a>      fcb <span class="ot">&lt;-</span> <span class="fu">fc_backward</span>(d_logits, c_<span class="sc">$</span>flat, W)</span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true" tabindex="-1"></a>      d_flat <span class="ot">&lt;-</span> fcb<span class="sc">$</span>dx</span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Split up the big gradient back into each filter's pooled map</span></span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true" tabindex="-1"></a>      pool_h <span class="ot">&lt;-</span> <span class="fu">nrow</span>(c_<span class="sc">$</span>pools[[<span class="dv">1</span>]]); pool_w <span class="ot">&lt;-</span> <span class="fu">ncol</span>(c_<span class="sc">$</span>pools[[<span class="dv">1</span>]])</span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true" tabindex="-1"></a>      shapes <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fu">list</span>(<span class="fu">c</span>(pool_h, pool_w)), n_filters)</span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true" tabindex="-1"></a>      d_pools <span class="ot">&lt;-</span> <span class="fu">flatten_backward</span>(d_flat, shapes)</span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (k <span class="cf">in</span> <span class="fu">seq_len</span>(n_filters)) {</span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Go backwards through max pooling (only winner pixel gets gradient)</span></span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true" tabindex="-1"></a>        d_act <span class="ot">&lt;-</span> <span class="fu">max_pool2d_backward</span>(d_pools[[k]], c_<span class="sc">$</span>switch_rs[[k]], c_<span class="sc">$</span>switch_cs[[k]],</span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">in_H =</span> <span class="fu">nrow</span>(c_<span class="sc">$</span>post_relus[[k]]), <span class="at">in_W =</span> <span class="fu">ncol</span>(c_<span class="sc">$</span>post_relus[[k]]))</span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Go backwards through ReLU</span></span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true" tabindex="-1"></a>        d_conv <span class="ot">&lt;-</span> <span class="fu">relu_2d_backward</span>(d_act, c_<span class="sc">$</span>pre_relus[[k]])</span>
+<span id="cb4-204"><a href="#cb4-204" aria-hidden="true" tabindex="-1"></a>        d_bias <span class="ot">&lt;-</span> <span class="fu">sum</span>(d_conv)</span>
+<span id="cb4-205"><a href="#cb4-205" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Find how to tweak the filter kernels</span></span>
+<span id="cb4-206"><a href="#cb4-206" aria-hidden="true" tabindex="-1"></a>        cb <span class="ot">&lt;-</span> <span class="fu">conv2d_backward</span>(d_conv, c_<span class="sc">$</span>image, kernels[[k]], <span class="at">stride =</span> <span class="dv">1</span>, <span class="at">padding =</span> <span class="dv">1</span>)</span>
+<span id="cb4-207"><a href="#cb4-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-208"><a href="#cb4-208" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Apply update (tiny step opposite the gradient)</span></span>
+<span id="cb4-209"><a href="#cb4-209" aria-hidden="true" tabindex="-1"></a>        kernels[[k]] <span class="ot">&lt;&lt;-</span> kernels[[k]] <span class="sc">-</span> lr <span class="sc">*</span> cb<span class="sc">$</span>d_kernel</span>
+<span id="cb4-210"><a href="#cb4-210" aria-hidden="true" tabindex="-1"></a>        biases_c[k] <span class="ot">&lt;&lt;-</span> biases_c[k] <span class="sc">-</span> lr <span class="sc">*</span> d_bias</span>
+<span id="cb4-211"><a href="#cb4-211" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb4-212"><a href="#cb4-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-213"><a href="#cb4-213" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Update fully connected layer weights and biases too</span></span>
+<span id="cb4-214"><a href="#cb4-214" aria-hidden="true" tabindex="-1"></a>      W <span class="ot">&lt;&lt;-</span> W <span class="sc">-</span> lr <span class="sc">*</span> fcb<span class="sc">$</span>dW</span>
+<span id="cb4-215"><a href="#cb4-215" aria-hidden="true" tabindex="-1"></a>      b <span class="ot">&lt;&lt;-</span> b <span class="sc">-</span> lr <span class="sc">*</span> fcb<span class="sc">$</span>db</span>
+<span id="cb4-216"><a href="#cb4-216" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb4-217"><a href="#cb4-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-218"><a href="#cb4-218" aria-hidden="true" tabindex="-1"></a>    <span class="at">predict_one =</span> <span class="cf">function</span>(image) {</span>
+<span id="cb4-219"><a href="#cb4-219" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Predict the digit for one image (returns best guess and probabilities)</span></span>
+<span id="cb4-220"><a href="#cb4-220" aria-hidden="true" tabindex="-1"></a>      probs <span class="ot">&lt;-</span> <span class="fu">forward</span>(image)</span>
+<span id="cb4-221"><a href="#cb4-221" aria-hidden="true" tabindex="-1"></a>      <span class="fu">list</span>(<span class="at">pred =</span> <span class="fu">which.max</span>(probs) <span class="sc">-</span> <span class="dv">1</span>L, <span class="at">probs =</span> probs)</span>
+<span id="cb4-222"><a href="#cb4-222" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb4-223"><a href="#cb4-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-224"><a href="#cb4-224" aria-hidden="true" tabindex="-1"></a>    <span class="at">predict_batch =</span> <span class="cf">function</span>(images) {</span>
+<span id="cb4-225"><a href="#cb4-225" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Predict digits for a list of images (returns guesses)</span></span>
+<span id="cb4-226"><a href="#cb4-226" aria-hidden="true" tabindex="-1"></a>      <span class="fu">sapply</span>(images, <span class="cf">function</span>(img) <span class="fu">predict_one</span>(img)<span class="sc">$</span>pred)</span>
+<span id="cb4-227"><a href="#cb4-227" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-228"><a href="#cb4-228" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-229"><a href="#cb4-229" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-230"><a href="#cb4-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-231"><a href="#cb4-231" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"TinyCNN helpers ready (with explanations)!</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Download + parse MNIST (IDX format) ───────────────────────────────────────</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># We already have the MNIST IDX files locally in ../Data/mnist (no download needed).</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>mnist_dir <span class="ot">&lt;-</span> <span class="st">"../Data/mnist"</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>load_idx_labels <span class="ot">&lt;-</span> <span class="cf">function</span>(path) {</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Load the labels from the .gz file.</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  con <span class="ot">&lt;-</span> <span class="fu">gzfile</span>(path, <span class="st">"rb"</span>); <span class="fu">on.exit</span>(<span class="fu">close</span>(con))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  magic <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">integer</span>(), <span class="at">n =</span> <span class="dv">1</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">endian =</span> <span class="st">"big"</span>)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  n <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">integer</span>(), <span class="at">n =</span> <span class="dv">1</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">endian =</span> <span class="st">"big"</span>)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stopifnot</span>(magic <span class="sc">==</span> <span class="dv">2049</span>)   <span class="co"># make sure this is a label file</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.integer</span>(<span class="fu">readBin</span>(con, <span class="fu">raw</span>(), <span class="at">n =</span> n))</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>load_idx_images_at <span class="ot">&lt;-</span> <span class="cf">function</span>(path, indices) {</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Load just the images at the given (0-indexed) indices, as H x W matrices in [0, 1].</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  con <span class="ot">&lt;-</span> <span class="fu">gzfile</span>(path, <span class="st">"rb"</span>); <span class="fu">on.exit</span>(<span class="fu">close</span>(con))</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  magic <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">integer</span>(), <span class="at">n =</span> <span class="dv">1</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">endian =</span> <span class="st">"big"</span>)</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  n <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">integer</span>(), <span class="at">n =</span> <span class="dv">1</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">endian =</span> <span class="st">"big"</span>)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  rows <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">integer</span>(), <span class="at">n =</span> <span class="dv">1</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">endian =</span> <span class="st">"big"</span>)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>  cols <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">integer</span>(), <span class="at">n =</span> <span class="dv">1</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">endian =</span> <span class="st">"big"</span>)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stopifnot</span>(magic <span class="sc">==</span> <span class="dv">2051</span>)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  buf <span class="ot">&lt;-</span> <span class="fu">readBin</span>(con, <span class="fu">raw</span>(), <span class="at">n =</span> n <span class="sc">*</span> rows <span class="sc">*</span> cols)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>  size <span class="ot">&lt;-</span> rows <span class="sc">*</span> cols</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  images <span class="ot">&lt;-</span> <span class="fu">lapply</span>(indices, <span class="cf">function</span>(i) {</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    base <span class="ot">&lt;-</span> i <span class="sc">*</span> size</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    px <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(buf[(base <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(base <span class="sc">+</span> size)]) <span class="sc">/</span> <span class="fl">255.0</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    <span class="fu">matrix</span>(px, <span class="at">nrow =</span> rows, <span class="at">ncol =</span> cols, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">images =</span> images, <span class="at">rows =</span> rows, <span class="at">cols =</span> cols)</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="co"># Pick the same number of indices for every digit class (0-9), for a balanced dataset.</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>stratified_indices <span class="ot">&lt;-</span> <span class="cf">function</span>(labels, n_per_class, <span class="at">seed =</span> <span class="dv">42</span>) {</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(seed)</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>  chosen <span class="ot">&lt;-</span> <span class="fu">integer</span>(<span class="dv">0</span>)</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (c <span class="cf">in</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">9</span>) {</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    class_idx <span class="ot">&lt;-</span> <span class="fu">which</span>(labels <span class="sc">==</span> c) <span class="sc">-</span> <span class="dv">1</span>L   <span class="co"># 0-indexed, to match image-buffer offsets</span></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    chosen <span class="ot">&lt;-</span> <span class="fu">c</span>(chosen, <span class="fu">sample</span>(class_idx, n_per_class))</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sample</span>(chosen)   <span class="co"># shuffle</span></span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="co"># Split into train/val/test (default 70% train, 15% val, 15% test)</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>train_val_test_split_mnist <span class="ot">&lt;-</span> <span class="cf">function</span>(X, y, <span class="at">train_frac =</span> <span class="fl">0.7</span>, <span class="at">val_frac =</span> <span class="fl">0.15</span>, <span class="at">seed =</span> <span class="dv">42</span>) {</span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(seed)</span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>  n <span class="ot">&lt;-</span> <span class="fu">length</span>(X)</span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>  idx <span class="ot">&lt;-</span> <span class="fu">sample</span>(n)</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>  n_train <span class="ot">&lt;-</span> <span class="fu">floor</span>(n <span class="sc">*</span> train_frac)</span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>  n_val <span class="ot">&lt;-</span> <span class="fu">floor</span>(n <span class="sc">*</span> val_frac)</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>  tr <span class="ot">&lt;-</span> idx[<span class="dv">1</span><span class="sc">:</span>n_train]</span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>  va <span class="ot">&lt;-</span> idx[(n_train <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>(n_train <span class="sc">+</span> n_val)]</span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>  te <span class="ot">&lt;-</span> idx[(n_train <span class="sc">+</span> n_val <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>n]</span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">X_train =</span> X[tr], <span class="at">y_train =</span> y[tr], <span class="at">X_val =</span> X[va], <span class="at">y_val =</span> y[va],</span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>       <span class="at">X_test =</span> X[te], <span class="at">y_test =</span> y[te])</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Read in all the train labels</span></span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>all_labels <span class="ot">&lt;-</span> <span class="fu">load_idx_labels</span>(<span class="fu">file.path</span>(mnist_dir, <span class="st">"train-labels-idx1-ubyte.gz"</span>))</span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Full MNIST train labels: %d</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(all_labels)))</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. We only want a small sample for speed: 40 examples per digit = 400 total</span></span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>n_per_class <span class="ot">&lt;-</span> <span class="dv">40</span></span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>idx_sub <span class="ot">&lt;-</span> <span class="fu">stratified_indices</span>(all_labels, <span class="at">n_per_class =</span> n_per_class, <span class="at">seed =</span> <span class="dv">42</span>)</span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Loading %d selected images ...</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(idx_sub)))</span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Load the corresponding images and labels</span></span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a>img_data <span class="ot">&lt;-</span> <span class="fu">load_idx_images_at</span>(<span class="fu">file.path</span>(mnist_dir, <span class="st">"train-images-idx3-ubyte.gz"</span>), idx_sub)</span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>X_sub <span class="ot">&lt;-</span> img_data<span class="sc">$</span>images</span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>y_sub <span class="ot">&lt;-</span> all_labels[idx_sub <span class="sc">+</span> <span class="dv">1</span>]</span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Image size: %dx%d</span><span class="sc">\n</span><span class="st">"</span>, img_data<span class="sc">$</span>rows, img_data<span class="sc">$</span>cols))</span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Split into training, validation, and test sets</span></span>
+<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a>split_mnist <span class="ot">&lt;-</span> <span class="fu">train_val_test_split_mnist</span>(X_sub, y_sub, <span class="at">train_frac =</span> <span class="fl">0.7</span>, <span class="at">val_frac =</span> <span class="fl">0.15</span>, <span class="at">seed =</span> <span class="dv">42</span>)</span>
+<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>X_train <span class="ot">&lt;-</span> split_mnist<span class="sc">$</span>X_train; y_train <span class="ot">&lt;-</span> split_mnist<span class="sc">$</span>y_train</span>
+<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a>X_val   <span class="ot">&lt;-</span> split_mnist<span class="sc">$</span>X_val;   y_val   <span class="ot">&lt;-</span> split_mnist<span class="sc">$</span>y_val</span>
+<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a>X_test  <span class="ot">&lt;-</span> split_mnist<span class="sc">$</span>X_test;  y_test  <span class="ot">&lt;-</span> split_mnist<span class="sc">$</span>y_test</span>
+<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Subset sizes - train: %d, val: %d, test: %d</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(X_train), <span class="fu">length</span>(X_val), <span class="fu">length</span>(X_test)))</span>
+<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Label example (first 20 train):"</span>, y_train[<span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>], <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Pixel range check: min=%.3f, max=%.3f</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">min</span>(X_train[[<span class="dv">1</span>]]), <span class="fu">max</span>(X_train[[<span class="dv">1</span>]])))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="visualize-mnist-data" class="level3">
+<h3 class="anchored" data-anchor-id="visualize-mnist-data">12.14.2 Visualize MNIST data</h3>
+<p>Before training, inspect the subset: a grid of handwritten digits and the class counts in each split.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Visualize MNIST subset (EXPLAINED FOR DUMMIES) ───────────────────────────</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>show_digit_grid <span class="ot">&lt;-</span> <span class="cf">function</span>(images, labels, title, <span class="at">n_rows =</span> <span class="dv">2</span>, <span class="at">n_cols =</span> <span class="dv">10</span>, <span class="at">seed =</span> <span class="dv">0</span>) {</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Show a table of digit pictures with their number above each one.</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(seed)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  idxs <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="fu">seq_along</span>(images))</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  idxs <span class="ot">&lt;-</span> idxs[<span class="dv">1</span><span class="sc">:</span><span class="fu">min</span>(<span class="fu">length</span>(idxs), n_rows <span class="sc">*</span> n_cols)]</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(n_rows, n_cols), <span class="at">mar =</span> <span class="fu">c</span>(<span class="fl">0.3</span>, <span class="fl">0.3</span>, <span class="fl">1.3</span>, <span class="fl">0.3</span>))</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> idxs) {</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    img <span class="ot">&lt;-</span> images[[i]]</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">image</span>(<span class="fu">t</span>(img[<span class="fu">nrow</span>(img)<span class="sc">:</span><span class="dv">1</span>, ]), <span class="at">col =</span> <span class="fu">gray.colors</span>(<span class="dv">256</span>, <span class="at">start =</span> <span class="dv">0</span>, <span class="at">end =</span> <span class="dv">1</span>), <span class="at">axes =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>          <span class="at">main =</span> labels[i], <span class="at">cex.main =</span> <span class="fl">1.0</span>)</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mtext</span>(title, <span class="at">side =</span> <span class="dv">3</span>, <span class="at">line =</span> <span class="sc">-</span><span class="fl">1.5</span>, <span class="at">outer =</span> <span class="cn">TRUE</span>, <span class="at">cex =</span> <span class="fl">1.0</span>)</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="co"># This function counts how many of each digit we have</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>count_labels <span class="ot">&lt;-</span> <span class="cf">function</span>(y, <span class="at">n_classes =</span> <span class="dv">10</span>) <span class="fu">sapply</span>(<span class="dv">0</span><span class="sc">:</span>(n_classes <span class="sc">-</span> <span class="dv">1</span>), <span class="cf">function</span>(c) <span class="fu">sum</span>(y <span class="sc">==</span> c))</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Show a sample grid of digit pictures from our training data</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="fu">show_digit_grid</span>(X_train, y_train, <span class="st">"MNIST training samples (subset)"</span>, <span class="at">n_rows =</span> <span class="dv">2</span>, <span class="at">n_cols =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Now let's see how many examples we have for each digit, in each data split</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>counts_mat <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="at">Train =</span> <span class="fu">count_labels</span>(y_train), <span class="at">Val =</span> <span class="fu">count_labels</span>(y_val), <span class="at">Test =</span> <span class="fu">count_labels</span>(y_test))</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(counts_mat) <span class="ot">&lt;-</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">9</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">barplot</span>(counts_mat, <span class="at">beside =</span> <span class="cn">TRUE</span>, <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"steelblue"</span>, <span class="st">"orange"</span>, <span class="st">"forestgreen"</span>),</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">xlab =</span> <span class="st">"Digit"</span>, <span class="at">ylab =</span> <span class="st">"Count"</span>, <span class="at">main =</span> <span class="st">"Class counts in the MNIST subset"</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">legend.text =</span> <span class="cn">TRUE</span>, <span class="at">args.legend =</span> <span class="fu">list</span>(<span class="at">x =</span> <span class="st">"topright"</span>, <span class="at">bty =</span> <span class="st">"n"</span>))</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Train images: %d  |  shape: %dx%d</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">length</span>(X_train), <span class="fu">nrow</span>(X_train[[<span class="dv">1</span>]]), <span class="fu">ncol</span>(X_train[[<span class="dv">1</span>]])))</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Pixel range: [%.2f, %.2f]</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">min</span>(X_train[[<span class="dv">1</span>]]), <span class="fu">max</span>(X_train[[<span class="dv">1</span>]])))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="train" class="level3">
+<h3 class="anchored" data-anchor-id="train">12.14.3 Train</h3>
+<p>Architecture: <strong>4 filters (3×3)</strong> → ReLU → <strong>2×2 max-pool</strong> → flatten → <strong>fully connected (10 logits)</strong> → softmax. Loss: cross-entropy. Optimizer: plain SGD.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Train TinyCNN on MNIST subset ────────────────────────────────────────────</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>evaluate_cnn <span class="ot">&lt;-</span> <span class="cf">function</span>(model, X, y) {</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Checks how well our model is doing: predictions and average loss.</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  preds <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">predict_batch</span>(X)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  loss <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(X)) {</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    probs <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">forward</span>(X[[i]])</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    loss <span class="ot">&lt;-</span> loss <span class="sc">+</span> <span class="fu">cross_entropy</span>(probs, <span class="fu">one_hot</span>(y[i]))</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">loss =</span> loss <span class="sc">/</span> <span class="fu">length</span>(X), <span class="at">acc =</span> <span class="fu">accuracy_cnn</span>(y, preds))</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>train_cnn <span class="ot">&lt;-</span> <span class="cf">function</span>(model, X_train, y_train, X_val, y_val, <span class="at">epochs =</span> <span class="dv">5</span>, <span class="at">batch_size =</span> <span class="dv">20</span>) {</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Feeds lots of images through the model so it can practice and get better.</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  history <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">train_loss =</span> <span class="fu">numeric</span>(<span class="dv">0</span>), <span class="at">val_loss =</span> <span class="fu">numeric</span>(<span class="dv">0</span>), <span class="at">val_acc =</span> <span class="fu">numeric</span>(<span class="dv">0</span>))</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  n <span class="ot">&lt;-</span> <span class="fu">length</span>(X_train)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (epoch <span class="cf">in</span> <span class="fu">seq_len</span>(epochs)) {</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    order_ <span class="ot">&lt;-</span> <span class="fu">sample</span>(n)   <span class="co"># shuffle so every epoch sees a different order</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    running_loss <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (start <span class="cf">in</span> <span class="fu">seq</span>(<span class="dv">1</span>, n, <span class="at">by =</span> batch_size)) {</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>      end_ <span class="ot">&lt;-</span> <span class="fu">min</span>(start <span class="sc">+</span> batch_size <span class="sc">-</span> <span class="dv">1</span>, n)</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>      batch <span class="ot">&lt;-</span> order_[start<span class="sc">:</span>end_]</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> (i <span class="cf">in</span> batch) {</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>        probs <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">forward</span>(X_train[[i]])</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>        y_oh <span class="ot">&lt;-</span> <span class="fu">one_hot</span>(y_train[i])</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>        running_loss <span class="ot">&lt;-</span> running_loss <span class="sc">+</span> <span class="fu">cross_entropy</span>(probs, y_oh)</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>        model<span class="sc">$</span><span class="fu">backward</span>(y_oh)   <span class="co"># let the model adjust itself</span></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>    train_loss <span class="ot">&lt;-</span> running_loss <span class="sc">/</span> n</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>    ev <span class="ot">&lt;-</span> <span class="fu">evaluate_cnn</span>(model, X_val, y_val)</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>    history<span class="sc">$</span>train_loss <span class="ot">&lt;-</span> <span class="fu">c</span>(history<span class="sc">$</span>train_loss, train_loss)</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>    history<span class="sc">$</span>val_loss <span class="ot">&lt;-</span> <span class="fu">c</span>(history<span class="sc">$</span>val_loss, ev<span class="sc">$</span>loss)</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>    history<span class="sc">$</span>val_acc <span class="ot">&lt;-</span> <span class="fu">c</span>(history<span class="sc">$</span>val_acc, ev<span class="sc">$</span>acc)</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Epoch %d/%d  train_loss=%.4f  val_loss=%.4f  val_acc=%.1f%%</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>                epoch, epochs, train_loss, ev<span class="sc">$</span>loss, ev<span class="sc">$</span>acc <span class="sc">*</span> <span class="dv">100</span>))</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>  history</span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>cnn <span class="ot">&lt;-</span> TinyCNN<span class="sc">$</span><span class="fu">new</span>(<span class="at">n_filters =</span> <span class="dv">4</span>, <span class="at">n_classes =</span> <span class="dv">10</span>, <span class="at">lr =</span> <span class="fl">0.05</span>, <span class="at">seed =</span> <span class="dv">42</span>)</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Model: %d conv filters -&gt; %d features -&gt; %d classes</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>            cnn<span class="sc">$</span>n_filters, cnn<span class="sc">$</span>n_flat, cnn<span class="sc">$</span>n_classes))</span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Training (pure R -- please wait) ...</span><span class="sc">\n\n</span><span class="st">"</span>)</span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>history <span class="ot">&lt;-</span> <span class="fu">train_cnn</span>(cnn, X_train, y_train, X_val, y_val, <span class="at">epochs =</span> <span class="dv">5</span>, <span class="at">batch_size =</span> <span class="dv">20</span>)</span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Training complete.</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="training-and-validation-loss" class="level3">
+<h3 class="anchored" data-anchor-id="training-and-validation-loss">12.14.4 Training and validation loss</h3>
+<p>Plot the cross-entropy curves stored in <code>history</code> after each epoch. Training loss should fall; validation loss shows how well the model generalizes.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Plot training / validation loss ───────────────────────────────────────────</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>epochs_range <span class="ot">&lt;-</span> <span class="fu">seq_along</span>(history<span class="sc">$</span>train_loss)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>))</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(epochs_range, history<span class="sc">$</span>train_loss, <span class="at">type =</span> <span class="st">"o"</span>, <span class="at">col =</span> <span class="st">"steelblue"</span>, <span class="at">pch =</span> <span class="dv">16</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"Epoch"</span>, <span class="at">ylab =</span> <span class="st">"Cross-entropy loss"</span>, <span class="at">main =</span> <span class="st">"Training vs validation loss"</span>, <span class="at">xaxt =</span> <span class="st">"n"</span>)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="fu">axis</span>(<span class="dv">1</span>, <span class="at">at =</span> epochs_range)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(epochs_range, history<span class="sc">$</span>val_loss, <span class="at">type =</span> <span class="st">"o"</span>, <span class="at">col =</span> <span class="st">"tomato"</span>, <span class="at">pch =</span> <span class="dv">15</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"topright"</span>, <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Train loss"</span>, <span class="st">"Val loss"</span>), <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"steelblue"</span>, <span class="st">"tomato"</span>),</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">16</span>, <span class="dv">15</span>), <span class="at">bty =</span> <span class="st">"n"</span>)</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="fu">grid</span>()</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(epochs_range, history<span class="sc">$</span>val_acc <span class="sc">*</span> <span class="dv">100</span>, <span class="at">type =</span> <span class="st">"o"</span>, <span class="at">col =</span> <span class="st">"forestgreen"</span>, <span class="at">pch =</span> <span class="dv">16</span>,</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"Epoch"</span>, <span class="at">ylab =</span> <span class="st">"Accuracy (%)"</span>, <span class="at">main =</span> <span class="st">"Validation accuracy"</span>, <span class="at">ylim =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>), <span class="at">xaxt =</span> <span class="st">"n"</span>)</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="fu">axis</span>(<span class="dv">1</span>, <span class="at">at =</span> epochs_range)</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="fu">grid</span>()</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Final train loss: %.4f  |  Final val loss: %.4f  |  Final val acc: %.1f%%</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>            <span class="fu">tail</span>(history<span class="sc">$</span>train_loss, <span class="dv">1</span>), <span class="fu">tail</span>(history<span class="sc">$</span>val_loss, <span class="dv">1</span>), <span class="fu">tail</span>(history<span class="sc">$</span>val_acc, <span class="dv">1</span>) <span class="sc">*</span> <span class="dv">100</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+</section>
+<section id="prediction-and-validation" class="level3">
+<h3 class="anchored" data-anchor-id="prediction-and-validation">12.14.5 Prediction and validation</h3>
+<p>Predict digit labels with <code>argmax</code> over softmax probabilities, measure accuracy on the validation and test splits, and inspect a few sample predictions.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Predict + validate (EXPLAINED FOR DUMMIES) ────────────────────────────────</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>ascii_digit <span class="ot">&lt;-</span> <span class="cf">function</span>(image, <span class="at">threshold =</span> <span class="fl">0.4</span>) {</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Show a tiny version of a 28x28 digit image using just '#' and '.'</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  lines_out <span class="ot">&lt;-</span> <span class="fu">c</span>()</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (r <span class="cf">in</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">28</span>, <span class="at">by =</span> <span class="dv">2</span>)) {</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    row_str <span class="ot">&lt;-</span> <span class="st">""</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (c <span class="cf">in</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">28</span>, <span class="at">by =</span> <span class="dv">2</span>)) {</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>      r2 <span class="ot">&lt;-</span> <span class="fu">min</span>(r <span class="sc">+</span> <span class="dv">1</span>, <span class="dv">28</span>); c2 <span class="ot">&lt;-</span> <span class="fu">min</span>(c <span class="sc">+</span> <span class="dv">1</span>, <span class="dv">28</span>)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>      v <span class="ot">&lt;-</span> (image[r, c] <span class="sc">+</span> image[r, c2] <span class="sc">+</span> image[r2, c] <span class="sc">+</span> image[r2, c2]) <span class="sc">/</span> <span class="fl">4.0</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>      row_str <span class="ot">&lt;-</span> <span class="fu">paste0</span>(row_str, <span class="cf">if</span> (v <span class="sc">&gt;</span> threshold) <span class="st">"#"</span> <span class="cf">else</span> <span class="st">"."</span>)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    lines_out <span class="ot">&lt;-</span> <span class="fu">c</span>(lines_out, row_str)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">paste</span>(lines_out, <span class="at">collapse =</span> <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Get predictions for all validation images using our trained CNN</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>val_preds <span class="ot">&lt;-</span> cnn<span class="sc">$</span><span class="fu">predict_batch</span>(X_val)</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>val_acc <span class="ot">&lt;-</span> <span class="fu">accuracy_cnn</span>(y_val, val_preds)</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Validation accuracy: %.1f%%  (%d/%d)</span><span class="sc">\n</span><span class="st">"</span>, val_acc <span class="sc">*</span> <span class="dv">100</span>, <span class="fu">sum</span>(y_val <span class="sc">==</span> val_preds), <span class="fu">length</span>(y_val)))</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="co"># Now do the same for the test set (images the model never saw)</span></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>test_preds <span class="ot">&lt;-</span> cnn<span class="sc">$</span><span class="fu">predict_batch</span>(X_test)</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>test_acc <span class="ot">&lt;-</span> <span class="fu">accuracy_cnn</span>(y_test, test_preds)</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"Test accuracy:       %.1f%%  (%d/%d)</span><span class="sc">\n</span><span class="st">"</span>, test_acc <span class="sc">*</span> <span class="dv">100</span>, <span class="fu">sum</span>(y_test <span class="sc">==</span> test_preds), <span class="fu">length</span>(y_test)))</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Let's see how often the model gets each digit right or wrong</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Validation confusion (true -&gt; predicted counts):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (true_c <span class="cf">in</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">9</span>) {</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>  idxs <span class="ot">&lt;-</span> <span class="fu">which</span>(y_val <span class="sc">==</span> true_c)</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(idxs) <span class="sc">==</span> <span class="dv">0</span>) <span class="cf">next</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>  pred_counts <span class="ot">&lt;-</span> <span class="fu">sapply</span>(<span class="dv">0</span><span class="sc">:</span><span class="dv">9</span>, <span class="cf">function</span>(c) <span class="fu">sum</span>(val_preds[idxs] <span class="sc">==</span> c))</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>  top <span class="ot">&lt;-</span> <span class="fu">order</span>(pred_counts, <span class="at">decreasing =</span> <span class="cn">TRUE</span>)[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>  parts <span class="ot">&lt;-</span> <span class="fu">character</span>(<span class="dv">0</span>)</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (c_i <span class="cf">in</span> top) {</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (pred_counts[c_i] <span class="sc">&gt;</span> <span class="dv">0</span>) parts <span class="ot">&lt;-</span> <span class="fu">c</span>(parts, <span class="fu">sprintf</span>(<span class="st">"%d:%d"</span>, c_i <span class="sc">-</span> <span class="dv">1</span>, pred_counts[c_i]))</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"  digit %d: %s</span><span class="sc">\n</span><span class="st">"</span>, true_c, <span class="fu">paste</span>(parts, <span class="at">collapse =</span> <span class="st">", "</span>)))</span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a><span class="co"># Show a few examples: what the model predicted vs. the real answer</span></span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Sample predictions (true vs pred):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">min</span>(<span class="dv">5</span>, <span class="fu">length</span>(X_test))) {</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> cnn<span class="sc">$</span><span class="fu">predict_one</span>(X_test[[i]])</span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>  pred <span class="ot">&lt;-</span> res<span class="sc">$</span>pred; probs <span class="ot">&lt;-</span> res<span class="sc">$</span>probs</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>  conf <span class="ot">&lt;-</span> probs[pred <span class="sc">+</span> <span class="dv">1</span>]</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">--- sample %d: true=%d  pred=%d  conf=%.2f ---</span><span class="sc">\n</span><span class="st">"</span>, i <span class="sc">-</span> <span class="dv">1</span>, y_test[i], pred, conf))</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">ascii_digit</span>(X_test[[i]]), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<hr>
+</section>
+</section>
+<section id="key-cnn-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="key-cnn-concepts">12.15 Key CNN Concepts</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Convolution</td>
+<td>Local pattern detection with shared weights</td>
+</tr>
+<tr class="even">
+<td>Padding</td>
+<td>Control output size; preserve border info</td>
+</tr>
+<tr class="odd">
+<td>Stride</td>
+<td>Control downsampling rate</td>
+</tr>
+<tr class="even">
+<td>Pooling</td>
+<td>Reduce spatial dimensions, add invariance</td>
+</tr>
+<tr class="odd">
+<td>Feature maps</td>
+<td>Multiple filters → multiple channels</td>
+</tr>
+<tr class="even">
+<td>Parameter sharing</td>
+<td>Each kernel reused across entire input</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="classic-architectures-reference" class="level2">
+<h2 class="anchored" data-anchor-id="classic-architectures-reference">12.16 Classic Architectures (Reference)</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Year</th>
+<th>Key Innovation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>LeNet-5</td>
+<td>1998</td>
+<td>First practical CNN</td>
+</tr>
+<tr class="even">
+<td>AlexNet</td>
+<td>2012</td>
+<td>Deep CNN + ReLU + Dropout</td>
+</tr>
+<tr class="odd">
+<td>VGGNet</td>
+<td>2014</td>
+<td>Very deep, small 3×3 kernels</td>
+</tr>
+<tr class="even">
+<td>ResNet</td>
+<td>2015</td>
+<td>Skip connections (residual learning)</td>
+</tr>
+<tr class="odd">
+<td>EfficientNet</td>
+<td>2019</td>
+<td>Compound scaling</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="exercises" class="level2">
+<h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
+<ol type="1">
+<li>Increase <code>n_filters</code> from 4 to 8 and compare validation accuracy (expect slower training).</li>
+<li>What is the <strong>receptive field</strong> of a pixel after 3 conv layers with 3×3 kernels (stride 1, no pool)?</li>
+<li>Why does parameter sharing make CNNs dramatically more efficient than fully connected nets on images?</li>
+<li>Add a second fully connected hidden layer (e.g.&nbsp;64 units + ReLU) before the 10-class output and retrain.</li>
+</ol>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>This chapter introduced Convolutional Neural Networks (CNNs), a class of neural networks especially effective for image data. It covered the core building blocks of CNNs—convolutions, padding, stride, pooling, feature maps, and parameter sharing—explaining how these techniques enable local pattern detection while greatly reducing the number of parameters compared to fully connected networks. You learned how to implement and train a simple CNN from scratch, visualized its predictions, and saw how CNNs can learn to classify image data. The chapter also outlined classic CNN architectures such as LeNet, AlexNet, VGG, and ResNet, providing historical perspective on how the field evolved. Exercises encouraged hands-on experimentation to deepen understanding of receptive fields, efficiency gains from parameter sharing, and architectural tweaks. Overall, this notebook established practical and theoretical foundations for convolutional networks and prepared you for deeper explorations of advanced architectures.</p>
+<p><strong>← Previous:</strong> <a href="../Notebook/chapter-11-neural-networks.html">Chapter 11: Neural Networks</a></p>
+<p><strong>→ Next:</strong> <a href="../Notebook/chapter-13-cnn-advanced.html">Chapter 13: CNN-Advanced</a></p>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/zia207\.github\.io\/ML-R");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../Notebook/chapter-11-neural-networks.html" class="pagination-link" aria-label="Ch 11 · Neural Networks (MLP)">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">Ch 11 · Neural Networks (MLP)</span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../Notebook/chapter-13-cnn-advanced.html" class="pagination-link" aria-label="Ch 13 · CNNs — Advanced">
+        <span class="nav-page-text">Ch 13 · CNNs — Advanced</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© CC-By Zia Ahmed, Upatta Analytics, 2026</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/Notebook/chapter-12-cnn.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>This page is built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

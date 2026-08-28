@@ -1,0 +1,317 @@
+---
+title: "Chapter 00: Prerequisites & Setup"
+subtitle: "Math refresher and the R toolkit we use throughout"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 00: Prerequisites & Setup
+
+> **Level**: Beginner | **Estimated Time**: 2–3 hours
+
+---
+
+## 0.1 What You Need to Know First
+
+Before starting, you should be comfortable with:
+- Basic R syntax (variables, loops, functions, vectors)
+- High school algebra (equations, functions, graphs)
+- No prior machine learning knowledge is required!
+
+Need an R refresher?
+See *[Python for Beginners](https://python-beginners-zia207.netlify.app/)* for a concise, practical introduction to programming concepts that carry over directly to R.
+
+---
+
+## 0.2 Math Refresher
+
+### Vectors and Matrices
+A **vector** is an ordered list of numbers: $\mathbf{x} = [x_1, x_2, \ldots, x_n]$
+A **matrix** is a 2D array of numbers with rows and columns.
+
+**Dot product** (used constantly in ML):
+
+$$\mathbf{x} \cdot \mathbf{w} = x_1 w_1 + x_2 w_2 + \cdots + x_n w_n$$
+
+### Summation Notation
+
+$$\sum_{i=1}^{n} x_i \text{ means } x_1 + x_2 + \cdots + x_n$$
+
+### Derivatives (Calculus basics)
+The derivative $\frac{df}{dx}$ measures how much $f$ changes when $x$ changes slightly.
+Key rule: if $f(x) = x^2$, then $\frac{df}{dx} = 2x$
+
+### Logarithms
+$\log(x)$ is the inverse of exponentiation. Used in probability and loss functions.
+Key property: $\log(a \times b) = \log(a) + \log(b)$
+
+---
+
+## 0.3 R Setup
+
+```bash
+# Recommended: R 4.2+
+R --version
+
+# We use ONLY base R in core chapters
+# Optional: ggplot2 for plotting (not required for algorithms)
+install.packages("ggplot2")
+```
+
+---
+
+## 0.4 Building Our Own Math Utilities (From Scratch)
+
+Throughout this tutorial we will **never rely on modeling packages** for core algorithms.
+Here are the basic utilities we will reuse in every chapter:
+
+```{r}
+# utils.R — our simple math toolkit
+
+# ── Vector operations ──────────────────────────────────────────────────────
+
+dot <- function(v1, v2) {
+  # Dot product of two vectors.
+  # Multiply each pair of elements (same position) in two vectors and add all the results together.
+  # Example: c(a, b) . c(x, y) = a*x + b*y
+  sum(v1 * v2)
+}
+
+vec_add <- function(v1, v2) {
+  # Element-wise addition.
+  # Example: c(1, 2) + c(3, 4) = c(4, 6)
+  v1 + v2
+}
+
+vec_sub <- function(v1, v2) {
+  # Element-wise subtraction.
+  # Example: c(5, 7) - c(2, 3) = c(3, 4)
+  v1 - v2
+}
+
+scalar_mul <- function(s, v) {
+  # Multiply a vector by a single number (scalar).
+  # Example: 3 * c(2, 4) = c(6, 12)
+  s * v
+}
+
+vec_norm <- function(v) {
+  # Euclidean (L2) norm of a vector.
+  # Think of this as the 'length' of the vector. For c(a, b), it's sqrt(a^2 + b^2).
+  sqrt(sum(v^2))
+}
+
+# ── Matrix operations ──────────────────────────────────────────────────────
+
+mat_mul <- function(A, B) {
+  # Matrix multiplication: A (m×k) x B (k×n) -> C (m×n).
+  # If you have two grids of numbers, multiply them using the basic 'row times column' rule.
+  # C[i, j] is the sum of A's row i multiplied elementwise by B's column j.
+  rows_A <- nrow(A); cols_A <- ncol(A); cols_B <- ncol(B)
+  C <- matrix(0.0, nrow = rows_A, ncol = cols_B)
+  for (i in seq_len(rows_A)) {
+    for (j in seq_len(cols_B)) {
+      for (k in seq_len(cols_A)) {
+        C[i, j] <- C[i, j] + A[i, k] * B[k, j]
+      }
+    }
+  }
+  C
+}
+
+mat_transpose <- function(M) {
+  # Transpose a matrix.
+  # Flip rows and columns. The top row becomes the first column.
+  # Example: rbind(c(1,2), c(3,4)) -> rbind(c(1,3), c(2,4))
+  t(M)
+}
+
+mat_vec_mul <- function(M, v) {
+  # Multiply matrix M by vector v.
+  # For each row in the matrix, take its dot product with the vector v.
+  apply(M, 1, function(row) dot(row, v))
+}
+
+# ── Statistics ─────────────────────────────────────────────────────────────
+
+my_mean <- function(values) {
+  # Average of a vector of numbers.
+  sum(values) / length(values)
+}
+
+my_variance <- function(values) {
+  # How spread out the numbers are (average squared distance from the mean).
+  m <- my_mean(values)
+  sum((values - m)^2) / length(values)
+}
+
+my_std_dev <- function(values) {
+  # Standard deviation (the typical distance from the mean).
+  sqrt(my_variance(values))
+}
+
+my_covariance <- function(x, y) {
+  # How much two vectors of numbers change together.
+  # Positive if they go up and down together, negative if opposite.
+  mx <- my_mean(x); my <- my_mean(y)
+  sum((x - mx) * (y - my)) / length(x)
+}
+
+# ── Activation / math helpers ───────────────────────────────────────────────
+
+sigmoid <- function(z) {
+  # Sigmoid squashes any number to be between 0 and 1. Common in ML.
+  1.0 / (1.0 + exp(-z))
+}
+
+relu <- function(z) {
+  # ReLU: outputs the input if it's positive, otherwise 0. Used in neural nets.
+  # relu(-2) = 0; relu(3) = 3
+  pmax(0.0, z)
+}
+
+softmax <- function(z) {
+  # Softmax function: turns a vector of numbers into probabilities (they sum to 1).
+  # Bigger numbers get higher probability. Useful for classification (picking a class).
+  # This version uses a trick (subtracting max) to avoid large exponentials.
+  max_z <- max(z)
+  exp_z <- exp(z - max_z)
+  exp_z / sum(exp_z)
+}
+```
+
+Note: we name these helpers `vec_norm`, `mat_transpose`, `my_mean`, `my_variance`, `my_std_dev`,
+`my_covariance` instead of `norm`, `t`, `mean`, `var`, `sd`, `cov` so that we don't silently shadow
+R's own built-in functions of the same names — but conceptually they are exactly the from-scratch
+functions the Python version defines.
+
+---
+
+## 0.5 Understanding Data Representation
+
+In ML, data is structured as:
+- **Feature matrix X**: shape `(n_samples, n_features)` — each row is one observation
+- **Target vector y**: shape `(n_samples,)` — what we want to predict
+
+```{r}
+# Example dataset: house size (sqft) vs price ($1000s)
+X <- matrix(c(800, 1200, 1500, 2000, 2500), ncol = 1)
+y <- c(150, 200, 250, 320, 400)  # prices
+```
+
+---
+
+## 0.6 Train/Test Split (From Scratch)
+
+```{r}
+train_test_split <- function(X, y, test_ratio = 0.2, seed = 42) {
+  # For beginners:
+  # This function breaks your data into two parts:
+  # - A training set (to learn from)
+  # - A test set (to check if learning is good)
+  #
+  # How it works, step-by-step:
+  # 1. "set.seed(seed)": This makes sure you always get the same split every time you run it.
+  # 2. "n <- nrow(X)": Count how many data points you have.
+  # 3. "indices <- sample(seq_len(n))": Shuffle the positions of the data randomly.
+  # 4. "split_at <- floor(n * (1 - test_ratio))": Figure out where to cut the shuffled list.
+  # 5. "train_idx <- indices[1:split_at]": First part goes to training.
+  # 6. "test_idx <- indices[(split_at+1):n]": The rest goes to testing.
+  # 7. Slice X/y by those positions and return the new split data!
+  #
+  # Example:
+  #   split <- train_test_split(X, y)
+  #   X_train <- split$X_train; X_test <- split$X_test
+  #   y_train <- split$y_train; y_test <- split$y_test
+
+  set.seed(seed)              # So "shuffling" is the same every time
+  n <- nrow(X)                 # Total number of data points
+  indices <- sample(seq_len(n))  # Shuffled data positions
+
+  split_at <- floor(n * (1 - test_ratio))  # Where to cut for train/test
+  train_idx <- indices[seq_len(split_at)]
+  test_idx  <- indices[(split_at + 1):n]
+
+  list(
+    X_train = X[train_idx, , drop = FALSE],
+    X_test  = X[test_idx, , drop = FALSE],
+    y_train = y[train_idx],
+    y_test  = y[test_idx]
+  )
+}
+```
+
+---
+
+## 0.7 Feature Normalization
+
+Most ML algorithms work better when features are on the same scale.
+
+**Min-Max Scaling** maps values to $[0, 1]$:
+
+$$x_{\text{scaled}} = \frac{x - x_{\min}}{x_{\max} - x_{\min}}$$
+
+**Z-score Standardization** maps to mean=0, std=1:
+
+$$x_{\text{std}} = \frac{x - \mu}{\sigma}$$
+
+```{r}
+min_max_scale <- function(X) {
+  # Scale each feature column in X to the [0, 1] range using min-max normalization.
+  #
+  # Parameters:
+  #   X: matrix (rows are samples, columns are features)
+  #
+  # Returns:
+  #   scaled: matrix, same shape as X, but each feature column is scaled to [0, 1]
+  #   mins: vector of minimum values for each feature column (used for scaling/inverse-transform)
+  #   maxs: vector of maximum values for each feature column (used for scaling/inverse-transform)
+  #
+  # How it works:
+  #   1. For each feature column, compute the minimum and maximum values.
+  #   2. Subtract the min and divide by the range (max - min) for that feature,
+  #      so every feature value maps to [0, 1].
+  #   3. The small value (1e-8) in the denominator prevents division by zero if all values are constant.
+  #
+  # Example:
+  #   X <- matrix(c(2, 4, 6, 10, 20, 15), nrow = 3)
+  #   out <- min_max_scale(X)
+  #   out$scaled
+
+  mins <- apply(X, 2, min)
+  maxs <- apply(X, 2, max)
+  ranges <- maxs - mins + 1e-8
+  scaled <- sweep(X, 2, mins, "-")
+  scaled <- sweep(scaled, 2, ranges, "/")
+  list(scaled = scaled, mins = mins, maxs = maxs)
+}
+```
+
+---
+
+##  Chapter Summary
+
+| Concept | Key Takeaway |
+|---------|-------------|
+| Vectors/Matrices | Core data structures for ML |
+| Dot product | Foundation of most ML computations |
+| Derivatives | Needed for gradient-based learning |
+| Feature matrix | Rows = samples, Columns = features |
+| Normalization | Essential preprocessing step |
+
+---
+
+##  Exercises
+
+1. Implement a `euclidean_distance(v1, v2)` function using only base R.
+2. Write a function `normalize_column(data, col_idx)` that z-score normalizes a single column.
+3. Create a 3×3 identity matrix using `matrix()` or `diag()`.
+
+---
+
+**Next Chapter →** [Chapter 01: Introduction to Machine Learning](chapter-01-intro-to-ml.qmd)

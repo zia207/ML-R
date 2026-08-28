@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Machine Learning in R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./references.html" rel="next">
+<link href="./Images/favicon.png" rel="icon" type="image/png">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-b13248f691110a3a988f32c964d6cd84.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-ca9bf16e8dc8b2b84fe809bf6c7d2a01.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Machine Learning in R</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="./index.html" aria-current="page"> <i class="bi bi-house" role="img" aria-label="Home">
+</i> 
+<span class="menu-text">Machine Learning in R</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/zia207/ML-R"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/zia-ahmed207"> <i class="bi bi-linkedin" role="img" aria-label="LinkedIn">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="mailto:zia207@gmail.com"> <i class="bi bi-mailbox" role="img" aria-label="Email">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html"><strong>Machine Learning in R</strong></a></li><li class="breadcrumb-item"><a href="./index.html">Introduction</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html"><strong>Machine Learning in R</strong></a></li><li class="breadcrumb-item"><a href="./index.html">Introduction</a></li></ol></nav>
+      <h1 class="title">Machine Learning in R</h1>
+            <p class="subtitle lead">From Beginner to Advanced: From Scratch without Tears</p>
+                      </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta column-body">
+
+      
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-center sidebar-header">
+      <a href="./index.html" class="sidebar-logo-link">
+      <img src="./Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo light-content py-0 d-lg-inline d-none">
+      <img src="./Images/chapter_logo_ml_r.png" alt="From Scratch — without Tears" class="sidebar-logo dark-content py-0 d-lg-inline d-none">
+      </a>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Machine Learning in R</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟢 Beginner</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-00-prerequisites.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 00 · Prerequisites &amp; Setup</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-01-intro-to-ml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 01 · Introduction to ML</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-02-linear-regression.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 02 · Linear Regression</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-03-glm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 03 · Generalized Linear Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-04-knn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 04 · K-Nearest Neighbors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-05-naive-bayes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 05 · Naive Bayes</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🟡 Intermediate</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-06-decision-trees.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 06 · Decision Trees</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-07-svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 07 · Support Vector Machines</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-08-ensemble-methods.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 08 · Ensemble Methods</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-09-kmeans.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 09 · K-Means Clustering</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-10-pca.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 10 · PCA</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>🔴 Advanced</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-11-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 11 · Neural Networks (MLP)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-12-cnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 12 · Convolutional Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-13-cnn-advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 13 · CNNs — Advanced</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-14-rnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 14 · Recurrent Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-15-lstm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 15 · LSTM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-16-gnn.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 16 · Graph Neural Networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-17-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 17 · NLP</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-18-generative-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 18 · Generative Models</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-19-reinforcement-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 19 · Reinforcement Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+ <span class="menu-text"><strong>📊 Best Practices</strong></span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Notebook/chapter-20-model-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Ch 20 · Model Evaluation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#who-is-it-for" id="toc-who-is-it-for" class="nav-link active" data-scroll-target="#who-is-it-for">Who Is It For?</a></li>
+  <li><a href="#philosophy" id="toc-philosophy" class="nav-link" data-scroll-target="#philosophy">Philosophy</a></li>
+  <li><a href="#why-tutorials-still-matter-in-the-ai-era" id="toc-why-tutorials-still-matter-in-the-ai-era" class="nav-link" data-scroll-target="#why-tutorials-still-matter-in-the-ai-era">Why Tutorials Still Matter in the AI Era</a></li>
+  <li><a href="#what-youll-learn" id="toc-what-youll-learn" class="nav-link" data-scroll-target="#what-youll-learn">What You’ll Learn</a></li>
+  <li><a href="#beginners-guide" id="toc-beginners-guide" class="nav-link" data-scroll-target="#beginners-guide">🟢 Beginner Path</a></li>
+  <li><a href="#intermediate" id="toc-intermediate" class="nav-link" data-scroll-target="#intermediate">🟡 Intermediate Path</a></li>
+  <li><a href="#advanced" id="toc-advanced" class="nav-link" data-scroll-target="#advanced">🔴 Advanced Path</a></li>
+  <li><a href="#chapter-list" id="toc-chapter-list" class="nav-link" data-scroll-target="#chapter-list">📊 Best Practices</a></li>
+  <li><a href="#suggested-learning-paths" id="toc-suggested-learning-paths" class="nav-link" data-scroll-target="#suggested-learning-paths">Suggested Learning Paths</a></li>
+  <li><a href="#license" id="toc-license" class="nav-link" data-scroll-target="#license">License</a></li>
+  <li><a href="#contributing" id="toc-contributing" class="nav-link" data-scroll-target="#contributing">Contributing</a></li>
+  <li><a href="#author" id="toc-author" class="nav-link" data-scroll-target="#author">Author</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/index.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block column-body" id="quarto-document-content">
+
+
+
+
+
+<div class="page-banner">
+<p><img src="Images/banner_ml_r.png" class="img-fluid" alt="Machine Learning in R — From Scratch without Tears"></p>
+</div>
+<div class="badge-row">
+<p><a href="#beginners-guide" class="badge-beginner">🟢 Beginner</a> <a href="#intermediate" class="badge-intermediate">🟡 Intermediate</a> <a href="#advanced" class="badge-advanced">🔴 Advanced</a> <a href="#chapter-list" class="badge-all">21 Chapters</a> <a href="#philosophy" class="badge-all">Base R</a></p>
+</div>
+<p>Machine learning has a reputation for being intimidating — a wall of Greek symbols, black-box libraries, and jargon that makes it feel like something only a specialist could ever understand. This tutorial is built on the opposite belief: that machine learning is a collection of simple, sensible ideas, and that the fastest way to truly understand any of them is to build it yourself.</p>
+<p>At its heart, machine learning is just this: instead of writing rules by hand, you show a program examples and let it discover the rules on its own. A spam filter isn’t told what spam looks like — it learns from thousands of labeled emails. That single shift, from programming instructions to learning from data, is the whole revolution. Everything else is detail.</p>
+<p>And the details are more approachable than they look. Behind every impressive model — a neural network that recognizes faces, a language model that writes text, a system that recommends your next film — sits arithmetic you already know: multiply some numbers, add them up, nudge them in the right direction, repeat. There is no magic step. When you write these models from scratch, in plain base R, the mystery dissolves and what remains is something you can reason about, debug, and trust.</p>
+<p>That is the promise of this tutorial. We won’t hide the machinery behind a library call. We’ll derive the ideas, write the code line by line, and run it until it works — so that by the end you won’t just use machine learning, you’ll understand exactly what it’s doing and why. No hand-waving, and no tears.</p>
+<p><strong>Machine Learning in R</strong> is a free, open-source tutorial that teaches every major ML algorithm by building it from scratch using only <strong>base R</strong> — no caret, no tidymodels, no keras, no torch, no black boxes.</p>
+<hr>
+<section id="who-is-it-for" class="level2">
+<h2 class="anchored" data-anchor-id="who-is-it-for">Who Is It For?</h2>
+<p>This tutorial is designed for:</p>
+<ul>
+<li>R users who want to understand ML from first principles</li>
+<li>Students taking an introductory ML course and looking for a practical companion</li>
+<li>Engineers who use ML packages and want to demystify what’s happening under the hood</li>
+<li>Anyone curious about the mathematics behind modern AI systems</li>
+</ul>
+<p><strong>You need:</strong> basic R (variables, loops, functions, vectors, data frames) and high-school algebra. No prior ML experience required. For a more comprehensive introduction to R, see <a href="https://r4ds.hadley.nz/">R for Data Science</a>.</p>
+<hr>
+</section>
+<section id="philosophy" class="level2">
+<h2 class="anchored" data-anchor-id="philosophy">Philosophy</h2>
+<blockquote class="blockquote">
+<p><em>“I hear and I forget. I see and I remember. I do and I understand.”</em> — Confucius</p>
+</blockquote>
+<blockquote class="blockquote">
+<p>“The best way to understand an algorithm is to implement it from scratch.”</p>
+</blockquote>
+<p>Every algorithm in this tutorial is implemented without ML packages. This means:</p>
+<ul>
+<li>No hidden behaviour — you can read every line</li>
+<li>Genuine understanding — you can modify and experiment</li>
+<li>Portable knowledge — the math translates to any language or framework</li>
+</ul>
+<p>This tutorial uses <strong>only base R</strong> for all core algorithm implementations.<br>
+No <code>caret</code>, no <code>tidymodels</code>, no <code>keras</code>, no <code>torch</code> — just vectors, matrices, and explicit loops.</p>
+<p>This forces you to truly understand what each algorithm is doing, not just call <code>train()</code>.</p>
+<hr>
+</section>
+<section id="why-tutorials-still-matter-in-the-ai-era" class="level2">
+<h2 class="anchored" data-anchor-id="why-tutorials-still-matter-in-the-ai-era">Why Tutorials Still Matter in the AI Era</h2>
+<p>We now live in a world where a working model can appear in seconds. Ask a coding assistant for logistic regression, a CNN, or a transformer, and it will usually produce something that <em>runs</em>. Packages, boilerplates, and large language models have made it easy to ship machine learning code without ever writing a loss function, a gradient update, or a split that actually prevents leakage.</p>
+<p>That convenience is real. It is also a trap if it becomes a substitute for understanding.</p>
+<p>When you depend on AI to write the code <strong>without</strong> the theory behind the model, several things go wrong at once:</p>
+<ul>
+<li><strong>You cannot tell good output from confident nonsense.</strong> An assistant may use the wrong loss, shuffle time-series data, apply the wrong activation, or treat a leakage-filled accuracy as success. If you do not know what the model is <em>supposed</em> to do, you cannot catch it.</li>
+<li><strong>You cannot debug.</strong> When training diverges, accuracy plateaus, or a production model silently fails, the stack trace is not enough. You need to know whether the problem is the data, the objective, the optimizer, the capacity of the model, or the evaluation.</li>
+<li><strong>You cannot choose.</strong> “Just use a neural net” is not a decision. Linear models, trees, kernels, and deep networks make different assumptions. Without those assumptions, every problem looks like a prompt.</li>
+<li><strong>You cannot adapt.</strong> Copy-pasted pipelines work on the demo. They break on missing values, class imbalance, non-stationary data, small samples, and domain shift — the cases that actually matter.</li>
+<li><strong>You become dependent on the tool.</strong> The assistant can generate <code>model &lt;- train(...)</code>. It cannot give you judgment. Judgment comes from having derived the math and implemented the algorithm yourself at least once.</li>
+</ul>
+<p>AI is a powerful multiplier <strong>for people who already know what they are asking for</strong>. It is a liability for people who only know how to ask. The difference is theory: loss functions, inductive bias, overfitting, regularization, evaluation, and the geometry of the model class.</p>
+<p>That is what this tutorial is for.</p>
+<p>It does not compete with Copilot, ChatGPT, or tidymodels. Those tools are how most production work gets done. The point is to make you the person who can <em>direct</em> them: who can read the generated code, reject a wrong architecture, rewrite a broken training loop, and explain why a model succeeded or failed.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>The rule of this era:</strong> use AI to write faster, not to think less. If you cannot implement the algorithm without a package, you do not yet understand it well enough to trust AI-generated code that claims to.</p>
+</div>
+</div>
+<p>A from-scratch tutorial is slower than prompting. That slowness is the feature. Typing a gradient by hand, watching a decision tree split, or deriving backpropagation on a napkin is how the black box becomes a box you can open. After that, using a package — or asking an assistant to use one — is a choice, not a dependency.</p>
+<p>If you skip the theory, you will always be waiting for the next model to tell you what to do. If you learn it once, AI becomes what it should be: an accelerator for someone who already knows the map.</p>
+</section>
+<section id="what-youll-learn" class="level2">
+<h2 class="anchored" data-anchor-id="what-youll-learn">What You’ll Learn</h2>
+<p>This tutorial takes you from the mathematical foundations of machine learning all the way through deep learning and reinforcement learning, with <strong>every algorithm coded from scratch in base R</strong>.</p>
+<p>Each chapter follows a consistent structure:</p>
+<ol type="1">
+<li><strong>Intuition</strong> — Plain-English motivation</li>
+<li><strong>Theory</strong> — Mathematical formulation with notation explained</li>
+<li><strong>Algorithm</strong> — Step-by-step pseudocode</li>
+<li><strong>From-Scratch R</strong> — Complete, runnable implementation</li>
+<li><strong>Exercises</strong> — Practice problems</li>
+</ol>
+<p>The tutorial is grouped into clear learning levels:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 40%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Level</th>
+<th>Chapters</th>
+<th>Topics</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>🟢 Beginner</td>
+<td>00–05</td>
+<td>Prerequisites, Introduction to ML, Linear Regression, Generalized Linear Models, K-Nearest Neighbors, Naive Bayes</td>
+</tr>
+<tr class="even">
+<td>🟡 Intermediate</td>
+<td>06–10</td>
+<td>Decision Trees, Support Vector Machines, Ensemble Methods, K-Means Clustering, Principal Component Analysis</td>
+</tr>
+<tr class="odd">
+<td>🔴 Advanced</td>
+<td>11–19</td>
+<td>Neural Networks (MLP), CNNs, RNNs, LSTM, Graph Neural Networks, NLP, Generative Models, Reinforcement Learning</td>
+</tr>
+<tr class="even">
+<td>📊 Essential</td>
+<td>20</td>
+<td>Model Evaluation &amp; Best Practices</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="beginners-guide" class="level2">
+<h2 class="anchored" data-anchor-id="beginners-guide">🟢 Beginner Path</h2>
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 00</div>
+    <div class="card-title">Prerequisites &amp; Setup</div>
+    <div class="card-desc">Base R math utilities, vector/matrix operations, data normalization — the toolkit we use in every chapter.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 2–3 hrs</div>
+    <a href="Notebook/chapter-00-prerequisites.html">→ Start Here</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 01</div>
+    <div class="card-title">Introduction to Machine Learning</div>
+    <div class="card-desc">Types of ML, the learning workflow, key terminology, bias-variance tradeoff, and your first baseline model.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 1–2 hrs</div>
+    <a href="Notebook/chapter-01-intro-to-ml.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 02</div>
+    <div class="card-title">Linear Regression</div>
+    <div class="card-desc">Ordinary least squares, gradient descent, MSE cost function, R² evaluation. The foundation of supervised learning.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 3–4 hrs</div>
+    <a href="Notebook/chapter-02-linear-regression.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 03</div>
+    <div class="card-title">Generalized Linear Models</div>
+    <div class="card-desc">The GLM framework unifying linear, logistic, Poisson, and ordinal regression, plus Ridge, Lasso, and Elastic Net.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 5–6 hrs</div>
+    <a href="Notebook/chapter-03-glm.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 04</div>
+    <div class="card-title">K-Nearest Neighbors</div>
+    <div class="card-desc">Distance metrics, lazy learning, KNN for classification and regression, curse of dimensionality.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 2–3 hrs</div>
+    <a href="Notebook/chapter-04-knn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 05</div>
+    <div class="card-title">Naive Bayes</div>
+    <div class="card-desc">Bayes' theorem, Gaussian NB for continuous data, Multinomial NB for text, Laplace smoothing, spam detection.</div>
+    <div class="card-footer"><span class="badge-beginner">🟢 Beginner</span> · 3 hrs</div>
+    <a href="Notebook/chapter-05-naive-bayes.html">→ Read Chapter</a>
+  </div>
+</div>
+<hr>
+</section>
+<section id="intermediate" class="level2">
+<h2 class="anchored" data-anchor-id="intermediate">🟡 Intermediate Path</h2>
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 06</div>
+    <div class="card-title">Decision Trees</div>
+    <div class="card-desc">Entropy, Gini impurity, information gain, CART algorithm for classification and regression.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 4–5 hrs</div>
+    <a href="Notebook/chapter-06-decision-trees.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 07</div>
+    <div class="card-title">Support Vector Machines</div>
+    <div class="card-desc">Maximum margin hyperplane, soft-margin SVM, hinge loss, kernel trick (RBF, polynomial).</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 4–5 hrs</div>
+    <a href="Notebook/chapter-07-svm.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 08</div>
+    <div class="card-title">Ensemble Methods</div>
+    <div class="card-desc">Bagging, Random Forest, Extra Trees, AdaBoost, Gradient Boosting, and XGBoost — classification and regression from scratch with full theory and benchmarks.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-08-ensemble-methods.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 09</div>
+    <div class="card-title">K-Means Clustering</div>
+    <div class="card-desc">Unsupervised clustering, K-Means++ initialization, elbow method, silhouette score.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 3 hrs</div>
+    <a href="Notebook/chapter-09-kmeans.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 10</div>
+    <div class="card-title">Principal Component Analysis</div>
+    <div class="card-desc">Covariance matrix, eigendecomposition via power iteration, dimensionality reduction, explained variance.</div>
+    <div class="card-footer"><span class="badge-intermediate">🟡 Intermediate</span> · 4–5 hrs</div>
+    <a href="Notebook/chapter-10-pca.html">→ Read Chapter</a>
+  </div>
+</div>
+<hr>
+</section>
+<section id="advanced" class="level2">
+<h2 class="anchored" data-anchor-id="advanced">🔴 Advanced Path</h2>
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 11</div>
+    <div class="card-title">Neural Networks (MLP)</div>
+    <div class="card-desc">Perceptrons, forward pass, backpropagation, activation functions, He initialization, XOR problem.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-11-neural-networks.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 12</div>
+    <div class="card-title">Convolutional Neural Networks</div>
+    <div class="card-desc">2D convolution, padding, stride, max pooling, feature maps, Sobel edge detection from scratch.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-12-cnn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 13</div>
+    <div class="card-title">CNNs — Advanced Architectures</div>
+    <div class="card-desc">Batch normalisation, residual (skip) connections, depthwise separable conv, IoU, non-maximum suppression, data augmentation.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-13-cnn-advanced.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 14</div>
+    <div class="card-title">Recurrent Neural Networks</div>
+    <div class="card-desc">Vanilla RNN, vanishing gradient problem, BPTT, and GRU architecture.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-14-rnn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 15</div>
+    <div class="card-title">Long Short-Term Memory (LSTM)</div>
+    <div class="card-desc">Gates (forget/input/output), cell state highway, reparameterised gradients, GRU comparison, character-level language model.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-15-lstm.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 16</div>
+    <div class="card-title">Graph Neural Networks</div>
+    <div class="card-desc">Message passing, GCN spectral convolution, GraphSAGE, link prediction, graph pooling, node classification.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 6–8 hrs</div>
+    <a href="Notebook/chapter-16-gnn.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 17</div>
+    <div class="card-title">Natural Language Processing</div>
+    <div class="card-desc">Tokenisation, BPE, TF-IDF, Word2Vec skip-gram, scaled dot-product attention, positional encoding, Transformer encoder.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 8–10 hrs</div>
+    <a href="Notebook/chapter-17-nlp.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 18</div>
+    <div class="card-title">Generative Models</div>
+    <div class="card-desc">VAE (ELBO, reparameterisation trick), GAN (min-max game, mode collapse), diffusion models (forward/reverse process).</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 8–10 hrs</div>
+    <a href="Notebook/chapter-18-generative-models.html">→ Read Chapter</a>
+  </div>
+  <div class="chapter-card">
+    <div class="card-number">Chapter 19</div>
+    <div class="card-title">Reinforcement Learning</div>
+    <div class="card-desc">Markov decision processes, Q-learning, Bellman equation, ε-greedy policy, GridWorld agent.</div>
+    <div class="card-footer"><span class="badge-advanced">🔴 Advanced</span> · 5–6 hrs</div>
+    <a href="Notebook/chapter-19-reinforcement-learning.html">→ Read Chapter</a>
+  </div>
+</div>
+<hr>
+</section>
+<section id="chapter-list" class="level2">
+<h2 class="anchored" data-anchor-id="chapter-list">📊 Best Practices</h2>
+<div class="chapter-grid">
+  <div class="chapter-card">
+    <div class="card-number">Chapter 20</div>
+    <div class="card-title">Model Evaluation &amp; Best Practices</div>
+    <div class="card-desc">Cross-validation, confusion matrix, ROC-AUC, regression metrics, overfitting/regularization, learning curves.</div>
+    <div class="card-footer"><span class="badge-all">🔵 All Levels</span> · 3–4 hrs</div>
+    <a href="Notebook/chapter-20-model-evaluation.html">→ Read Chapter</a>
+  </div>
+</div>
+<hr>
+</section>
+<section id="suggested-learning-paths" class="level2">
+<h2 class="anchored" data-anchor-id="suggested-learning-paths">Suggested Learning Paths</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 34%">
+<col style="width: 44%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Path</th>
+<th>Chapters</th>
+<th>Who it’s for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>🟢 <strong>Beginner</strong></td>
+<td>00 → 01 → 02 → 03 → 04 → 05 → 20</td>
+<td>New to ML</td>
+</tr>
+<tr class="even">
+<td>🟡 <strong>Intermediate</strong></td>
+<td>00–05 → 06 → 07 → 08 → 09 → 10 → 20</td>
+<td>Comfortable with R</td>
+</tr>
+<tr class="odd">
+<td>🔴 <strong>Deep Learning</strong></td>
+<td>11 → 12 → 13 → 14 → 15 → 20</td>
+<td>Neural network focus</td>
+</tr>
+<tr class="even">
+<td>🔴 <strong>Modern AI</strong></td>
+<td>15 → 16 → 17 → 18 → 19 → 20</td>
+<td>LSTM, GNNs, NLP, Generative, RL</td>
+</tr>
+<tr class="odd">
+<td>🔴 <strong>Full Course</strong></td>
+<td>00 → 20 in order</td>
+<td>Complete mastery</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="license" class="level2">
+<h2 class="anchored" data-anchor-id="license">License</h2>
+<p>This tutorial is released under the <a href="https://opensource.org/licenses/MIT">MIT License</a>. You are free to use, copy, modify, and distribute it — with attribution.</p>
+<hr>
+</section>
+<section id="contributing" class="level2">
+<h2 class="anchored" data-anchor-id="contributing">Contributing</h2>
+<p>Found a bug? Have an improvement? Open an issue or pull request on <a href="https://github.com/zia207/ML-R">GitHub</a>.</p>
+<hr>
+</section>
+<section id="author" class="level2">
+<h2 class="anchored" data-anchor-id="author">Author</h2>
+<p>This tutorial is written and maintained by <strong>Zia Ahmed, PhD</strong> (Upatta Analytics) — <a href="https://github.com/zia207">Zia207</a>.</p>
+<p>Built with <a href="https://quarto.org">Quarto</a> and hosted on <a href="https://zia207.github.io/ML-R">GitHub Pages</a>.</p>
+
+
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/zia207\.github\.io\/ML-R");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation column-body">
+  <div class="nav-page nav-page-previous">
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./references.html" class="pagination-link" aria-label="References">
+        <span class="nav-page-text">References</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© CC-By Zia Ahmed, Upatta Analytics, 2026</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/zia207/ML-R/blob/main/index.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/zia207/ML-R/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>This page is built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

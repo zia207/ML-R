@@ -1,0 +1,1267 @@
+---
+title: "Chapter 11: Neural Networks (MLP)"
+subtitle: "Perceptrons, forward/backprop from scratch, and hyperparameter tuning on real data"
+title-block-style: none
+title-block-banner: false
+toc-depth: 3
+---
+
+::: {.page-banner}
+![](../Images/banner_ml_r.png){fig-alt="Machine Learning in R — From Scratch without Tears"}
+:::
+
+# Chapter 11: Neural Networks (MLP)
+
+> **Level**: Intermediate–Advanced | **Estimated Time**: 6–8 hours
+
+---
+
+## 11.1 Overview
+
+A neural network is a layered architecture of interconnected "neurons". Each layer transforms its input and passes it forward — like an assembly line of feature detectors.
+
+Inspired by (but not a literal model of) biological neurons.
+
+---
+
+## 11.2 What is a Neural Network?
+
+A neural network is a computer system designed to recognize patterns. You can think of it like a simplified version of how the human brain works. It is made up of layers of tiny units called "neurons" that are connected together.
+
+### 11.3 How Does It Work? Steps for Beginners:
+
+1. **Input Layer:**
+   - The neural network takes in data (for example, pictures or numbers) through the first layer, called the input layer.
+   - Each neuron in this layer represents an input feature (like a pixel in an image or a measurement in a table).
+
+2. **Hidden Layers:**
+   - The information from the input layer moves through one or more hidden layers.
+   - Inside each neuron, the data is multiplied by some numbers called 'weights', then added up and passed through a special math function (called an "activation function") that decides what to keep or ignore.
+   - This lets the network learn complex patterns or rules about your data.
+
+3. **Output Layer:**
+   - Finally, the processed information reaches the output layer.
+   - The output layer gives the answer, prediction, or classification (for example, "cat" or "dog", or a number between 0 and 1).
+
+4. **Learning (Training):**
+   - At the start, the neural network guesses with random weights.
+   - We show it lots of examples with known answers and compare its prediction to the correct answer.
+   - It then makes small changes to its weights to do better next time.
+   - This learning process is called "training", and it happens many times until the network gets good at predicting.
+
+**In summary:**
+A neural network is like a big system of "if this, then that" rules—but instead of writing the rules by hand, the network figures them out automatically by learning from examples!
+
+## 11.3 Key Neural Network Concepts
+
+Neural networks are made up of simple parts called neurons, which are arranged in layers. The main building block is the neuron (or perceptron), which takes inputs, applies weights and biases, and then passes the result through a special function called an activation function. This activation function helps the network learn complex, non-linear patterns.
+
+When data moves through the network from the input to the output layer, it's called the forward pass. The network then learns by comparing its output to the correct answer and adjusting its internal parameters using a method known as backpropagation. This process helps the network get better over time at recognizing patterns and making predictions.
+
+### 11.3.1 The Perceptron (Building Block)
+
+Imagine a "neuron" as a tiny calculator. It takes in some numbers (inputs), multiplies each by its own special setting (called a weight), adds them up, and then does one last tweak (adding a bias, which is just another number).
+
+Here's the equation:
+
+$$\text{output} = \text{activation}(w_1 \cdot x_1 + w_2 \cdot x_2 + \cdots + w_p \cdot x_p + b)$$
+
+- $x_1, x_2, ..., x_p$ = your input values (like pixels or measurements)
+- $w_1, w_2, ..., w_p$ = "weights" (numbers the model learns)
+- $b$ = bias (an extra number the model learns)
+- **activation** = a special function that decides what gets passed on (see below)
+
+So, for each input:
+1. Multiply input value by its weight
+2. Add them all up
+3. Add the bias
+4. Pass the result through an activation function
+   (the "activation" turns raw numbers into something useful, like "yes/no" or a score)
+
+### 11.3.2 Activation Function
+
+An **activation function** is like a decision-making step inside each tiny "neuron" of a neural network. It takes the result calculated by a neuron (a number, often called $z$ or "signal in") and turns it into something useful for the next layer, often squashing or shaping the number in some way.
+
+Think of it as a light switch or a filter that decides: "Should I let this signal pass, and if so, how much?"
+
+**Why do we need it?**
+Without activation functions, a neural network is just a fancy version of a straight line—no matter how many layers, it can't learn complex patterns. Activation functions add non-linearity, letting your network learn curves, twists, and everything in between.
+
+----
+
+### Types of Activation Functions
+
+Here are some of the most popular types, written with their math, what they mean, and where they're often used:
+
+| Name        | Formula                                                                   | What does it do?                             | Typical Usage                                                      |
+|-------------|--------------------------------------------------------------------------|----------------------------------------------|--------------------------------------------------------------------|
+| **Sigmoid** | $\displaystyle\text{Sigmoid}(z) = \frac{1}{1 + e^{-z}}$                 | Squashes any number to **0–1**.              | Final layer for probabilities, e.g., "Is it a cat?"                |
+| **ReLU**    | $\displaystyle\text{ReLU}(z) = \max(0, z)$                              | Sets negative numbers to **0**, keeps positives. | Most hidden layers (makes learning faster!)                     |
+| **Tanh**    | $\displaystyle\text{tanh}(z) = \frac{e^z-e^{-z}}{e^z+e^{-z}}$           | Squashes to **-1 to +1**                     | For data that swings both ways, sometimes in hidden layers          |
+| **Softmax** | $\displaystyle\text{Softmax}(z_j) = \frac{e^{z_j}}{\sum_i e^{z_i}}$     | Turns a list of numbers into a set of **probabilities** that add up to 1 | Output layer for picking one category out of many (cat, dog, hamster) |
+
+----
+
+**In plain language:**
+- **Sigmoid:** Like a dimmer switch, smoothly goes from "off" to "on" (0 to 1). Used when you want a probability.
+- **ReLU:** Like a broken light—only turns on for positive signals, ignores anything negative. Makes training quicker!
+- **Tanh:** Like a seesaw—goes from strongly negative (-1), through zero, to strongly positive (+1). Good for balancing data that swings both ways.
+- **Softmax:** Like a voting machine—turns the outputs into percentages that all add up to 100%, so you can "pick a winner" in classification tasks.
+
+In summary:
+The activation function is the magic ingredient that lets neural networks learn things that are more complicated than simple lines. It helps shape the answers your network can discover!
+
+```{r}
+# Visualize the activation functions in a panel
+
+sigmoid_viz <- function(z) 1 / (1 + exp(-z))
+relu_viz <- function(z) pmax(0, z)
+tanh_viz <- function(z) tanh(z)
+softmax_viz <- function(z_mat) {
+  # z_mat: matrix with one row per class, columns = points
+  exp_z <- exp(sweep(z_mat, 2, apply(z_mat, 2, max), "-"))
+  sweep(exp_z, 2, colSums(exp_z), "/")
+}
+
+z <- seq(-5, 5, length.out = 300)
+z_softmax <- rbind(z - 2, z, z + 2)   # simulate 3-class input
+
+par(mfrow = c(1, 4))
+
+plot(z, sigmoid_viz(z), type = "l", col = "purple", xlab = "z", ylab = "output",
+     main = "Sigmoid", ylim = c(-0.1, 1.1)); grid()
+
+plot(z, relu_viz(z), type = "l", col = "blue", xlab = "z", ylab = "output",
+     main = "ReLU", ylim = c(-1, 5.25)); grid()
+
+plot(z, tanh_viz(z), type = "l", col = "orange", xlab = "z", ylab = "output",
+     main = "Tanh", ylim = c(-1.1, 1.1)); grid()
+
+softmax_vals <- softmax_viz(z_softmax)
+plot(z, softmax_vals[1, ], type = "l", col = "red", xlab = "z", ylab = "probability",
+     main = "Softmax (3 classes)", ylim = c(-0.05, 1.05))
+lines(z, softmax_vals[2, ], col = "green")
+lines(z, softmax_vals[3, ], col = "grey40")
+legend("topright", legend = c("Class 1", "Class 2", "Class 3"),
+       col = c("red", "green", "grey40"), lwd = 1, cex = 0.7, bty = "n")
+grid()
+
+par(mfrow = c(1, 1))
+```
+
+### Common activation functions: Dummies Edition
+
+Think of the "activation function" as the final decision-making step for a neuron—the math shortcut that tells it how to react to its input.
+
+| Name     | What it looks like (formula)                                | What does it do?          | Where is it used?            |
+|----------|------------------------------------------------------------|--------------------------|------------------------------|
+| Sigmoid  | $\displaystyle\text{Sigmoid}(z) = \frac{1}{1+e^{-z}}$      | Squashes to 0–1          | Yes/no probs (outputs)       |
+| ReLU     | $\displaystyle\text{ReLU}(z) = \max(0, z)$                 | 0 if negative, else z    | Hidden layers, speed boost!  |
+| Tanh     | $\displaystyle \text{tanh}(z) = \frac{e^z-e^{-z}}{e^z+e^{-z}}$ | Squashes to -1..1        | Ups & downs, balance         |
+| Softmax  | $\displaystyle\text{Softmax}(z_j) = \frac{e^{z_j}}{\sum_i e^{z_i}}$  | Converts to probability sum = 1 | Pick a category (cats/dogs)  |
+
+**Silly analogy:**
+- **Sigmoid:** Like a dimmer switch—smoothly turns up from "no" (0) to "yes" (1).
+- **ReLU:** Like a door—shuts (0) for negative, wide open for positive!
+- **Tanh:** Like a balance scale—tips between "negative" (-1) and "positive" (+1).
+- **Softmax:** Like an election—each category gets its fair share of probability votes, sum always 1.
+
+**Bottom line:**
+The neuron combines your inputs, adds a bias, then pulls out one of these calculators to turn the jumble into a clear, useful output!
+
+---
+
+## 11.3.4 Forward Pass
+
+Let's break down how a neural network passes your input through all its layers, step by step:
+
+1. **Start with your input:**
+   $$\mathbf{a}^{(0)} = \mathbf{x}$$
+   (This just means: the first "activation" is your input data.)
+
+2. **At each layer:**
+   $$\mathbf{z}^{(l)} = \mathbf{W}^{(l)} \cdot \mathbf{a}^{(l-1)} + \mathbf{b}^{(l)}$$
+   (Take last layer's output, multiply by that layer's weights, add bias — like making a fancy sandwich out of the last layer's ingredients!)
+
+   $$\mathbf{a}^{(l)} = f(\mathbf{z}^{(l)})$$
+   (Now, squish that result through an "activation function" — so it's not just a plain number, but something useful! This is how neurons decide to "fire" or not.)
+
+3. **Output:**
+   $$\hat{\mathbf{y}} = \mathbf{a}^{(L)}$$
+   (Final layer pops out your prediction. Ta-da!)
+
+**Bottom line:**
+At each step, you're just taking the last answer, doing a little math (weights and bias), squishing it through a function, and marching on to the next "layer-brain cell" until you get your output!
+
+---
+
+## 11.3.5 Backpropagation
+
+**What is Backprop?**
+It's just a step-by-step way to figure out how much each weight and bias in your network should change, so your neural network gets better at its job!
+
+**The "backward" part:** You start at the end (the output), see how wrong you were (the loss), and work backwards to find out who to blame in each layer.
+
+### "Dumbed Down" Equations with Explanations:
+
+#### 1. How does the loss change if I nudge a weight or bias?
+
+> Imagine a super simple neuron:
+>
+> $z = w \cdot a_\text{prev} + b$
+> $a = f(z)$ (like sigmoid of $z$)
+> $L$ = loss (e.g., how far our guess is from truth)
+
+**For a single weight $w$:**
+$$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial a} \cdot \frac{\partial a}{\partial z} \cdot \frac{\partial z}{\partial w}$$
+
+Fill in each "link in the chain":
+- $\frac{\partial z}{\partial w} = a_\text{prev}$ (the input that fed this weight)
+- $\frac{\partial a}{\partial z} = f'(z)$ (derivative of activation function)
+- $\frac{\partial L}{\partial a}$ (depends on loss function & output)
+
+**So, it's like:**
+> "How much did my guess hurt?", times
+> "How much does the squishing function pass that on?", times
+> "How much did this particular weight actually contribute?"
+
+**Vectorized for whole layer $l$:**
+$$
+\frac{\partial L}{\partial \mathbf{W}^{(l)}} =
+\left( \frac{\partial L}{\partial \mathbf{z}^{(l)}} \right)
+\cdot
+\left( \mathbf{a}^{(l-1)} \right)^\top
+$$
+
+**For the biases:**
+$$
+\frac{\partial L}{\partial \mathbf{b}^{(l)}} =
+\frac{\partial L}{\partial \mathbf{z}^{(l)}}
+$$
+(Just the error signal, since bias only adds a constant.)
+
+#### 2. Passing the blame backward:
+- The "blame" (error, called $\delta$ or "delta") for a layer is:
+$$
+\boldsymbol{\delta}^{(l)} = \frac{\partial L}{\partial \mathbf{z}^{(l)}}
+$$
+
+- To find the error for a hidden layer, you "pass back" from the next layer:
+$$
+\boldsymbol{\delta}^{(l)} =
+(\mathbf{W}^{(l+1)})^\top \cdot \boldsymbol{\delta}^{(l+1)} \odot f'\left(\mathbf{z}^{(l)}\right)
+$$
+where $\odot$ means element-wise (Hadamard) multiplication, and $f'$ is "how much can this neuron still change the output?" (the slope of activation).
+
+---
+
+**Silly analogy:** Think of each layer like workers on an assembly line:
+"How much did my work have to do with the final mistake?" Then, pass the blame to the previous worker, with adjustments for how much their work mattered!
+
+---
+
+## 11.4 Deep Learning, Step by Step
+
+*A walk through how a neural network learns, and what each one actually means.*
+
+---
+
+## The big idea in one breath
+
+A neural network learns the way a person does: **it makes a guess, checks how wrong it was, then goes back and adjusts — and repeats this thousands of times until the guesses get good.**
+
+That loop has four named parts, and everything below is just those four parts in slow motion:
+
+> **Forward propagation → Loss → Backpropagation → Gradient descent → (repeat)**
+
+---
+
+![Neural Network Training Steps](../Images/dnn_training_steps.gif){width=100%}
+
+### The building block: one neuron
+
+A neuron is a tiny calculator. It takes some numbers in, multiplies each by an *importance knob* called a **weight**, adds them up, adds a small offset called a **bias**, and then passes the result through a **squashing function**.
+
+The **squashing function** (also called the activation function) compresses the neuron's output into a fixed range—usually between 0 and 1, or -1 and 1—no matter how large or small the input. This helps the network deal with extreme values and lets it learn and represent non-linear patterns. Common squashing functions are the sigmoid, tanh, and ReLU.
+
+Stack a few neurons side‑by‑side and you get a **layer**. Stack several layers front‑to‑back — like Lego bricks — and you get a **deep neural network** (the "deep" just means "many layers").
+
+**Notation cheat‑sheet** (don't memorize, just glance back here):
+
+| Symbol | Plain meaning |
+|---|---|
+| $\mathbf{x}$ | the input data (what you feed in) |
+| $\mathbf{W}$ | weights — the "importance knobs" the network learns |
+| $\mathbf{b}$ | bias — a small nudge/offset |
+| $\mathbf{z}$ | the weighted sum (before squashing) |
+| $\sigma$ | activation function (the squasher) |
+| $\mathbf{a}$ | activation — the neuron's output |
+| $\hat{\mathbf{y}}$ | the prediction |
+| $\mathbf{y}$ | the true answer |
+| $\mathcal{L}$ | loss — a single "how wrong were we?" score |
+| $\eta$ | learning rate — how big a step we take when adjusting |
+| $(l)$ | which layer we're talking about |
+
+---
+
+### Step 1: Input: hand the network the data
+
+$$\mathbf{a}^{(0)} = \mathbf{x}$$
+
+**In English:** we call the raw input the "activation of layer 0." Nothing fancy is happening yet — this is just saying *"the starting point is whatever data you fed in."* If you're classifying a photo, $\mathbf{x}$ is the pixels.
+
+---
+
+### Step 2: Weighted sum: mix the inputs
+
+$$\mathbf{z}^{(l)} = \mathbf{W}^{(l)}\,\mathbf{a}^{(l-1)} + \mathbf{b}^{(l)}$$
+
+**In English:** every neuron takes the outputs of the previous layer, multiplies each by its weight (how much it *cares* about that input), adds them all up, and adds its bias.
+
+**Dummy analogy:** it's a weighted recipe. If you're guessing whether a photo is a cat, "pointy ears" might get a big weight and "background color" a tiny one. The bias is like a chef's baseline seasoning added no matter what.
+
+---
+
+### Step 3: Activation: decide how strongly to fire
+
+$$\mathbf{a}^{(l)} = \sigma\!\left(\mathbf{z}^{(l)}\right)$$
+
+**In English:** the weighted sum is pushed through an **activation function** $\sigma$. This does two jobs: it keeps numbers in a sensible range, and — crucially — it adds *non‑linearity* so the network can learn curvy, complicated patterns instead of just straight lines.
+
+**Common squashers:**
+- **ReLU:** $\sigma(z) = \max(0, z)$ — "if negative, output 0; otherwise pass it through." Simple and the most popular.
+- **Sigmoid:** $\sigma(z) = \dfrac{1}{1 + e^{-z}}$ — squashes anything into a 0–1 range, like a probability.
+
+**Dummy analogy:** a neuron deciding whether to "fire," like a dimmer switch that stays off until the signal is strong enough.
+
+Steps 2 and 3 repeat for every layer, feeding forward. That's why it's called **forward propagation**.
+
+---
+
+### Step 4: Prediction: the network's final guess
+
+$$\hat{\mathbf{y}} = \mathbf{a}^{(L)} = \mathrm{softmax}\!\left(\mathbf{z}^{(L)}\right)$$
+
+**In English:** the last layer ($L$) produces the answer. For classification we usually pass it through **softmax**, which turns raw scores into probabilities that add up to 1.
+
+$$\mathrm{softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}$$
+
+**Dummy analogy:** the network says *"I'm 80% sure this is a cat, 15% a dog, 5% a fox."* This is the "**future**" — we've traveled forward and seen the outcome.
+
+---
+
+## Step 5: Loss: measure how wrong we were
+
+$$\mathcal{L} = -\sum_i y_i \,\log \hat{y}_i \quad \text{(cross‑entropy, for classification)}$$
+
+**In English:** the loss is a single number scoring how far the prediction $\hat{\mathbf{y}}$ is from the truth $\mathbf{y}$. **Big loss = very wrong. Small loss = doing great.**
+
+For predicting numbers (regression) instead of categories, a common choice is **Mean Squared Error**:
+
+$$\mathcal{L} = \frac{1}{n}\sum_i \left(y_i - \hat{y}_i\right)^2$$
+
+**Dummy analogy:** this is the network looking at its guess and its report card and going *"ouch, I was way off."* This mistake is exactly what it's about to learn from.
+
+---
+
+### Step 6: Backpropagation starts: blame the output
+
+$$\delta^{(L)} = \hat{\mathbf{y}} - \mathbf{y}$$
+
+**In English:** now we travel **back in time**. We start at the output and compute the **error signal** $\delta$ — literally "prediction minus truth." It says *how much, and in which direction, each output neuron was off.*
+
+**Dummy analogy:** you got the wrong answer on a test, so you first figure out *by how much* your final answer missed.
+
+---
+
+### Step 7: Backpropagation continues: share the blame backward
+
+$$\delta^{(l)} = \left(\mathbf{W}^{(l+1)\top}\,\delta^{(l+1)}\right) \odot \sigma'\!\left(\mathbf{z}^{(l)}\right)$$
+
+**In English:** the error is passed backward layer by layer. Each hidden neuron gets a share of the blame based on (a) how much it fed into the neurons ahead of it (the $\mathbf{W}^\top$ part) and (b) how sensitive it was at that moment (the $\sigma'$ part, the slope of the activation). The $\odot$ just means "multiply element‑by‑element."
+
+**Dummy analogy:** it's a chain of accountability. The final mistake gets traced back through the network — *"you contributed this much to the error, and you this much"* — so everyone knows their part.
+
+This is the "**backpropagation**" (backward propagation of errors) that beginners find scary. It's really just the chain rule from calculus, applied politely, layer by layer.
+
+---
+
+### Step 8: Gradients: how much did each weight matter?
+
+$$\frac{\partial \mathcal{L}}{\partial \mathbf{W}^{(l)}} = \delta^{(l)}\,\mathbf{a}^{(l-1)\top}$$
+
+**In English:** the **gradient** answers *"if I wiggle this weight a tiny bit, does the loss go up or down, and how fast?"* A big gradient means that weight has a big effect on the error.
+
+**Dummy analogy:** for every knob in the machine, we now know *which way to turn it* and *how much it matters* for reducing the mistake.
+
+---
+
+### Step 9: Gradient descent: nudge the weights to be less wrong
+
+$$\mathbf{W}^{(l)} \leftarrow \mathbf{W}^{(l)} - \eta\,\frac{\partial \mathcal{L}}{\partial \mathbf{W}^{(l)}}$$
+
+**In English:** finally we **update** every weight: move it a small step in the direction that lowers the loss. The step size is the **learning rate** $\eta$ — small enough to be safe, big enough to make progress. (Biases update the same way.)
+
+**Dummy analogy — walking downhill in fog:** the loss is a valley. The gradient tells you which way is *up*, so you step the opposite way, *down*. Take too big a step ($\eta$ too large) and you overshoot the valley; too small and you crawl forever.
+
+---
+
+### Step 10: Repeat: learn from mistakes, again and again
+
+Now jump back to Step 1 with the freshly nudged weights and do it all over. One full pass over the training data is called an **epoch**, and networks train for many epochs.
+
+Each loop, the prediction gets a little better and the **loss curve slopes downward** — the visual proof that, just like people, *the network is learning from its mistakes.*
+
+```
+        ┌──────────────────────────────────────────────┐
+        │                                              │
+        ▼                                              │
+   Forward pass ──► Loss ──► Backprop ──► Update weights┘
+   (predict the       (how    (assign      (nudge to be
+    future)          wrong?)   blame)       less wrong)
+```
+
+---
+
+### The whole thing on one page
+
+| # | Step | Equation | What it really means |
+|---|------|----------|----------------------|
+| 1 | Input | $\mathbf{a}^{(0)}=\mathbf{x}$ | feed in the data |
+| 2 | Weighted sum | $\mathbf{z}^{(l)}=\mathbf{W}^{(l)}\mathbf{a}^{(l-1)}+\mathbf{b}^{(l)}$ | mix inputs by importance |
+| 3 | Activation | $\mathbf{a}^{(l)}=\sigma(\mathbf{z}^{(l)})$ | decide how strongly to fire |
+| 4 | Prediction | $\hat{\mathbf{y}}=\mathrm{softmax}(\mathbf{z}^{(L)})$ | make the final guess |
+| 5 | Loss | $\mathcal{L}=-\sum_i y_i\log\hat{y}_i$ | score how wrong we were |
+| 6 | Output error | $\delta^{(L)}=\hat{\mathbf{y}}-\mathbf{y}$ | measure the miss at the end |
+| 7 | Hidden error | $\delta^{(l)}=(\mathbf{W}^{(l+1)\top}\delta^{(l+1)})\odot\sigma'(\mathbf{z}^{(l)})$ | share blame backward |
+| 8 | Gradients | $\frac{\partial \mathcal{L}}{\partial \mathbf{W}^{(l)}}=\delta^{(l)}\mathbf{a}^{(l-1)\top}$ | how much each weight matters |
+| 9 | Update | $\mathbf{W}^{(l)}\leftarrow\mathbf{W}^{(l)}-\eta\frac{\partial\mathcal{L}}{\partial\mathbf{W}^{(l)}}$ | nudge weights downhill |
+| 10 | Repeat | — | do it again until loss is small |
+
+---
+
+### Five words that will make you sound like an expert
+
+- **Weights & biases** — the numbers the network learns; everything else is fixed math.
+- **Forward propagation** — pushing data through to get a prediction.
+- **Loss function** — the single score of "how wrong."
+- **Backpropagation** — the chain rule sending the error backward to assign blame.
+- **Gradient descent** — walking the weights downhill to shrink the loss.
+
+That's the entire game. Everything fancier — CNNs for images, RNNs/Transformers for sequences, dropout, batch‑norm — is a variation on *this same four‑part loop.*
+
+## 11.5 From-Scratch R Implementation
+
+```{r}
+# neural_network.R
+
+sigmoid <- function(z) 1.0 / (1.0 + exp(-pmin(pmax(z, -500), 500)))
+sigmoid_deriv <- function(a) a * (1 - a)
+relu_act <- function(z) pmax(0.0, z)
+relu_deriv <- function(z) as.numeric(z > 0)
+tanh_fn <- function(z) tanh(z)
+tanh_deriv <- function(a) 1.0 - a^2   # given a = tanh(z)
+
+# A fully connected layer, represented as a plain list (not a class) for speed —
+# `layer$W`, `layer$b`, plus caches for backprop. Functions below operate on/return
+# an updated copy of the layer, mirroring the Python `DenseLayer` object's fields.
+
+make_dense_layer <- function(n_in, n_out, activation = "relu") {
+  scale <- sqrt(2.0 / n_in)   # He initialization
+  list(
+    W = matrix(rnorm(n_out * n_in, 0, scale), nrow = n_out, ncol = n_in),
+    b = rep(0.0, n_out),
+    activation = activation,
+    z = NULL, a = NULL, a_prev = NULL
+  )
+}
+
+layer_activate <- function(layer, z) {
+  switch(layer$activation,
+    sigmoid = sigmoid(z),
+    relu = relu_act(z),
+    tanh = tanh_fn(z),
+    z   # linear
+  )
+}
+
+layer_activate_deriv <- function(layer, val, z) {
+  switch(layer$activation,
+    sigmoid = sigmoid_deriv(val),
+    relu = relu_deriv(z),
+    tanh = tanh_deriv(val),
+    rep(1.0, length(z))
+  )
+}
+
+layer_forward <- function(layer, a_prev) {
+  layer$a_prev <- a_prev
+  layer$z <- as.numeric(layer$W %*% a_prev) + layer$b
+  layer$a <- layer_activate(layer, layer$z)
+  layer
+}
+
+layer_backward <- function(layer, delta_next) {
+  # delta_next: gradient w.r.t. this layer's output (a)
+  delta <- delta_next * layer_activate_deriv(layer, layer$a, layer$z)   # gradient through activation
+  dW <- outer(delta, layer$a_prev)               # gradient for W
+  db <- delta                                     # gradient for b
+  delta_prev <- as.numeric(t(layer$W) %*% delta)  # gradient to pass back to previous layer
+  list(delta_prev = delta_prev, dW = dW, db = db)
+}
+
+# Multilayer Perceptron.
+# Supports arbitrary architectures, binary and multiclass classification.
+# Also can do regression if last activation is linear.
+# Pure base R — no ML libraries.
+
+MLP <- setRefClass(
+  "MLP",
+  fields = list(layers = "list", lr = "numeric", n_epochs = "numeric",
+                loss_history = "numeric", val_loss_history = "numeric", task = "character"),
+  methods = list(
+    initialize = function(layer_sizes, activations = NULL, lr = 0.01, n_epochs = 100,
+                          task = "classification", ...) {
+      # layer_sizes: e.g. c(2, 4, 4, 1) -> 2 inputs, two hidden layers, 1 output
+      # activations: vector of activations per layer (excluding input)
+      # task: 'classification' or 'regression'
+      n_layers <- length(layer_sizes) - 1
+      if (is.null(activations)) {
+        if (task == "classification") {
+          activations <- c(rep("relu", n_layers - 1), "sigmoid")
+        } else {
+          activations <- c(rep("relu", n_layers - 1), "linear")
+        }
+      }
+      layers <<- lapply(seq_len(n_layers), function(i) {
+        make_dense_layer(layer_sizes[i], layer_sizes[i + 1], activations[i])
+      })
+      lr <<- lr; n_epochs <<- n_epochs
+      loss_history <<- numeric(0); val_loss_history <<- numeric(0)
+      task <<- task
+      callSuper(...)
+    },
+
+    forward_one = function(x) {
+      a <- x
+      for (i in seq_along(layers)) {
+        layers[[i]] <<- layer_forward(layers[[i]], a)
+        a <- layers[[i]]$a
+      }
+      a
+    },
+
+    bce_loss = function(y_hat, y_true) {
+      # Binary cross-entropy loss.
+      yh <- pmin(pmax(y_hat, 1e-15), 1 - 1e-15)
+      mean(-(y_true * log(yh) + (1 - y_true) * log(1 - yh)))
+    },
+
+    mse_loss = function(y_hat, y_true) mean((y_hat - y_true)^2),
+
+    fit = function(X, y, X_val = NULL, y_val = NULL) {
+      n <- nrow(X)
+      for (epoch in seq_len(n_epochs)) {
+        indices <- sample(n)    # shuffle
+        total_loss <- 0.0
+
+        for (i in indices) {
+          xi <- X[i, ]; yi <- y[i]
+
+          # Forward pass
+          output <- forward_one(xi)
+          yh <- output[1]
+
+          if (task == "classification") {
+            yh_c <- min(max(yh, 1e-15), 1 - 1e-15)
+            total_loss <- total_loss - (yi * log(yh_c) + (1 - yi) * log(1 - yh_c))
+            # Output gradient: d(BCE)/d(yh) for sigmoid output = yh - yi
+            delta <- yh - yi
+          } else {   # regression (MSE loss)
+            total_loss <- total_loss + (yh - yi)^2
+            delta <- 2 * (yh - yi)     # d(MSE) / d(yh)
+          }
+
+          # Backward pass through layers (reversed)
+          grads <- vector("list", length(layers))
+          for (li in rev(seq_along(layers))) {
+            res <- layer_backward(layers[[li]], delta)
+            delta <- res$delta_prev
+            grads[[li]] <- list(dW = res$dW, db = res$db)
+          }
+
+          # Update weights
+          for (li in seq_along(layers)) {
+            layers[[li]]$W <<- layers[[li]]$W - lr * grads[[li]]$dW
+            layers[[li]]$b <<- layers[[li]]$b - lr * grads[[li]]$db
+          }
+        }
+
+        # Save training loss
+        train_loss <- total_loss / n
+        loss_history <<- c(loss_history, train_loss)
+
+        # Optionally, evaluate validation loss
+        if (!is.null(X_val) && !is.null(y_val)) {
+          val_loss <- evaluate(X_val, y_val)
+          val_loss_history <<- c(val_loss_history, val_loss)
+        }
+      }
+
+      invisible(.self)
+    },
+
+    predict_proba = function(X) {
+      # Only meaningful for classification
+      vapply(seq_len(nrow(X)), function(i) forward_one(X[i, ])[1], numeric(1))
+    },
+
+    predict = function(X, threshold = 0.5) {
+      if (task == "classification") {
+        as.integer(predict_proba(X) >= threshold)
+      } else {
+        vapply(seq_len(nrow(X)), function(i) forward_one(X[i, ])[1], numeric(1))
+      }
+    },
+
+    evaluate = function(X, y) {
+      # Compute loss on provided data
+      y_hat <- vapply(seq_len(nrow(X)), function(i) forward_one(X[i, ])[1], numeric(1))
+      if (task == "classification") bce_loss(y_hat, y) else mse_loss(y_hat, y)
+    },
+
+    accuracy = function(X, y) {
+      # Only for classification
+      preds <- predict(X)
+      mean(preds == y)
+    },
+
+    r2_score = function(X, y) {
+      # Only for regression
+      preds <- predict(X)
+      mean_y <- mean(y)
+      ss_tot <- sum((y - mean_y)^2)
+      ss_res <- sum((y - preds)^2)
+      if (ss_tot != 0) 1 - ss_res / ss_tot else 0.0
+    }
+  )
+)
+```
+
+```{r}
+# ── Demos: Classification and Regression on Splits ─────────────────────────────
+
+train_val_test_split <- function(X, y, train_frac = 0.6, val_frac = 0.2, seed = 42) {
+  set.seed(seed)
+  n <- nrow(X)
+  idx <- sample(n)
+  n_train <- floor(train_frac * n)
+  n_val <- floor(val_frac * n)
+  train_idx <- idx[1:n_train]
+  val_idx <- idx[(n_train + 1):(n_train + n_val)]
+  test_idx <- idx[(n_train + n_val + 1):n]
+  list(X_train = X[train_idx, , drop = FALSE], y_train = y[train_idx],
+       X_val   = X[val_idx, , drop = FALSE],   y_val   = y[val_idx],
+       X_test  = X[test_idx, , drop = FALSE],  y_test  = y[test_idx])
+}
+
+cat("==== Binary Classification: XOR Problem ====\n")
+# Demo data: XOR (repeat for more samples)
+X_cls <- matrix(rep(c(0, 0, 0, 1, 1, 0, 1, 1), 20), ncol = 2, byrow = TRUE)
+y_cls <- rep(c(0, 1, 1, 0), 20)
+
+split1 <- train_val_test_split(X_cls, y_cls, train_frac = 0.5, val_frac = 0.25, seed = 10)
+X_train <- split1$X_train; y_train <- split1$y_train
+X_val   <- split1$X_val;   y_val   <- split1$y_val
+X_test  <- split1$X_test;  y_test  <- split1$y_test
+
+mlp_cls <- MLP$new(layer_sizes = c(2, 4, 1), activations = c("relu", "sigmoid"),
+                    lr = 0.1, n_epochs = 300)
+mlp_cls$fit(X_train, y_train, X_val, y_val)
+
+cat(sprintf("Train Accuracy:     %.3f\n", mlp_cls$accuracy(X_train, y_train)))
+cat(sprintf("Validation Accuracy: %.3f\n", mlp_cls$accuracy(X_val, y_val)))
+cat(sprintf("Test Accuracy:      %.3f\n", mlp_cls$accuracy(X_test, y_test)))
+cat(sprintf("Final Train Loss: %.4f\n", tail(mlp_cls$loss_history, 1)))
+if (length(mlp_cls$val_loss_history) > 0) {
+  cat(sprintf("Final Val Loss:   %.4f\n", tail(mlp_cls$val_loss_history, 1)))
+}
+
+cat("\nPredictions on Test:\n")
+for (i in 1:min(8, nrow(X_test))) {
+  prob <- mlp_cls$predict_proba(matrix(X_test[i, ], nrow = 1))
+  pred <- ifelse(prob >= 0.5, 1, 0)
+  mark <- if (pred == y_test[i]) "OK" else "X"
+  cat(sprintf("  [%d %d] -> prob=%.3f  pred=%d  true=%d  %s\n",
+              X_test[i, 1], X_test[i, 2], prob, pred, y_test[i], mark))
+}
+
+cat("\n==== Regression: Noisy Sine Curve ====\n")
+# Demo data: simple regression problem (sine curve with noise)
+X_reg <- matrix((0:39) / 40.0, ncol = 1)
+set.seed(1)
+y_reg <- sin(2 * pi * X_reg[, 1]) + rnorm(40, 0, 0.1)
+
+split2 <- train_val_test_split(X_reg, y_reg, train_frac = 0.6, val_frac = 0.2, seed = 22)
+Xr_train <- split2$X_train; yr_train <- split2$y_train
+Xr_val   <- split2$X_val;   yr_val   <- split2$y_val
+Xr_test  <- split2$X_test;  yr_test  <- split2$y_test
+
+mlp_reg <- MLP$new(layer_sizes = c(1, 8, 1), activations = c("tanh", "linear"),
+                    lr = 0.05, n_epochs = 300, task = "regression")
+mlp_reg$fit(Xr_train, yr_train, Xr_val, yr_val)
+
+cat(sprintf("Train RMSE:     %.3f\n", sqrt(mlp_reg$evaluate(Xr_train, yr_train))))
+cat(sprintf("Val RMSE:       %.3f\n", sqrt(mlp_reg$evaluate(Xr_val, yr_val))))
+cat(sprintf("Test RMSE:      %.3f\n", sqrt(mlp_reg$evaluate(Xr_test, yr_test))))
+cat(sprintf("Train R2:       %.3f\n", mlp_reg$r2_score(Xr_train, yr_train)))
+cat(sprintf("Val R2:         %.3f\n", mlp_reg$r2_score(Xr_val, yr_val)))
+cat(sprintf("Test R2:        %.3f\n", mlp_reg$r2_score(Xr_test, yr_test)))
+
+cat("\nRegression test predictions:\n")
+for (i in 1:min(6, nrow(Xr_test))) {
+  pred <- mlp_reg$predict(matrix(Xr_test[i, ], nrow = 1))
+  cat(sprintf("  [%.3f] -> pred=%.3f  true=%.3f\n", Xr_test[i, 1], pred, yr_test[i]))
+}
+```
+
+```{r}
+# Visualize training and validation loss for classification
+plot(mlp_cls$loss_history, type = "l", col = "blue",
+     xlab = "Epoch", ylab = "Loss", main = "MLP Classification: Training and Validation Loss")
+if (length(mlp_cls$val_loss_history) > 0) lines(mlp_cls$val_loss_history, col = "orange")
+legend("topright", legend = c("Train Loss (classification)", "Val Loss (classification)"),
+       col = c("blue", "orange"), lwd = 1, bty = "n")
+grid()
+
+# Visualize training and validation loss for regression
+plot(mlp_reg$loss_history, type = "l", col = "forestgreen",
+     xlab = "Epoch", ylab = "Loss", main = "MLP Regression: Training and Validation Loss")
+if (length(mlp_reg$val_loss_history) > 0) lines(mlp_reg$val_loss_history, col = "red")
+legend("topright", legend = c("Train Loss (regression)", "Val Loss (regression)"),
+       col = c("forestgreen", "red"), lwd = 1, bty = "n")
+grid()
+```
+
+## 11.6 Apply on Real-World Data
+
+### 11.6.1 Classification
+
+```{r}
+# DUMMIES EXPLANATION VERSION:
+# Let's use a neural network (that we made ourselves!) to figure out, from medical data,
+# who probably has diabetes. We'll do everything by hand: pick the data, split it, scale it
+# (so numbers are all kind of the same), build the neural network, and see how good it is!
+
+# Let's write our own function to split the data into training, validation, and test sets,
+# just like how a chef tastes a bit of soup before serving the whole bowl!
+custom_train_test_split <- function(X, y, test_size = 0.25, random_state = NULL, stratify = NULL) {
+  # Splits our data into 'train' and 'test' chunks. If you want, you can keep the
+  # proportions of each class the same using 'stratify'.
+  n <- nrow(X)
+  if (!is.null(random_state)) set.seed(random_state)
+  if (!is.null(stratify)) {
+    # Stratified means: keep similar proportions of 'yes diabetes' and 'no diabetes' in each set.
+    labels <- sort(unique(stratify))
+    test_idxs <- integer(0)
+    for (lab in labels) {
+      indices <- which(stratify == lab)
+      n_test <- round(test_size * length(indices))
+      rand_indices <- sample(indices)
+      test_idxs <- c(test_idxs, rand_indices[seq_len(n_test)])
+    }
+    train_idxs <- setdiff(seq_len(n), test_idxs)
+  } else {
+    idxs <- sample(n)
+    n_test <- round(test_size * n)
+    test_idxs <- idxs[seq_len(n_test)]
+    train_idxs <- idxs[(n_test + 1):n]
+  }
+  list(X_train = X[train_idxs, , drop = FALSE], X_test = X[test_idxs, , drop = FALSE],
+       y_train = y[train_idxs], y_test = y[test_idxs])
+}
+
+# When numbers are wildly different sizes (like one goes from 0-800 and another from 0-2),
+# it confuses a neural net! So we 'standardize' everything: make the mean=0 and std=1.
+StandardScaler <- setRefClass(
+  "StandardScaler",
+  fields = list(mean_ = "numeric", scale_ = "numeric"),
+  methods = list(
+    fit = function(X) {
+      mean_ <<- colMeans(X)
+      var_ <- colMeans(sweep(X, 2, mean_, "-")^2)
+      scale_ <<- ifelse(var_ > 0, sqrt(var_), 1.0)   # avoid division by zero
+      invisible(.self)
+    },
+    transform = function(X) sweep(sweep(X, 2, mean_, "-"), 2, scale_, "/"),
+    fit_transform = function(X) { fit(X); transform(X) }
+  )
+)
+
+# Now get the actual data! We want the Pima Indians Diabetes dataset (fetched via URL,
+# same source the Python original uses through pandas).
+pima_data <- tryCatch({
+  url <- "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv"
+  df <- read.csv(url)
+  list(X = as.matrix(df[, setdiff(names(df), "Outcome")]), y = df$Outcome)
+}, error = function(e) {
+  cat("Failed to load Pima dataset, using local diabetes CSV as fallback\n")
+  df <- read.csv("../Data/diabetes_sklearn.csv")
+  list(X = as.matrix(df[, setdiff(names(df), "target")]),
+       y = as.integer(df$target > median(df$target)))
+})
+X <- pima_data$X; y <- pima_data$y
+
+# Let's split the data: 60% for training, 20% for validation, 20% for testing.
+split_temp <- custom_train_test_split(X, y, test_size = 0.2, random_state = 42, stratify = y)
+X_temp <- split_temp$X_train; y_temp <- split_temp$y_train
+X_test <- split_temp$X_test;  y_test <- split_temp$y_test
+
+split_tv <- custom_train_test_split(X_temp, y_temp, test_size = 0.25, random_state = 42, stratify = y_temp)
+X_train <- split_tv$X_train; y_train <- split_tv$y_train
+X_val   <- split_tv$X_test;  y_val   <- split_tv$y_test
+# After this: train=60%, val=20%, test=20%
+
+# Now scale (standardize) all features!
+scaler <- StandardScaler$new()
+X_train <- scaler$fit_transform(X_train)
+X_val   <- scaler$transform(X_val)
+X_test  <- scaler$transform(X_test)
+
+# Now all our data is ready! Let's build a neural network:
+# - Input: 8 values (1 from each feature, e.g., age, glucose, etc)
+# - First hidden layer: 16 "neurons"
+# - Second hidden layer: 8 neurons
+# - Output: 1 number (probability of diabetes!)
+set.seed(42)
+mlp_pima <- MLP$new(
+  layer_sizes = c(ncol(X_train), 16, 8, 1),
+  lr = 0.01, n_epochs = 100, task = "classification"
+)
+mlp_pima$fit(X_train, y_train, X_val, y_val)
+
+# We'll make a helper to compute F1 score, which balances "did we catch positives?"
+# vs "did we avoid false alarms?".
+f1_score <- function(y_true, y_pred) {
+  tp <- sum(y_true == 1 & y_pred == 1)
+  fp <- sum(y_true == 0 & y_pred == 1)
+  fn <- sum(y_true == 1 & y_pred == 0)
+  prec <- if (tp + fp > 0) tp / (tp + fp) else 0.0
+  rec  <- if (tp + fn > 0) tp / (tp + fn) else 0.0
+  if (prec + rec > 0) 2 * prec * rec / (prec + rec) else 0.0
+}
+
+y_test_pred <- mlp_pima$predict(X_test)
+
+cat("Pima Diabetes - From-Scratch MLP Classification Results:\n")
+cat(sprintf("Train acc: %.3f\n", mlp_pima$accuracy(X_train, y_train)))
+cat(sprintf("Val acc:   %.3f\n", mlp_pima$accuracy(X_val, y_val)))
+cat(sprintf("Test acc:  %.3f\n", mlp_pima$accuracy(X_test, y_test)))
+cat(sprintf("Test F1:   %.3f\n", f1_score(y_test, y_test_pred)))
+
+cat("\nSample predictions:\n")
+for (i in 1:min(6, nrow(X_test))) {
+  pred <- mlp_pima$predict(matrix(X_test[i, ], nrow = 1))
+  xi_rounded <- round(X_test[i, ], 2)
+  cat(sprintf("  [%s] -> pred=%d  true=%d\n", paste(xi_rounded, collapse = ", "), pred, y_test[i]))
+}
+
+# And let's plot how the loss went down (hopefully!) during training
+plot(mlp_pima$loss_history, type = "l", col = "steelblue",
+     xlab = "Epoch", ylab = "Binary cross-entropy", main = "Pima Diabetes — MLP training curves")
+lines(mlp_pima$val_loss_history, col = "tomato")
+legend("topright", legend = c("Train loss", "Validation loss"), col = c("steelblue", "tomato"),
+       lwd = 1, bty = "n")
+grid(col = adjustcolor("grey", alpha.f = 0.3))
+```
+
+### 11.6.2 Regression
+
+For regression we use the **California Housing** dataset (20,640 districts, 8 features, target = median house value in units of \$100,000).
+
+Two practical adjustments for our pure-R `MLP`:
+
+- **Subsample**: 20,640 rows × 100 epochs would be slow, so we train on a random subset of 1,500 districts — plenty to learn the pattern.
+- **Scale the target too**: the raw target ranges from 0.15 to 5. Standardizing it keeps the gradients well-behaved with the same learning rate we used for classification. We un-scale predictions for display (R² is unaffected by this linear scaling).
+
+We reuse `custom_train_test_split` and our `StandardScaler` from the classification demo above, and switch the network to `task='regression'` (linear output + MSE loss).
+
+```{r}
+# California Housing Regression with our from-scratch MLP — EXPLAINED FOR DUMMIES
+
+# 1. Load the California housing data (features in X_all, prices in y_all)
+housing_df <- read.csv("../Data/california_housing.csv")
+X_all <- as.matrix(housing_df[, setdiff(names(housing_df), "MedHouseVal")])
+y_all <- housing_df$MedHouseVal
+
+# 2. Pick 1,500 random districts from the 20k+ available
+set.seed(42)
+idx <- sample(nrow(X_all), 1500)
+X <- X_all[idx, ]
+y <- y_all[idx]
+
+# 3. Split into train/validation/test chunks (60% train, 20% validation, 20% test)
+split_temp <- custom_train_test_split(X, y, test_size = 0.2, random_state = 42)
+X_temp <- split_temp$X_train; y_temp <- split_temp$y_train
+X_test <- split_temp$X_test;  y_test <- split_temp$y_test
+
+split_tv <- custom_train_test_split(X_temp, y_temp, test_size = 0.25, random_state = 42)  # 0.25 x 0.8 = 0.2
+X_train <- split_tv$X_train; y_train <- split_tv$y_train
+X_val   <- split_tv$X_test;  y_val   <- split_tv$y_test
+
+# 4. Normalize ("standardize") the feature data: center to mean 0, scale to stdev 1.
+scaler <- StandardScaler$new()
+X_train <- scaler$fit_transform(X_train)
+X_val   <- scaler$transform(X_val)
+X_test  <- scaler$transform(X_test)
+
+# 5. Standardize the TARGET (house prices) too — makes the output more stable.
+y_mean <- mean(y_train)
+y_std <- sqrt(mean((y_train - y_mean)^2))
+y_train_s <- (y_train - y_mean) / y_std
+y_val_s   <- (y_val - y_mean) / y_std
+y_test_s  <- (y_test - y_mean) / y_std
+
+# 6. Create our MLP: 8 features in, two hidden layers (16 and 8), one output node.
+#    Loss is MSE because it's regression!
+set.seed(42)
+mlp_house <- MLP$new(
+  layer_sizes = c(ncol(X_train), 16, 8, 1),
+  lr = 0.005, n_epochs = 100, task = "regression"
+)
+mlp_house$fit(X_train, y_train_s, X_val, y_val_s)
+
+# 7. Print R^2 scores — shows how well our net predicts. Closer to 1 is better.
+cat("California Housing - From-Scratch MLP Regression Results:\n")
+cat(sprintf("Train R2: %.3f\n", mlp_house$r2_score(X_train, y_train_s)))
+cat(sprintf("Val R2:   %.3f\n", mlp_house$r2_score(X_val, y_val_s)))
+cat(sprintf("Test R2:  %.3f\n", mlp_house$r2_score(X_test, y_test_s)))
+
+# 8. Show a few prediction examples (convert them back to dollars!)
+cat("\nSample predictions (median house value, $100k):\n")
+for (i in 1:min(6, nrow(X_test))) {
+  pred_s <- mlp_house$predict(matrix(X_test[i, ], nrow = 1))   # standardized units
+  pred <- pred_s * y_std + y_mean                              # back to original $100k units
+  cat(sprintf("  pred=%5.2f  true=%5.2f\n", pred, y_test[i]))
+}
+
+# 9. Plot how the loss went down, for both train and validation data. Lower is better.
+plot(mlp_house$loss_history, type = "l", col = "steelblue",
+     xlab = "Epoch", ylab = "MSE (standardized target)", main = "California Housing — MLP training curves")
+lines(mlp_house$val_loss_history, col = "tomato")
+legend("topright", legend = c("Train loss", "Validation loss"), col = c("steelblue", "tomato"),
+       lwd = 1, bty = "n")
+grid(col = adjustcolor("grey", alpha.f = 0.3))
+```
+
+## 11.7 Hyperparameter Tuning
+
+"Hyperparameter tuning" means picking the best settings for how you train your neural network. Think of it like adjusting the dials on a washing machine, you choose things like water temperature, wash cycle, and spin speed to get clean clothes. In machine learning, these "dials" (hyperparameters) include things like how fast the network learns (learning rate), how many layers or neurons to use, or how many times to go through your data (epochs).
+
+The goal is to try different combinations of these settings to find out which ones make your model work best. Just like using the wrong washing settings can ruin your clothes, using the wrong hyperparameters can make your model perform poorly!
+
+### 11.7.1 Hyperparameters of DNN models
+
+Hyperparameters are the "settings" or "dials" you choose before you start training your neural network. They can make a huge difference—like setting the oven temperature for baking a cake. Here are the main ones:
+
+- **Learning Rate:** How big each learning step is. Too high and you skip over the answer, too low and learning is super slow.
+- **Number of Layers:** How many layers of neurons your network has (the "deep" in deep learning). More layers can learn fancier things, but can also be harder to train.
+- **Number of Neurons per Layer:** How many "cells" are in each layer. More neurons usually means more brainpower, but takes longer to train.
+- **Batch Size:** How many examples the network looks at before updating itself. Like reading 1 page of a book at a time versus a whole chapter.
+- **Number of Epochs:** How many times the network will look at ALL the training data. More epochs = more training.
+- **Activation Function:** The "trick" each neuron uses to squish numbers (like ReLU, sigmoid, etc.).
+- **Optimizer:** The method used to update the weights (like Adam, SGD). Different optimizers change how quickly and smoothly the network learns.
+- **Weight Initialization:** How the starting weights are chosen. Good choices help the network learn faster.
+- **Regularization:** Settings to prevent overfitting (when the model is too good on training but bad on new data), like "dropout" or "weight decay".
+
+These are the most common hyperparameters. You choose them before training, and finding the best combo is called "hyperparameter tuning".
+
+### 11.7.2 Hyperparameter Tuning: Steps and Search Algorithms
+
+Hyperparameter tuning for Deep Neural Network (DNN) models means searching for the best settings (hyperparameters) to maximize your model's performance. Here are the main steps involved, along with the most common search algorithms:
+
+**General Steps for Hyperparameter Tuning:**
+1. **Choose the hyperparameters to tune:** Decide whether to adjust learning rate, number of layers, number of neurons, batch size, activation function, optimizer, etc.
+2. **Define the search space:** Specify a range or set of values for each hyperparameter. For example, learning rate ∈ [0.0001, 0.1], neurons ∈ [64, 128, 256].
+3. **Select a search algorithm:** Choose your strategy for exploring combinations (see below).
+4. **Run training for each candidate:** Train the model using each hyperparameter combination, evaluating performance (often on validation data).
+5. **Pick the best hyperparameters:** Select the set that gives the top validation performance.
+6. **Retrain (optional):** Optionally, retrain your model from scratch with the best hyperparameters.
+
+**Common Hyperparameter Search Algorithms:**
+- **Grid Search:** Try every possible combination in your search space (brute force, but can be slow with many hyperparameters).
+- **Random Search:** Test a fixed number of random combinations. Often more efficient than grid search when some hyperparameters matter much more than others.
+- **Bayesian Optimization:** Uses past evaluation results to choose the next promising hyperparameter set, balancing exploration and exploitation.
+- **Manual Search:** Try combinations using human intuition or experience.
+- **Evolutionary/Genetic Algorithms:** Use concepts from biology (mutation, crossover) to "evolve" promising hyperparameters.
+
+**Summary Table:**
+
+| Search Algorithm       | How it works                                | Pros                            | Cons                        |
+|-----------------------|-----------------------------------------------|---------------------------------|-----------------------------|
+| Grid Search           | Tests all value combinations                | Simple, systematic              | Slow, not scalable          |
+| Random Search         | Randomly samples combinations               | Efficient, easy                 | May miss best region        |
+| Bayesian Optimization | Learns from past runs, predicts next best   | Smart, fewer trials needed      | Complex, slower per trial   |
+| Evolutionary/Genetic  | Population-based, evolves parameters        | Good for large/search spaces    | Computationally expensive   |
+| Manual                | Human picks                                 | Can leverage intuition          | Not systematic, can miss out|
+
+In practice, **random search** and **Bayesian optimization** are popular for DNNs, because they are more efficient for high-dimensional spaces.
+
+### 11.7.2 Hyperparameter Tuning for DNNs
+
+Imagine you're baking a cake (deep neural network) and have to figure out the best settings: oven temperature, baking time, amount of sugar, etc. Hyperparameter tuning is just the fancy word for finding those "recipes" that work best!
+
+### The Steps:
+
+1. **Pick which dials to turn:** Which settings (hyperparameters) matter? For DNNs, these are things like learning rate, how many layers, how many neurons per layer, batch size, and what optimizer or activation function to use.
+
+2. **Decide what's possible for each dial:** Should the learning rate be 0.01 or 0.001? Should you try 2, 3, or 5 layers? This makes your "search space".
+
+3. **Choose a way to explore combinations (search algorithm):**
+   - **Grid Search:** Try every single combination like a robot. Works, but takes forever if you have many dials.
+   - **Random Search:** Just spin the dials randomly a bunch of times and see what happens—surprisingly good!
+   - **Bayesian Optimization:** Each time you try a "recipe," you learn something about what works, so you get smarter about which to try next.
+   - **Manual search:** Just guess using your gut or by copying what's worked for others.
+   - **Evolutionary algorithms:** Pretend your recipes are creatures that can mutate and the best ones survive, evolving over time.
+
+4. **Train and test each hyperparameter combo:** For each set of dials/settings, see how well your DNN works (usually by checking accuracy on validation data).
+
+5. **Pick the best settings:** Choose the combination that gave the highest score.
+
+6. **Retrain one last time (optional):** If you want, rebuild your network from scratch with your best-found recipe for the final model.
+
+**In short:** Hyperparameter tuning is like finding the best recipe for your model. You pick some dials, decide what values to try, choose a way to explore them, and see what bakes the best cake!
+
+### 11.7.3 Hyperparameter Tuning from Scratch
+
+```{r}
+# Our MLP uses different constructor arguments than sklearn's MLPClassifier.
+# This helper translates sklearn-style hyperparameter names into a properly
+# configured MLP, so the grid can be written in familiar sklearn vocabulary:
+#
+#   sklearn name          our MLP equivalent
+#   ------------------    -------------------------------------------
+#   hidden_layer_sizes -> layer_sizes = c(n_features, hidden..., 1)
+#   activation         -> activations = c(act, ..., output act)
+#   learning_rate_init -> lr
+#   max_iter           -> n_epochs
+
+build_mlp <- function(params, n_features, task) {
+  # A factory that "builds" a neural network (MLP) with the exact settings we want.
+  hidden <- params$hidden_layer_sizes                              # hidden layer sizes
+  act <- if (!is.null(params$activation)) params$activation else "relu"
+  out_act <- if (task == "classification") "sigmoid" else "linear"
+  MLP$new(
+    layer_sizes = c(n_features, hidden, 1),
+    activations = c(rep(act, length(hidden)), out_act),
+    lr = if (!is.null(params$learning_rate_init)) params$learning_rate_init else 0.01,
+    n_epochs = if (!is.null(params$max_iter)) params$max_iter else 100,
+    task = task
+  )
+}
+
+grid_search_classification <- function(param_grid, X_train, y_train, X_val, y_val) {
+  # Tries every combination in param_grid, trains a network for each, tests validation accuracy.
+  # Returns: list(best_params, best_score, all_results)
+  keys <- names(param_grid)
+  combos <- expand.grid(param_grid, KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
+
+  best_score <- -1.0; best_params <- NULL
+  all_results <- list()
+
+  for (i in seq_len(nrow(combos))) {
+    params <- as.list(combos[i, ])
+    set.seed(42)   # always start from scratch for fairness
+    model <- build_mlp(params, ncol(X_train), task = "classification")
+    model$fit(X_train, y_train)
+    score <- model$accuracy(X_val, y_val)
+    all_results[[i]] <- list(params = params, score = score)
+    if (score > best_score) { best_score <- score; best_params <- params }
+  }
+
+  list(best_params = best_params, best_score = best_score, all_results = all_results)
+}
+
+grid_search_regression <- function(param_grid, X_train, y_train, X_val, y_val) {
+  # Same as above, but scores by MSE (lower is better).
+  keys <- names(param_grid)
+  combos <- expand.grid(param_grid, KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
+
+  best_score <- Inf; best_params <- NULL
+  all_results <- list()
+
+  for (i in seq_len(nrow(combos))) {
+    params <- as.list(combos[i, ])
+    set.seed(42)
+    model <- build_mlp(params, ncol(X_train), task = "regression")
+    model$fit(X_train, y_train)
+    preds <- model$predict(X_val)
+    mse_val <- mean((preds - y_val)^2)
+    all_results[[i]] <- list(params = params, score = mse_val)
+    if (mse_val < best_score) { best_score <- mse_val; best_params <- params }
+  }
+
+  list(best_params = best_params, best_score = best_score, all_results = all_results)
+}
+```
+
+### Classification Problem
+
+```{r}
+#| cache: false
+# Demo: Hyperparameter Tuning on Pima Diabetes (Classification)
+# Reuses custom_train_test_split and our StandardScaler from Section 11.6.1.
+
+pima_data2 <- tryCatch({
+  url <- "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv"
+  df <- read.csv(url)
+  list(X = as.matrix(df[, setdiff(names(df), "Outcome")]), y = df$Outcome)
+}, error = function(e) {
+  cat("Failed to load Pima dataset, using local diabetes CSV as fallback\n")
+  df <- read.csv("../Data/diabetes_sklearn.csv")
+  list(X = as.matrix(df[, setdiff(names(df), "target")]),
+       y = as.integer(df$target > median(df$target)))
+})
+X <- pima_data2$X; y <- pima_data2$y
+
+# Split FIRST, then scale (fit the scaler on training data only)
+split_hp <- custom_train_test_split(X, y, test_size = 0.2, random_state = 42, stratify = y)
+X_train <- split_hp$X_train; y_train <- split_hp$y_train
+X_val   <- split_hp$X_test;  y_val   <- split_hp$y_test
+
+scaler <- StandardScaler$new()
+X_train <- scaler$fit_transform(X_train)
+X_val   <- scaler$transform(X_val)
+
+# Define a small hyperparameter grid for demonstration (2x2x2 = 8 combos).
+param_grid <- list(
+  hidden_layer_sizes = list(c(16), c(32)),
+  activation = c("relu", "tanh"),
+  learning_rate_init = c(0.01, 0.05),
+  max_iter = c(200)
+)
+# expand.grid doesn't handle list-valued columns (hidden_layer_sizes) directly,
+# so we build the combinations manually here.
+combos <- expand.grid(
+  activation = param_grid$activation,
+  learning_rate_init = param_grid$learning_rate_init,
+  max_iter = param_grid$max_iter,
+  hidden_idx = seq_along(param_grid$hidden_layer_sizes),
+  stringsAsFactors = FALSE
+)
+
+best_score <- -1.0; best_params <- NULL; results <- list()
+for (i in seq_len(nrow(combos))) {
+  params <- list(
+    hidden_layer_sizes = param_grid$hidden_layer_sizes[[combos$hidden_idx[i]]],
+    activation = combos$activation[i],
+    learning_rate_init = combos$learning_rate_init[i],
+    max_iter = combos$max_iter[i]
+  )
+  set.seed(42)
+  model <- build_mlp(params, ncol(X_train), task = "classification")
+  model$fit(X_train, y_train)
+  score <- model$accuracy(X_val, y_val)
+  results[[i]] <- list(params = params, score = score)
+  if (score > best_score) { best_score <- score; best_params <- params }
+}
+
+cat("All grid search results (sorted by validation accuracy):\n")
+ord <- order(sapply(results, function(r) -r$score))
+for (i in ord) {
+  r <- results[[i]]
+  cat(sprintf("  val acc=%.4f  hidden=%s activation=%s lr=%.2f max_iter=%d\n",
+              r$score, paste(r$params$hidden_layer_sizes, collapse = ","),
+              r$params$activation, r$params$learning_rate_init, r$params$max_iter))
+}
+
+cat("\nBest hyperparameters:\n")
+cat(sprintf("  hidden=%s activation=%s lr=%.2f max_iter=%d\n",
+            paste(best_params$hidden_layer_sizes, collapse = ","),
+            best_params$activation, best_params$learning_rate_init, best_params$max_iter))
+cat(sprintf("Best validation accuracy: %.4f\n", best_score))
+```
+
+### Regression Problems
+
+```{r}
+# California Housing Regression Demo
+# Predict median house value with our from-scratch MLP
+
+housing_df2 <- read.csv("../Data/california_housing.csv")
+X_all <- as.matrix(housing_df2[, setdiff(names(housing_df2), "MedHouseVal")])
+y_all <- housing_df2$MedHouseVal
+
+# Load data (subsample 1,500 rows — pure-R MLP is slow on 20k+ districts)
+set.seed(42)
+idx <- sample(nrow(X_all), 1500)
+X <- X_all[idx, ]
+y <- y_all[idx]
+
+# Split FIRST, then scale (fit on train only)
+split_reg_hp <- custom_train_test_split(X, y, test_size = 0.2, random_state = 42)
+X_train <- split_reg_hp$X_train; y_train <- split_reg_hp$y_train
+X_val   <- split_reg_hp$X_test;  y_val   <- split_reg_hp$y_test
+
+scaler <- StandardScaler$new()
+X_train <- scaler$fit_transform(X_train)
+X_val   <- scaler$transform(X_val)
+
+# Use a param list for easy experiment tracking, mirroring a sklearn-like interface.
+set.seed(1)
+mlp_reg2 <- MLP$new(
+  layer_sizes = c(ncol(X_train), 32, 16, 1),
+  activations = c("relu", "relu", "linear"),
+  lr = 0.01, n_epochs = 250, task = "regression"
+)
+mlp_reg2$fit(X_train, y_train)
+
+# Predict on validation set
+y_pred <- mlp_reg2$predict(X_val)
+
+# Compute MSE and R^2
+mse_val <- mean((y_pred - y_val)^2)
+mean_y <- mean(y_val)
+ss_tot <- sum((y_val - mean_y)^2)
+ss_res <- sum((y_val - y_pred)^2)
+r2_val <- if (ss_tot > 0) 1 - ss_res / ss_tot else 0.0
+cat(sprintf("California Housing Regression (MLP) - Validation MSE: %.3f, R2: %.3f\n", mse_val, r2_val))
+
+# Plot predictions vs actual values
+plot(y_val, y_pred, col = adjustcolor("steelblue", alpha.f = 0.3), pch = 16,
+     xlab = "True Median House Value", ylab = "Predicted Value",
+     main = "California Housing: MLP Regression\nValidation Set")
+lo <- min(y_val); hi <- max(y_val)
+lines(c(lo, hi), c(lo, hi), col = "red", lty = 2)
+```
+
+---
+
+## 11.8 Key Concepts Summary
+
+| Concept                 | Description                                                                          |
+|-------------------------|--------------------------------------------------------------------------------------|
+| Forward pass            | Propagates input data through the layers to produce an output.                       |
+| Loss function           | Quantifies the difference between predictions and true values.                       |
+| Backpropagation         | Algorithm applying the chain rule to compute weight gradients layer by layer.        |
+| Weight update           | $\mathbf{W} \gets \mathbf{W} - \text{lr}\ \frac{\partial L}{\partial \mathbf{W}}$   |
+| Vanishing/exploding gradient | Early layers' gradients become too small/large, can stall or destabilize training; ReLU helps. |
+| He initialization       | Initializes weights as $\mathcal{N}(0, \sqrt{2/n_{\text{in}}})$ for ReLU networks.  |
+| Regularization          | Techniques like L2 or dropout to prevent overfitting.                                |
+| Mini-batch gradient descent | Updates weights using batches of samples, balancing speed and stability.          |
+| Momentum                | Accelerates learning by combining gradients with running averages.                   |
+| Softmax output          | Used for multi-class classification, outputs probabilities for each class.           |
+
+---
+
+## 📝 Exercises
+
+1. Add **L2 regularization** (weight decay) to the weight update.
+2. Implement **mini-batch gradient descent** (update after B samples, not 1).
+3. Add **momentum** to the optimizer: $\mathbf{v} \leftarrow \beta \mathbf{v} + (1-\beta)\frac{\partial L}{\partial \mathbf{W}}$; $\mathbf{W} \leftarrow \mathbf{W} - \text{lr} \cdot \mathbf{v}$
+4. Implement a **softmax output layer** for multiclass classification.
+
+---
+
+**← Previous:** [Chapter 10: PCA](chapter-10-pca.qmd)
+**→ Next:** [Chapter 12: Convolutional Neural Networks](chapter-12-cnn.qmd)
